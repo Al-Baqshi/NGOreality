@@ -6,6 +6,7 @@ import {
   Users,
   Globe,
   Mail,
+  FileText,
   ChevronLeft,
   Menu,
 } from 'lucide-react';
@@ -17,6 +18,7 @@ const navItems = [
   { to: '/verification', icon: Shield, label: 'Verification' },
   { to: '/contacts', icon: Users, label: 'Contacts' },
   { to: '/inquiries', icon: Mail, label: 'Inquiries' },
+  { to: '/blog-manager', icon: FileText, label: 'Blog' },
   { to: '/public', icon: Globe, label: 'Public Site' },
 ];
 

@@ -8,6 +8,7 @@ import OrganizationNew from './pages/crm/OrganizationNew';
 import Verification from './pages/crm/Verification';
 import Contacts from './pages/crm/Contacts';
 import Inquiries from './pages/crm/Inquiries';
+import BlogManager from './pages/crm/BlogManager';
 import Homepage from './pages/public/Homepage';
 import HowItWorks from './pages/public/HowItWorks';
 import Directory from './pages/public/Directory';
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/verification" element={<Verification />} />
           <Route path="/contacts" element={<Contacts />} />
           <Route path="/inquiries" element={<Inquiries />} />
+          <Route path="/blog-manager" element={<BlogManager />} />
         </Route>
 
         {/* Public Routes */}

@@ -7,7 +7,8 @@ const navItems = [
   { to: '/public/how-it-works', label: 'How It Works' },
   { to: '/public/verified', label: 'Verified' },
   { to: '/public/directory', label: 'Directory' },
-  { to: '/public/verification', label: 'Verification' },
+  { to: '/public/reality-badge', label: 'Reality Badge' },
+  { to: '/public/blog', label: 'Blog' },
   { to: '/public/about', label: 'About' },
   { to: '/public/contact', label: 'Contact' },
 ];
@@ -103,6 +104,7 @@ export default function PublicLayout() {
                 <NavLink to="/public/how-it-works" className="block text-xs text-ink-400 hover:text-white transition-colors">How It Works</NavLink>
                 <NavLink to="/public/directory" className="block text-xs text-ink-400 hover:text-white transition-colors">Verified Directory</NavLink>
                 <NavLink to="/public/verification" className="block text-xs text-ink-400 hover:text-white transition-colors">Verification</NavLink>
+                <NavLink to="/public/blog" className="block text-xs text-ink-400 hover:text-white transition-colors">Blog</NavLink>
               </div>
             </div>
             <div>
