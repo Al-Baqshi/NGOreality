@@ -1,0 +1,101 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: #0a0a0a;
+    background-color: #fafafa;
+  }
+
+  body {
+    @apply text-ink-950;
+  }
+
+  ::selection {
+    background-color: #c23c2a;
+    color: white;
+  }
+}
+
+@layer components {
+  .btn-brutal {
+    @apply border-3 border-ink-950 bg-ink-950 text-white font-semibold px-6 py-3 shadow-brutal
+           transition-all duration-150
+           hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm
+           active:translate-x-[4px] active:translate-y-[4px] active:shadow-none;
+  }
+
+  .btn-brutal-outline {
+    @apply border-3 border-ink-950 bg-white text-ink-950 font-semibold px-6 py-3 shadow-brutal-sm
+           transition-all duration-150
+           hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none
+           active:bg-ink-950 active:text-white;
+  }
+
+  .btn-brutal-accent {
+    @apply border-3 border-ink-950 bg-accent text-white font-semibold px-6 py-3 shadow-brutal
+           transition-all duration-150
+           hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm
+           active:translate-x-[4px] active:translate-y-[4px] active:shadow-none;
+  }
+
+  .btn-brutal-teal {
+    @apply border-3 border-ink-950 bg-teal text-white font-semibold px-6 py-3 shadow-brutal
+           transition-all duration-150
+           hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm
+           active:translate-x-[4px] active:translate-y-[4px] active:shadow-none;
+  }
+
+  .card-brutal {
+    @apply border-3 border-ink-950 bg-white shadow-brutal;
+  }
+
+  .card-brutal-hover {
+    @apply border-3 border-ink-950 bg-white shadow-brutal
+           transition-all duration-150
+           hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm;
+  }
+
+  .input-brutal {
+    @apply border-3 border-ink-950 bg-white px-4 py-3 font-mono text-sm
+           focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2;
+  }
+
+  .label-brutal {
+    @apply text-2xs font-mono font-semibold uppercase tracking-widest text-ink-500 mb-2 block;
+  }
+
+  .section-brutal {
+    @apply border-t-3 border-ink-950 pt-8;
+  }
+
+  .badge-verified {
+    @apply inline-flex items-center gap-1.5 border-2 border-teal bg-teal-light text-teal
+           font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1;
+  }
+
+  .badge-pending {
+    @apply inline-flex items-center gap-1.5 border-2 border-ink-300 bg-ink-50 text-ink-500
+           font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1;
+  }
+
+  .badge-failed {
+    @apply inline-flex items-center gap-1.5 border-2 border-accent bg-accent-light text-accent
+           font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
