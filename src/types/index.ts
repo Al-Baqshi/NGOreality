@@ -6,6 +6,7 @@ export interface Organization {
   mission_statement: string;
   category: string;
   location: string;
+  country: string;
   website_url: string;
   email: string;
   phone: string;

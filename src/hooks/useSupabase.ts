@@ -189,3 +189,27 @@ export function useAllBlogPosts() {
   useEffect(() => { fetchAll(); }, []);
   return { posts, loading, refetch: fetchAll };
 }
+
+export function useCountryCounts() {
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    supabase.from('organizations').select('country').in('status', ['verified', 'active'])
+      .then(({ data, error }) => {
+        if (!error && data) {
+          const aggregated: Record<string, number> = {};
+          for (const row of data) {
+            if (row.country) {
+              aggregated[row.country] = (aggregated[row.country] || 0) + 1;
+            }
+          }
+          setCounts(aggregated);
+        }
+        setLoading(false);
+      });
+  }, []);
+
+  return { counts, loading };
+}
