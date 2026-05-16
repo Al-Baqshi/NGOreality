@@ -14,6 +14,7 @@ export interface Organization {
   verification_level: VerificationLevel;
   onboarding_stage: string;
   logo_url: string;
+  tags: string[];
   created_at: string;
   updated_at: string;
 }
