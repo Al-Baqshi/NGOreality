@@ -1,5 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Link, NavLink, Outlet } from 'react-router-dom';
+import { LogIn, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
 const navItems = [
@@ -11,6 +11,7 @@ const navItems = [
   { to: '/public/blog', label: 'Blog' },
   { to: '/public/about', label: 'About' },
   { to: '/public/contact', label: 'Contact' },
+  { to: '/ngo/login', label: 'NGO Portal' },
 ];
 
 export default function PublicLayout() {
@@ -105,6 +106,19 @@ export default function PublicLayout() {
                 <NavLink to="/public/directory" className="block text-xs text-ink-400 hover:text-white transition-colors">Verified Directory</NavLink>
                 <NavLink to="/public/verification" className="block text-xs text-ink-400 hover:text-white transition-colors">Verification</NavLink>
                 <NavLink to="/public/blog" className="block text-xs text-ink-400 hover:text-white transition-colors">Blog</NavLink>
+                <Link
+                  to="/ngo/login"
+                  className="inline-flex items-center gap-1.5 text-xs text-ink-400 hover:text-white transition-colors"
+                >
+                  <LogIn size={12} aria-hidden />
+                  NGO sign in
+                </Link>
+                <Link
+                  to="/dashboard"
+                  className="block text-xs text-ink-400 hover:text-white transition-colors"
+                >
+                  Staff CRM
+                </Link>
               </div>
             </div>
             <div>

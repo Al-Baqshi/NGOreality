@@ -127,6 +127,52 @@ export const FINANCIAL_CRITERIA: Omit<VerificationCriterion, 'id' | 'organizatio
   { criterion_key: 'donor_traceability', criterion_label: 'Donor acknowledgment and traceability', status: 'pending', notes: '', evaluated_at: null },
 ];
 
+export type MembershipStatus = 'active' | 'expired' | 'pending_renewal';
+
+export interface OrganizationMember {
+  id: string;
+  user_id: string;
+  organization_id: string;
+  role: 'owner' | 'admin';
+  created_at: string;
+}
+
+export interface OrganizationMembership {
+  id: string;
+  organization_id: string;
+  started_at: string;
+  expires_at: string;
+  status: MembershipStatus;
+  created_at: string;
+}
+
+export type BadgeRequestType = 'new_badge' | 'renewal' | 'reissue';
+export type BadgeRequestStatus = 'pending' | 'in_review' | 'approved' | 'rejected';
+
+export interface BadgeRequest {
+  id: string;
+  organization_id: string;
+  requested_by: string;
+  request_type: BadgeRequestType;
+  status: BadgeRequestStatus;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const BADGE_REQUEST_TYPE_LABELS: Record<BadgeRequestType, string> = {
+  new_badge: 'New Reality Badge',
+  renewal: 'Annual membership renewal',
+  reissue: 'Badge reissue',
+};
+
+export const BADGE_REQUEST_STATUS_LABELS: Record<BadgeRequestStatus, string> = {
+  pending: 'Pending',
+  in_review: 'In review',
+  approved: 'Approved',
+  rejected: 'Rejected',
+};
+
 export interface BlogPost {
   id: string;
   title: string;

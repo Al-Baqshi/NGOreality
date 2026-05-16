@@ -20,10 +20,25 @@ import BlogDetail from './pages/public/BlogDetail';
 import About from './pages/public/About';
 import Contact from './pages/public/Contact';
 import NotFound from './pages/public/NotFound';
+import NgoLogin from './pages/ngo/NgoLogin';
+import NgoSignup from './pages/ngo/NgoSignup';
+import NgoDashboard from './pages/ngo/NgoDashboard';
+import NgoLayout from './components/NgoLayout';
+import NgoProtectedRoute from './components/NgoProtectedRoute';
+import { isSupabaseConfigured } from './lib/supabase';
 
 export default function App() {
   return (
     <BrowserRouter>
+      {import.meta.env.DEV && !isSupabaseConfigured && (
+        <div
+          role="status"
+          className="border-b-3 border-ink-950 bg-amber-100 px-4 py-2 text-center font-mono text-2xs uppercase tracking-wider text-ink-950"
+        >
+          Supabase not configured — copy <code className="normal-case">.env.example</code> to{' '}
+          <code className="normal-case">.env.local</code> and add your project URL and anon key.
+        </div>
+      )}
       <Routes>
         {/* CRM Routes */}
         <Route element={<CRMLayout />}>
@@ -35,6 +50,15 @@ export default function App() {
           <Route path="/contacts" element={<Contacts />} />
           <Route path="/inquiries" element={<Inquiries />} />
           <Route path="/blog-manager" element={<BlogManager />} />
+        </Route>
+
+        {/* NGO Portal */}
+        <Route path="/ngo/login" element={<NgoLogin />} />
+        <Route path="/ngo/signup" element={<NgoSignup />} />
+        <Route element={<NgoProtectedRoute />}>
+          <Route element={<NgoLayout />}>
+            <Route path="/ngo" element={<NgoDashboard />} />
+          </Route>
         </Route>
 
         {/* Public Routes */}
