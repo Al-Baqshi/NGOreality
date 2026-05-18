@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import SEO from '../../components/SEO';
+import BrandLogo from '../../components/BrandLogo';
 
 type StaffLoginLocationState = {
   from?: string;
@@ -54,11 +55,8 @@ export default function StaffLogin() {
       />
       <div className="min-h-screen bg-surface flex flex-col">
         <header className="border-b-3 border-ink-950 px-4 sm:px-6 py-4">
-          <Link to="/public" className="inline-flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center border-3 border-ink-950 bg-accent font-mono text-xs font-black text-white">
-              N
-            </div>
-            <span className="text-sm font-black uppercase tracking-[0.15em]">NGOreality</span>
+          <Link to="/public" className="inline-flex items-center min-w-0">
+            <BrandLogo iconClassName="h-8 w-8" wordmarkClassName="h-7 w-auto max-w-[160px]" />
           </Link>
         </header>
 

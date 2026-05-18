@@ -98,23 +98,34 @@ export async function provisionNgoOrganization(input: {
 
 export async function linkExistingOrganization(input: {
   userId: string;
-  organizationSlug: string;
   email: string;
+  organizationId?: string;
+  organizationSlug?: string;
 }): Promise<{ organizationId: string | null; error: string | null }> {
-  const { data: org, error: orgError } = await supabase
-    .from('organizations')
-    .select('id, email')
-    .eq('slug', input.organizationSlug.trim().toLowerCase())
-    .maybeSingle();
-
-  if (orgError || !org) {
-    return { organizationId: null, error: 'Organization not found. Check the slug from your invite email.' };
+  if (!input.organizationId && !input.organizationSlug?.trim()) {
+    return { organizationId: null, error: 'Select your organization from the directory search.' };
   }
 
-  if (org.email && org.email.toLowerCase() !== input.email.toLowerCase()) {
+  let query = supabase.from('organizations').select('id, email, status');
+
+  if (input.organizationId) {
+    query = query.eq('id', input.organizationId);
+  } else {
+    query = query.eq('slug', input.organizationSlug!.trim().toLowerCase());
+  }
+
+  const { data: org, error: orgError } = await query.maybeSingle();
+
+  if (orgError || !org) {
+    return { organizationId: null, error: 'Organization not found. Search again or register as a new organization.' };
+  }
+
+  const orgEmail = org.email?.trim();
+  if (orgEmail && orgEmail.toLowerCase() !== input.email.toLowerCase()) {
     return {
       organizationId: null,
-      error: 'This account email must match the organization email on file.',
+      error:
+        'This signup email must match the email on file for that organization. Use the same email or contact NGOreality staff.',
     };
   }
 
@@ -137,6 +148,24 @@ export async function linkExistingOrganization(input: {
   if (memberError) {
     return { organizationId: null, error: memberError.message };
   }
+
+  if (!orgEmail) {
+    await supabase.from('organizations').update({ email: input.email }).eq('id', org.id);
+  }
+
+  if (org.status === 'listed') {
+    await supabase
+      .from('organizations')
+      .update({ status: 'onboarding', onboarding_stage: 'intake' })
+      .eq('id', org.id);
+  }
+
+  await supabase.from('activity_log').insert({
+    organization_id: org.id,
+    action: 'ngo_claim',
+    description: 'Organization claimed via NGO portal signup',
+    performed_by: input.email,
+  });
 
   const { data: existingMembership } = await supabase
     .from('organization_memberships')

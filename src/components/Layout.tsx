@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import BrandLogo from './BrandLogo';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -50,12 +51,11 @@ export default function CRMLayout() {
       >
         {/* Logo */}
         <div className={`flex items-center border-b border-ink-700 px-4 py-5 ${collapsed ? 'justify-center' : ''}`}>
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center border-2 border-accent bg-accent font-mono text-xs font-black">
-              N
-            </div>
-            {!collapsed && (
-              <span className="text-sm font-black uppercase tracking-[0.2em]">NGOreality</span>
+          <div className={collapsed ? '' : 'flex items-center gap-3'}>
+            {collapsed ? (
+              <BrandLogo variant="icon" onDark iconClassName="h-8 w-8" />
+            ) : (
+              <BrandLogo onDark iconClassName="h-8 w-8" wordmarkClassName="h-7 w-auto max-w-[140px]" />
             )}
           </div>
         </div>

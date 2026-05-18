@@ -6,13 +6,17 @@ import { supabase } from '../../lib/supabase';
 import { provisionNgoOrganization, linkExistingOrganization } from '../../lib/ngoSignup';
 import { CATEGORIES } from '../../types';
 import SEO from '../../components/SEO';
+import OrganizationClaimSearch from '../../components/OrganizationClaimSearch';
+import BrandLogo from '../../components/BrandLogo';
+import type { ClaimSearchOrganization } from '../../hooks/useOrganizationClaimSearch';
 
-type SignupMode = 'new' | 'existing';
+type SignupMode = 'existing' | 'new';
 
 export default function NgoSignup() {
   const { signUp, user, loading } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<SignupMode>('new');
+  const [mode, setMode] = useState<SignupMode>('existing');
+  const [selectedOrg, setSelectedOrg] = useState<ClaimSearchOrganization | null>(null);
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -21,7 +25,6 @@ export default function NgoSignup() {
     category: '',
     location: '',
     websiteUrl: '',
-    existingSlug: '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -34,6 +37,12 @@ export default function NgoSignup() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (mode === 'existing' && !selectedOrg) {
+      setError('Search the directory and select your organization, or register as new.');
+      return;
+    }
+
     setSubmitting(true);
 
     const { error: signUpError } = await signUp(form.email, form.password, form.fullName);
@@ -70,7 +79,7 @@ export default function NgoSignup() {
     } else {
       const { error: linkError } = await linkExistingOrganization({
         userId,
-        organizationSlug: form.existingSlug,
+        organizationId: selectedOrg!.id,
         email: form.email,
       });
       if (linkError) {
@@ -93,11 +102,8 @@ export default function NgoSignup() {
       />
       <div className="min-h-screen bg-surface flex flex-col">
         <header className="border-b-3 border-ink-950 px-4 sm:px-6 py-4">
-          <Link to="/public" className="inline-flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center border-3 border-ink-950 bg-accent font-mono text-xs font-black text-white">
-              N
-            </div>
-            <span className="text-sm font-black uppercase tracking-[0.15em]">NGOreality</span>
+          <Link to="/public" className="inline-flex items-center min-w-0">
+            <BrandLogo iconClassName="h-8 w-8" wordmarkClassName="h-7 w-auto max-w-[160px]" />
           </Link>
         </header>
 
@@ -122,21 +128,21 @@ export default function NgoSignup() {
               <div className="flex gap-2 p-1 border-2 border-ink-950 bg-ink-50">
                 <button
                   type="button"
+                  onClick={() => setMode('existing')}
+                  className={`flex-1 py-2 font-mono text-2xs uppercase tracking-wider min-h-[44px] ${
+                    mode === 'existing' ? 'bg-ink-950 text-white' : 'text-ink-600'
+                  }`}
+                >
+                  In directory
+                </button>
+                <button
+                  type="button"
                   onClick={() => setMode('new')}
                   className={`flex-1 py-2 font-mono text-2xs uppercase tracking-wider min-h-[44px] ${
                     mode === 'new' ? 'bg-ink-950 text-white' : 'text-ink-600'
                   }`}
                 >
                   New org
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('existing')}
-                  className={`flex-1 py-2 font-mono text-2xs uppercase tracking-wider min-h-[44px] ${
-                    mode === 'existing' ? 'bg-ink-950 text-white' : 'text-ink-600'
-                  }`}
-                >
-                  Link existing
                 </button>
               </div>
 
@@ -183,7 +189,17 @@ export default function NgoSignup() {
                 />
               </div>
 
-              {mode === 'new' ? (
+              {mode === 'existing' ? (
+                <OrganizationClaimSearch
+                  selected={selectedOrg}
+                  onSelect={setSelectedOrg}
+                  onRegisterNew={() => {
+                    setMode('new');
+                    setSelectedOrg(null);
+                    setError('');
+                  }}
+                />
+              ) : (
                 <>
                   <p className="border-t-3 border-ink-950 pt-4 label-brutal">Organization</p>
                   <div>
@@ -231,22 +247,17 @@ export default function NgoSignup() {
                       placeholder="https://"
                     />
                   </div>
-                </>
-              ) : (
-                <div>
-                  <label className="label-brutal" htmlFor="org-slug">Organization slug</label>
-                  <input
-                    id="org-slug"
-                    className="input-brutal w-full text-base"
-                    value={form.existingSlug}
-                    onChange={(e) => setForm({ ...form, existingSlug: e.target.value })}
-                    placeholder="your-org-slug"
-                    required
-                  />
-                  <p className="text-2xs text-ink-400 mt-1 font-mono">
-                    Use the slug from your invite. Email must match the organization record.
+                  <p className="text-xs text-ink-500 text-center">
+                    Already in our directory?{' '}
+                    <button
+                      type="button"
+                      onClick={() => setMode('existing')}
+                      className="font-semibold text-ink-950 underline min-h-[44px]"
+                    >
+                      Search and claim your listing
+                    </button>
                   </p>
-                </div>
+                </>
               )}
 
               <button

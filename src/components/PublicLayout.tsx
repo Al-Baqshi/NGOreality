@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { LogIn, Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import BrandLogo from './BrandLogo';
 
 const navItems = [
   { to: '/public', label: 'Home', end: true },
@@ -22,12 +23,7 @@ export default function PublicLayout() {
       {/* Header */}
       <header className="sticky top-0 z-40 border-b-3 border-ink-950 bg-surface-raised">
         <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
-          <NavLink to="/public" className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center border-3 border-ink-950 bg-accent font-mono text-sm font-black text-white">
-              N
-            </div>
-            <span className="text-lg font-black uppercase tracking-[0.15em] text-ink-950">NGOreality</span>
-          </NavLink>
+          <BrandLogo linkToPublic iconClassName="h-9 w-9 sm:h-10 sm:w-10" wordmarkClassName="h-8 sm:h-9 w-auto max-w-[min(200px,42vw)]" />
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1">
@@ -89,11 +85,8 @@ export default function PublicLayout() {
         <div className="max-w-7xl mx-auto px-6 py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex h-8 w-8 items-center justify-center border-2 border-accent bg-accent font-mono text-xs font-black text-white">
-                  N
-                </div>
-                <span className="text-sm font-black uppercase tracking-[0.2em] text-white">NGOreality</span>
+              <div className="mb-4">
+                <BrandLogo onDark iconClassName="h-8 w-8" wordmarkClassName="h-7 w-auto max-w-[180px]" />
               </div>
               <p className="text-xs leading-relaxed text-ink-400">
                 Digital trust infrastructure for nonprofits. Building the missing layer between intention and trust.
