@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useBlogPost } from '../../hooks/useSupabase';
 import { Calendar, User, ArrowLeft } from 'lucide-react';
 import SEO, { ArticleJsonLd, BreadcrumbJsonLd } from '../../components/SEO';
+import { absoluteUrl } from '../../config/site';
 
 export default function BlogDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -38,7 +39,7 @@ export default function BlogDetail() {
       <ArticleJsonLd
         title={post.title}
         description={post.excerpt || post.title}
-        url={`https://ngoreality.org/public/blog/${post.slug}`}
+        url={absoluteUrl(`/public/blog/${post.slug}`)}
         publishedTime={post.published_at || new Date().toISOString()}
         author={post.author}
         image={post.featured_image_url || undefined}

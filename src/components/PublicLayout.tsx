@@ -114,7 +114,7 @@ export default function PublicLayout() {
                   NGO sign in
                 </Link>
                 <Link
-                  to="/dashboard"
+                  to="/staff/login"
                   className="block text-xs text-ink-400 hover:text-white transition-colors"
                 >
                   Staff CRM

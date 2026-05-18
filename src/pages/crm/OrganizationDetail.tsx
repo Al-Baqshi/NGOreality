@@ -3,8 +3,19 @@ import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useOrganization, useContacts, useVerificationCriteria, useBadges, useActivityLog } from '../../hooks/useSupabase';
 import { StatusPill, VerificationBadge, CriterionStatus, FormField, Modal } from '../../components/ui';
-import { DEFAULT_CRITERIA, FINANCIAL_CRITERIA, CATEGORIES, ORG_STATUS_LABELS, VERIFICATION_LEVEL_LABELS } from '../../types';
-import type { OrgStatus, VerificationLevel } from '../../types';
+import {
+  DEFAULT_CRITERIA,
+  FINANCIAL_CRITERIA,
+  CATEGORIES,
+  ORG_STATUS_LABELS,
+  VERIFICATION_LEVEL_LABELS,
+  OUTREACH_STATUS_LABELS,
+  REGISTRY_SOURCE_LABELS,
+} from '../../types';
+import type { OrgStatus, VerificationLevel, OutreachStatus } from '../../types';
+import { isRegistryListed } from '../../types';
+import { FINANCIAL_VERIFICATION_ENABLED, getVerificationLevelOptions } from '../../config/features';
+import FinancialComingSoon from '../../components/FinancialComingSoon';
 import { ArrowLeft, Globe, Mail, Phone, MapPin, CreditCard as Edit3, Save, X, Shield, Clock, User, Plus, Trash2, Award } from 'lucide-react';
 
 export default function OrganizationDetail() {
@@ -42,6 +53,50 @@ export default function OrganizationDetail() {
       action: 'status_change',
       description: `Status changed to ${ORG_STATUS_LABELS[newStatus]}`,
       performed_by: 'admin',
+    });
+    window.location.reload();
+  };
+
+  const handleOutreachChange = async (outreach: OutreachStatus) => {
+    if (!id) return;
+    await supabase
+      .from('organizations')
+      .update({ outreach_status: outreach, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    await supabase.from('activity_log').insert({
+      organization_id: id,
+      action: 'outreach_updated',
+      description: `Outreach: ${OUTREACH_STATUS_LABELS[outreach]}`,
+      performed_by: 'staff',
+    });
+    window.location.reload();
+  };
+
+  const handleBeginVerification = async () => {
+    if (!id) return;
+    await supabase
+      .from('organizations')
+      .update({
+        status: 'onboarding',
+        onboarding_stage: 'intake',
+        outreach_status: 'responded',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+    const { count } = await supabase
+      .from('verification_criteria')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', id);
+    if (!count) {
+      await supabase.from('verification_criteria').insert(
+        DEFAULT_CRITERIA.map((c) => ({ organization_id: id, ...c })),
+      );
+    }
+    await supabase.from('activity_log').insert({
+      organization_id: id,
+      action: 'verification_started',
+      description: 'Moved from registry listing to NGOreality verification onboarding',
+      performed_by: 'staff',
     });
     window.location.reload();
   };
@@ -160,6 +215,57 @@ export default function OrganizationDetail() {
           </div>
         </div>
 
+        {isRegistryListed(organization) && (
+          <div className="mt-6 border-t-3 border-ink-950 pt-6">
+            <div className="label-brutal">Registry import</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 text-sm">
+              <div>
+                <span className="font-mono text-2xs uppercase tracking-wider text-ink-400">Source</span>
+                <p>{REGISTRY_SOURCE_LABELS[organization.source_registry] || organization.source_registry}</p>
+              </div>
+              {organization.charity_registration_number && (
+                <div>
+                  <span className="font-mono text-2xs uppercase tracking-wider text-ink-400">Registration</span>
+                  <p className="font-mono">{organization.charity_registration_number}</p>
+                </div>
+              )}
+              {organization.registry_url && (
+                <div className="md:col-span-2">
+                  <a href={organization.registry_url} target="_blank" rel="noopener noreferrer" className="text-teal hover:underline text-sm">
+                    View on official register
+                  </a>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
+              <div className="flex-1 min-w-0">
+                <label className="label-brutal">Outreach status</label>
+                <select
+                  className="input-brutal w-full mt-1"
+                  value={organization.outreach_status}
+                  onChange={(e) => handleOutreachChange(e.target.value as OutreachStatus)}
+                >
+                  {Object.entries(OUTREACH_STATUS_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {organization.status === 'listed' && (
+                <div className="flex items-end">
+                  <button type="button" onClick={handleBeginVerification} className="btn-brutal-teal w-full sm:w-auto text-sm">
+                    Begin NGOreality verification
+                  </button>
+                </div>
+              )}
+            </div>
+            <p className="text-2xs text-ink-400 mt-3 font-mono">
+              Public profile: /public/org/{organization.slug}
+            </p>
+          </div>
+        )}
+
         {/* Details */}
         {editing ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 border-t-3 border-ink-950 pt-6">
@@ -186,7 +292,9 @@ export default function OrganizationDetail() {
             </FormField>
             <FormField label="Verification Level">
               <select className="input-brutal w-full" value={editForm?.verification_level || 'none'} onChange={(e) => setEditForm({ ...editForm!, verification_level: e.target.value as VerificationLevel })}>
-                {Object.entries(VERIFICATION_LEVEL_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {getVerificationLevelOptions().map(({ value, label }) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
               </select>
             </FormField>
             <FormField label="Status">
@@ -244,7 +352,7 @@ export default function OrganizationDetail() {
             <div>
               <div className="label-brutal">Status Actions</div>
               <div className="flex flex-wrap gap-2 mt-2">
-                {(['onboarding', 'under_review', 'verified', 'active', 'lapsed'] as const)
+                {(['listed', 'onboarding', 'under_review', 'verified', 'active', 'lapsed'] as const)
                   .filter((s) => s !== organization.status)
                   .map((status) => (
                     <button
@@ -318,7 +426,8 @@ export default function OrganizationDetail() {
             </div>
           </div>
 
-          {/* Financial Criteria */}
+          {FINANCIAL_VERIFICATION_ENABLED ? (
+          /* Financial Criteria — preserved for launch; hidden via FINANCIAL_VERIFICATION_ENABLED */
           <div className="card-brutal">
             <div className="flex items-center justify-between border-b-3 border-ink-950 px-6 py-4">
               <h3 className="font-mono text-xs uppercase tracking-wider font-semibold flex items-center gap-2">
@@ -369,6 +478,9 @@ export default function OrganizationDetail() {
               )}
             </div>
           </div>
+          ) : (
+            <FinancialComingSoon variant="crm" />
+          )}
         </div>
 
         {/* Right column */}

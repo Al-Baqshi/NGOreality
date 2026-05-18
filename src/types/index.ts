@@ -15,11 +15,31 @@ export interface Organization {
   onboarding_stage: string;
   logo_url: string;
   tags: string[];
+  source_registry: string;
+  external_id: string;
+  registry_url: string;
+  charity_registration_number: string;
+  nzbn: string;
+  imported_at: string | null;
+  outreach_status: OutreachStatus;
   created_at: string;
   updated_at: string;
 }
 
-export type OrgStatus = 'onboarding' | 'under_review' | 'verified' | 'active' | 'lapsed';
+export type OrgStatus =
+  | 'listed'
+  | 'onboarding'
+  | 'under_review'
+  | 'verified'
+  | 'active'
+  | 'lapsed';
+
+export type OutreachStatus =
+  | 'not_contacted'
+  | 'contacted'
+  | 'responded'
+  | 'declined'
+  | 'not_applicable';
 export type VerificationLevel = 'none' | 'verified' | 'transparent_financial';
 
 export interface Contact {
@@ -69,6 +89,7 @@ export interface ActivityLogEntry {
 
 export interface InquirySubmission {
   id: string;
+  organization_id: string | null;
   organization_name: string;
   contact_name: string;
   email: string;
@@ -80,12 +101,36 @@ export interface InquirySubmission {
 }
 
 export const ORG_STATUS_LABELS: Record<OrgStatus, string> = {
+  listed: 'Listed (registry)',
   onboarding: 'Onboarding',
   under_review: 'Under Review',
   verified: 'Verified',
   active: 'Active',
   lapsed: 'Lapsed',
 };
+
+export const OUTREACH_STATUS_LABELS: Record<OutreachStatus, string> = {
+  not_contacted: 'Not contacted',
+  contacted: 'Contacted',
+  responded: 'Responded',
+  declined: 'Declined',
+  not_applicable: 'N/A',
+};
+
+export const REGISTRY_SOURCE_LABELS: Record<string, string> = {
+  nz_charities_register: 'NZ Charities Register',
+};
+
+export function isNgorealityVerified(org: Pick<Organization, 'status' | 'verification_level'>): boolean {
+  return (
+    (org.status === 'verified' || org.status === 'active') &&
+    org.verification_level !== 'none'
+  );
+}
+
+export function isRegistryListed(org: Pick<Organization, 'status' | 'source_registry'>): boolean {
+  return org.status === 'listed' && Boolean(org.source_registry);
+}
 
 export const VERIFICATION_LEVEL_LABELS: Record<VerificationLevel, string> = {
   none: 'None',

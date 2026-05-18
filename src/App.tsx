@@ -19,12 +19,15 @@ import Blog from './pages/public/Blog';
 import BlogDetail from './pages/public/BlogDetail';
 import About from './pages/public/About';
 import Contact from './pages/public/Contact';
+import OrganizationProfile from './pages/public/OrganizationProfile';
 import NotFound from './pages/public/NotFound';
 import NgoLogin from './pages/ngo/NgoLogin';
 import NgoSignup from './pages/ngo/NgoSignup';
 import NgoDashboard from './pages/ngo/NgoDashboard';
 import NgoLayout from './components/NgoLayout';
 import NgoProtectedRoute from './components/NgoProtectedRoute';
+import StaffProtectedRoute from './components/StaffProtectedRoute';
+import StaffLogin from './pages/staff/StaffLogin';
 import { isSupabaseConfigured } from './lib/supabase';
 
 export default function App() {
@@ -40,16 +43,19 @@ export default function App() {
         </div>
       )}
       <Routes>
-        {/* CRM Routes */}
-        <Route element={<CRMLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/organizations" element={<OrganizationsList />} />
-          <Route path="/organizations/new" element={<OrganizationNew />} />
-          <Route path="/organizations/:id" element={<OrganizationDetail />} />
-          <Route path="/verification" element={<Verification />} />
-          <Route path="/contacts" element={<Contacts />} />
-          <Route path="/inquiries" element={<Inquiries />} />
-          <Route path="/blog-manager" element={<BlogManager />} />
+        {/* Staff CRM */}
+        <Route path="/staff/login" element={<StaffLogin />} />
+        <Route element={<StaffProtectedRoute />}>
+          <Route element={<CRMLayout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/organizations" element={<OrganizationsList />} />
+            <Route path="/organizations/new" element={<OrganizationNew />} />
+            <Route path="/organizations/:id" element={<OrganizationDetail />} />
+            <Route path="/verification" element={<Verification />} />
+            <Route path="/contacts" element={<Contacts />} />
+            <Route path="/inquiries" element={<Inquiries />} />
+            <Route path="/blog-manager" element={<BlogManager />} />
+          </Route>
         </Route>
 
         {/* NGO Portal */}
@@ -66,6 +72,7 @@ export default function App() {
           <Route index element={<Homepage />} />
           <Route path="how-it-works" element={<HowItWorks />} />
           <Route path="directory" element={<Directory />} />
+          <Route path="org/:slug" element={<OrganizationProfile />} />
           <Route path="verified" element={<Verified />} />
           <Route path="reality-badge" element={<RealityBadge />} />
           <Route path="verification" element={<VerificationPublic />} />

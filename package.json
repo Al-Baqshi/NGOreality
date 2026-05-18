@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "import:nz-charities": "node scripts/import-nz-charities.mjs",
+    "backfill:nz-tags": "node scripts/backfill-nz-tags.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

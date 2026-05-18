@@ -3,20 +3,22 @@ import { Shield, Landmark, MapPin, Globe, ExternalLink, Search } from 'lucide-re
 import { useState } from 'react';
 import { CATEGORIES } from '../../types';
 import SEO, { BreadcrumbJsonLd } from '../../components/SEO';
+import { FINANCIAL_VERIFICATION_ENABLED } from '../../config/features';
+import FinancialComingSoon from '../../components/FinancialComingSoon';
 
 export default function Verified() {
   const { organizations, loading } = usePublicOrganizations();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
-  const [tierFilter, setTierFilter] = useState<'all' | 'verified' | 'transparent_financial'>('all');
+  const [tierFilter, setTierFilter] = useState<'all' | 'verified'>('all');
 
   const filtered = organizations.filter((org) => {
     const matchesSearch = org.name.toLowerCase().includes(search.toLowerCase()) ||
       org.description.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = !category || org.category === category;
-    const matchesTier = tierFilter === 'all' ||
-      (tierFilter === 'verified' && org.verification_level === 'verified') ||
-      (tierFilter === 'transparent_financial' && org.verification_level === 'transparent_financial');
+    const matchesTier =
+      tierFilter === 'all' ||
+      (tierFilter === 'verified' && (org.verification_level === 'verified' || org.verification_level === 'transparent_financial'));
     return matchesSearch && matchesCategory && matchesTier;
   });
 
@@ -46,19 +48,21 @@ export default function Verified() {
             <p className="text-ink-300 text-lg mb-6">
               These organizations have met NGOreality standards. Each has a functional live site, a clear mission, and accessible operations.
             </p>
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-6 flex-wrap">
               <div className="flex items-center gap-2">
                 <Shield size={16} className="text-teal" />
                 <span className="font-mono text-xs uppercase tracking-wider text-ink-300">
-                  {verifiedCount} Verified
+                  {verifiedCount} Reality Badge
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <Landmark size={16} className="text-accent" />
-                <span className="font-mono text-xs uppercase tracking-wider text-ink-300">
-                  {financialCount} Transparent Financial
-                </span>
-              </div>
+              {FINANCIAL_VERIFICATION_ENABLED && (
+                <div className="flex items-center gap-2">
+                  <Landmark size={16} className="text-accent" />
+                  <span className="font-mono text-xs uppercase tracking-wider text-ink-300">
+                    {financialCount} Transparent Financial
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -73,11 +77,15 @@ export default function Verified() {
               <span className="badge-verified">Verified</span>
               <span className="font-mono text-2xs text-ink-400 ml-1">Digital & operational (non-financial)</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Landmark size={14} className="text-accent" />
-              <span className="badge-failed">Transparent Financial</span>
-              <span className="font-mono text-2xs text-ink-400 ml-1">Includes financial transparency</span>
-            </div>
+            {FINANCIAL_VERIFICATION_ENABLED ? (
+              <div className="flex items-center gap-2">
+                <Landmark size={14} className="text-accent" />
+                <span className="badge-failed">Transparent Financial</span>
+                <span className="font-mono text-2xs text-ink-400 ml-1">Includes financial transparency</span>
+              </div>
+            ) : (
+              <FinancialComingSoon variant="compact" />
+            )}
           </div>
         </div>
       </section>
@@ -104,15 +112,16 @@ export default function Verified() {
               <option value="">All Categories</option>
               {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
-            <select
-              value={tierFilter}
-              onChange={(e) => setTierFilter(e.target.value as 'all' | 'verified' | 'transparent_financial')}
-              className="input-brutal"
-            >
-              <option value="all">All Tiers</option>
-              <option value="verified">Verified Only</option>
-              <option value="transparent_financial">Transparent Financial Only</option>
-            </select>
+            {FINANCIAL_VERIFICATION_ENABLED && (
+              <select
+                value={tierFilter}
+                onChange={(e) => setTierFilter(e.target.value as 'all' | 'verified')}
+                className="input-brutal"
+              >
+                <option value="all">All Tiers</option>
+                <option value="verified">Verified Only</option>
+              </select>
+            )}
           </div>
         </div>
       </section>
@@ -139,7 +148,7 @@ export default function Verified() {
               <div key={org.id} className="card-brutal-hover p-6">
                 <div className="flex items-start gap-3 mb-4">
                   <div className={`flex h-12 w-12 items-center justify-center border-2 shrink-0 font-mono text-lg font-black
-                    ${org.verification_level === 'transparent_financial'
+                    ${FINANCIAL_VERIFICATION_ENABLED && org.verification_level === 'transparent_financial'
                       ? 'border-accent bg-accent-light text-accent'
                       : 'border-teal bg-teal-light text-teal'
                     }`}>
@@ -148,7 +157,7 @@ export default function Verified() {
                   <div>
                     <h3 className="text-base font-bold">{org.name}</h3>
                     <div className="flex items-center gap-2 mt-1">
-                      {org.verification_level === 'transparent_financial' ? (
+                      {FINANCIAL_VERIFICATION_ENABLED && org.verification_level === 'transparent_financial' ? (
                         <span className="badge-failed">
                           <Landmark size={10} /> Transparent Financial
                         </span>

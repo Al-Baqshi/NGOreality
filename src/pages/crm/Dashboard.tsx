@@ -9,8 +9,12 @@ export default function Dashboard() {
 
   const stats = {
     total: organizations.length,
+    listed: organizations.filter((o) => o.status === 'listed').length,
     verified: organizations.filter((o) => o.status === 'verified' || o.status === 'active').length,
     pending: organizations.filter((o) => o.status === 'onboarding' || o.status === 'under_review').length,
+    outreachDue: organizations.filter(
+      (o) => o.status === 'listed' && o.outreach_status === 'not_contacted',
+    ).length,
     newInquiries: inquiries.filter((i) => i.status === 'new').length,
   };
 
@@ -22,10 +26,11 @@ export default function Dashboard() {
       <SectionHeader>Dashboard</SectionHeader>
 
       {/* Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <MetricCard label="Total Organizations" value={orgLoading ? '—' : stats.total} />
-        <MetricCard label="Verified" value={orgLoading ? '—' : stats.verified} accent />
-        <MetricCard label="Pending Review" value={orgLoading ? '—' : stats.pending} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
+        <MetricCard label="Total" value={orgLoading ? '—' : stats.total} />
+        <MetricCard label="Registry Listed" value={orgLoading ? '—' : stats.listed} />
+        <MetricCard label="NGOreality Verified" value={orgLoading ? '—' : stats.verified} accent />
+        <MetricCard label="Outreach Due" value={orgLoading ? '—' : stats.outreachDue} />
         <MetricCard label="New Inquiries" value={inqLoading ? '—' : stats.newInquiries} />
       </div>
 

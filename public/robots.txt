@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://ngoreality.org/sitemap.xml
+Sitemap: https://ngoreality.com/sitemap.xml

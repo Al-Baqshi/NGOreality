@@ -47,6 +47,7 @@ export default function OrganizationsList() {
             className="input-brutal text-sm"
           >
             <option value="all">All Statuses</option>
+            <option value="listed">Listed (registry)</option>
             <option value="onboarding">Onboarding</option>
             <option value="under_review">Under Review</option>
             <option value="verified">Verified</option>

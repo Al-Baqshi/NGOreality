@@ -8,7 +8,7 @@ export default function Homepage() {
       <SEO
         title="Digital Trust Infrastructure for Nonprofits"
         description="NGOreality is the missing layer between intention and trust. We verify, certify, and build digital infrastructure so nonprofits can be understood, trusted, and engaged with."
-        path="/public"
+        path="/"
       />
       <OrganizationJsonLd />
     <div>
@@ -105,7 +105,7 @@ export default function Homepage() {
               {
                 icon: <Eye size={24} />,
                 title: 'Transparency',
-                description: 'Impact updates, simplified financial snapshots, and public dashboards convert complex reporting into clear signals.',
+                description: 'Impact updates and public dashboards convert complex reporting into clear trust signals. Financial transparency tools coming soon.',
                 color: 'border-accent',
               },
             ].map((item) => (

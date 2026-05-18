@@ -123,13 +123,20 @@ export function useInquiries() {
   return { inquiries, loading, refetch: fetchAll };
 }
 
+const VERIFIED_STATUSES = ['verified', 'active'] as const;
+const DIRECTORY_STATUSES = ['listed', 'verified', 'active'] as const;
+
 export function usePublicOrganizations() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    supabase.from('organizations').select('*').in('status', ['verified', 'active']).order('name', { ascending: true })
+    supabase
+      .from('organizations')
+      .select('*')
+      .in('status', [...VERIFIED_STATUSES])
+      .order('name', { ascending: true })
       .then(({ data, error }) => {
         if (!error && data) setOrganizations(data);
         setLoading(false);
@@ -137,6 +144,49 @@ export function usePublicOrganizations() {
   }, []);
 
   return { organizations, loading };
+}
+
+export function usePublicDirectoryOrganizations() {
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    supabase
+      .from('organizations')
+      .select('*')
+      .in('status', [...DIRECTORY_STATUSES])
+      .order('name', { ascending: true })
+      .then(({ data, error }) => {
+        if (!error && data) setOrganizations(data);
+        setLoading(false);
+      });
+  }, []);
+
+  return { organizations, loading };
+}
+
+export function usePublicOrganizationBySlug(slug: string | undefined) {
+  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!slug) return;
+    setLoading(true);
+    supabase
+      .from('organizations')
+      .select('*')
+      .eq('slug', slug)
+      .in('status', [...DIRECTORY_STATUSES])
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!error && data) setOrganization(data);
+        else setOrganization(null);
+        setLoading(false);
+      });
+  }, [slug]);
+
+  return { organization, loading };
 }
 
 export function useBlogPosts() {
@@ -196,7 +246,7 @@ export function useCountryCounts() {
 
   useEffect(() => {
     setLoading(true);
-    supabase.from('organizations').select('country').in('status', ['verified', 'active'])
+    supabase.from('organizations').select('country, status').in('status', [...DIRECTORY_STATUSES])
       .then(({ data, error }) => {
         if (!error && data) {
           const aggregated: Record<string, number> = {};

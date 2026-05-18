@@ -1,19 +1,22 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import worldMapPaths from '../data/world-map-paths.json';
 import { COUNTRY_NAMES } from '../data/countryNames';
+import { getCountryFocus } from '../data/mapCountryFocus';
 import { ZoomIn, ZoomOut, Maximize, ChevronDown, Search, X } from 'lucide-react';
 
 interface WorldMapProps {
   countryCounts: Record<string, number>;
   onCountryClick?: (code: string) => void;
   selectedCountry?: string;
+  /** When set, crop/zoom the SVG viewBox to this country (e.g. NZ) */
+  focusCountry?: string;
 }
 
 const COUNTRY_LIST = Object.entries(COUNTRY_NAMES)
   .filter(([code]) => code in worldMapPaths)
   .sort(([, a], [, b]) => a.localeCompare(b));
 
-export default function WorldMap({ countryCounts, onCountryClick, selectedCountry }: WorldMapProps) {
+export default function WorldMap({ countryCounts, onCountryClick, selectedCountry, focusCountry }: WorldMapProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; code: string; count: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -93,8 +96,12 @@ export default function WorldMap({ countryCounts, onCountryClick, selectedCountr
 
   const maxCount = Math.max(...Object.values(countryCounts), 1);
 
+  const focus = focusCountry ? getCountryFocus(focusCountry) : null;
+  const isCountryMuted = (code: string) => Boolean(focusCountry && code !== focusCountry);
+
   const getCountryColor = (code: string) => {
     const count = countryCounts[code] || 0;
+    if (isCountryMuted(code)) return hovered === code ? '#d4d4d4' : '#ebebeb';
     if (selectedCountry === code) return '#0d9488';
     if (count === 0) return hovered === code ? '#d4d4d4' : '#e5e5e5';
     const intensity = 0.3 + 0.7 * (count / maxCount);
@@ -106,11 +113,13 @@ export default function WorldMap({ countryCounts, onCountryClick, selectedCountr
 
   const getCountryStroke = (code: string) => {
     if (selectedCountry === code) return '#0a0a0a';
+    if (isCountryMuted(code)) return '#f5f5f5';
     return hovered === code ? '#0a0a0a' : '#ffffff';
   };
 
   const getCountryStrokeWidth = (code: string) => {
-    if (selectedCountry === code) return 2;
+    if (selectedCountry === code) return 2.5;
+    if (focusCountry === code) return 1.5;
     return hovered === code ? 1.5 : 0.5;
   };
 
@@ -120,7 +129,7 @@ export default function WorldMap({ countryCounts, onCountryClick, selectedCountr
     name.toLowerCase().includes(countrySearch.toLowerCase())
   );
 
-  const viewBox = `0 0 2000 1001`;
+  const viewBox = focus?.viewBox ?? '0 0 2000 1001';
 
   return (
     <div ref={containerRef} className="relative w-full">
@@ -138,11 +147,11 @@ export default function WorldMap({ countryCounts, onCountryClick, selectedCountr
           ref={svgRef}
           viewBox={viewBox}
           className="w-full h-auto"
-          style={{
-            maxHeight: '520px',
-            transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+            style={{
+            maxHeight: focus ? '420px' : '520px',
+            transform: focus ? undefined : `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
             transformOrigin: 'center center',
-            transition: isPanning ? 'none' : 'transform 0.2s ease',
+            transition: isPanning ? 'none' : 'transform 0.35s ease, max-height 0.35s ease',
           }}
           role="img"
           aria-label="Interactive world map showing NGOreality verified organizations by country"
@@ -287,7 +296,7 @@ export default function WorldMap({ countryCounts, onCountryClick, selectedCountr
               {tooltip.count > 0 ? (
                 <>{tooltip.count} {tooltip.count === 1 ? 'organization' : 'organizations'}</>
               ) : (
-                <span className="text-ink-400">No verified organizations</span>
+                <span className="text-ink-400">No organizations listed</span>
               )}
             </div>
           </div>

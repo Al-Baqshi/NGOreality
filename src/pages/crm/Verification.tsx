@@ -2,6 +2,8 @@ import { useOrganizations } from '../../hooks/useSupabase';
 import { StatusPill, VerificationBadge, SectionHeader } from '../../components/ui';
 import { Shield, Landmark, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { FINANCIAL_VERIFICATION_ENABLED } from '../../config/features';
+import FinancialComingSoon from '../../components/FinancialComingSoon';
 
 export default function Verification() {
   const { organizations } = useOrganizations();
@@ -82,35 +84,38 @@ export default function Verification() {
         )}
       </div>
 
-      {/* Transparent Financial Tier */}
-      <div>
-        <h3 className="font-mono text-xs uppercase tracking-wider font-semibold text-accent mb-1 flex items-center gap-2">
-          <Landmark size={14} /> Transparent Financial ({transparentFinancial.length})
-        </h3>
-        <p className="font-mono text-2xs text-ink-400 mb-4 uppercase tracking-wider">Includes financial transparency verification</p>
-        {transparentFinancial.length === 0 ? (
-          <div className="card-brutal p-8 text-center">
-            <p className="text-sm text-ink-400">No organizations with transparent financial status yet</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {transparentFinancial.map((org) => (
-              <Link key={org.id} to={`/organizations/${org.id}`} className="card-brutal-hover p-5">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="flex h-9 w-9 items-center justify-center border-2 border-accent bg-accent-light font-mono text-sm font-bold text-accent">
-                    {org.name.charAt(0)}
+      {FINANCIAL_VERIFICATION_ENABLED ? (
+        <div>
+          <h3 className="font-mono text-xs uppercase tracking-wider font-semibold text-accent mb-1 flex items-center gap-2">
+            <Landmark size={14} /> Transparent Financial ({transparentFinancial.length})
+          </h3>
+          <p className="font-mono text-2xs text-ink-400 mb-4 uppercase tracking-wider">Includes financial transparency verification</p>
+          {transparentFinancial.length === 0 ? (
+            <div className="card-brutal p-8 text-center">
+              <p className="text-sm text-ink-400">No organizations with transparent financial status yet</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {transparentFinancial.map((org) => (
+                <Link key={org.id} to={`/organizations/${org.id}`} className="card-brutal-hover p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex h-9 w-9 items-center justify-center border-2 border-accent bg-accent-light font-mono text-sm font-bold text-accent">
+                      {org.name.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold">{org.name}</div>
+                      <div className="font-mono text-2xs text-ink-400 uppercase tracking-wider">{org.category}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-sm font-bold">{org.name}</div>
-                    <div className="font-mono text-2xs text-ink-400 uppercase tracking-wider">{org.category}</div>
-                  </div>
-                </div>
-                <VerificationBadge level={org.verification_level} />
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+                  <VerificationBadge level={org.verification_level} />
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <FinancialComingSoon variant="crm" />
+      )}
     </div>
   );
 }

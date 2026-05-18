@@ -1,10 +1,13 @@
 import { type ReactNode } from 'react';
 import { Shield, ShieldCheck, Clock, XCircle, AlertCircle, Landmark } from 'lucide-react';
 import type { OrgStatus, VerificationLevel } from '../../types';
-import { ORG_STATUS_LABELS, VERIFICATION_LEVEL_LABELS } from '../../types';
+import { ORG_STATUS_LABELS, VERIFICATION_LEVEL_LABELS, isNgorealityVerified } from '../../types';
+import { FINANCIAL_VERIFICATION_ENABLED } from '../../config/features';
+import type { Organization } from '../../types';
 
 export function StatusPill({ status }: { status: OrgStatus }) {
   const styles: Record<OrgStatus, string> = {
+    listed: 'bg-sky-50 text-sky-800 border-sky-300',
     onboarding: 'bg-ink-50 text-ink-600 border-ink-300',
     under_review: 'bg-amber-50 text-amber-700 border-amber-300',
     verified: 'bg-teal-light text-teal border-teal',
@@ -20,6 +23,22 @@ export function StatusPill({ status }: { status: OrgStatus }) {
   );
 }
 
+export function DirectoryTrustBadge({ org }: { org: Pick<Organization, 'status' | 'verification_level'> }) {
+  if (isNgorealityVerified(org)) {
+    return (
+      <span className="badge-verified">
+        <ShieldCheck size={10} /> NGOreality Verified
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 border border-ink-300 bg-ink-50 text-ink-600 font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1">
+      <AlertCircle size={10} />
+      Listed · Not verified
+    </span>
+  );
+}
+
 export function VerificationBadge({ level, showDisclaimer }: { level: VerificationLevel; showDisclaimer?: boolean }) {
   if (level === 'none') {
     return (
@@ -31,6 +50,14 @@ export function VerificationBadge({ level, showDisclaimer }: { level: Verificati
   }
 
   if (level === 'transparent_financial') {
+    if (!FINANCIAL_VERIFICATION_ENABLED) {
+      return (
+        <span className="inline-flex items-center gap-1.5 border border-dashed border-ink-300 bg-ink-50 text-ink-500 font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1">
+          <Landmark size={12} />
+          Coming soon
+        </span>
+      );
+    }
     return (
       <span className="inline-flex items-center gap-1.5 border-2 border-teal bg-teal-light text-teal font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1">
         <Landmark size={12} />

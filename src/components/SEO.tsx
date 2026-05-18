@@ -1,8 +1,10 @@
 import { Helmet } from 'react-helmet-async';
+import { SITE_URL, absoluteUrl } from '../config/site';
 
 const SITE_NAME = 'NGOreality';
-const SITE_URL = 'https://ngoreality.org';
 const DEFAULT_DESCRIPTION = 'Digital trust infrastructure for nonprofits. Building the missing layer between intention and trust.';
+
+export { SITE_URL, absoluteUrl };
 
 interface SEOProps {
   title?: string;
@@ -16,8 +18,8 @@ interface SEOProps {
 export default function SEO({ title, description, path, type = 'website', image, publishedTime }: SEOProps) {
   const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} — Digital Trust Infrastructure for Nonprofits`;
   const desc = description || DEFAULT_DESCRIPTION;
-  const url = path ? `${SITE_URL}${path}` : SITE_URL;
-  const ogImage = image || `${SITE_URL}/og-default.png`;
+  const url = absoluteUrl(path || '/');
+  const ogImage = image || absoluteUrl('/og-default.png');
 
   return (
     <Helmet>

@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Building2,
@@ -9,8 +9,10 @@ import {
   FileText,
   ChevronLeft,
   Menu,
+  LogOut,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -23,8 +25,15 @@ const navItems = [
 ];
 
 export default function CRMLayout() {
+  const { profile, signOut } = useAuth();
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/staff/login', { replace: true });
+  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface">
@@ -95,11 +104,24 @@ export default function CRMLayout() {
             </button>
             <div className="label-brutal mb-0">CRM Console</div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {profile?.full_name && (
+              <span className="hidden sm:inline font-mono text-2xs uppercase tracking-wider text-ink-500 truncate max-w-[140px]">
+                {profile.full_name}
+              </span>
+            )}
             <div className="flex items-center gap-2 border-2 border-ink-200 px-3 py-1.5">
               <div className="h-2 w-2 rounded-full bg-teal animate-pulse" />
-              <span className="font-mono text-2xs uppercase tracking-wider text-ink-500">System Active</span>
+              <span className="font-mono text-2xs uppercase tracking-wider text-ink-500">Active</span>
             </div>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="flex items-center justify-center min-h-[44px] min-w-[44px] border-2 border-ink-950 text-ink-600 hover:bg-ink-950 hover:text-white transition-colors"
+              aria-label="Sign out"
+            >
+              <LogOut size={18} />
+            </button>
           </div>
         </header>
 
