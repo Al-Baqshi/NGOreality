@@ -103,7 +103,7 @@ export default function NgoSignup() {
       <div className="min-h-screen bg-surface flex flex-col">
         <header className="border-b-3 border-ink-950 px-4 sm:px-6 py-4">
           <Link to="/public" className="inline-flex items-center min-w-0">
-            <BrandLogo iconClassName="h-8 w-8" wordmarkClassName="h-7 w-auto max-w-[160px]" />
+            <BrandLogo fullClassName="h-12 sm:h-14 w-auto max-w-[280px]" />
           </Link>
         </header>
 

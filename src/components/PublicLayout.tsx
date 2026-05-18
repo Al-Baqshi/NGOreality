@@ -23,7 +23,7 @@ export default function PublicLayout() {
       {/* Header */}
       <header className="sticky top-0 z-40 border-b-3 border-ink-950 bg-surface-raised">
         <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
-          <BrandLogo linkToPublic iconClassName="h-9 w-9 sm:h-10 sm:w-10" wordmarkClassName="h-8 sm:h-9 w-auto max-w-[min(200px,42vw)]" />
+          <BrandLogo linkToPublic fullClassName="h-12 sm:h-14 md:h-[4.25rem] w-auto max-w-[min(340px,62vw)]" />
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1">
@@ -86,7 +86,7 @@ export default function PublicLayout() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="mb-4">
-                <BrandLogo onDark iconClassName="h-8 w-8" wordmarkClassName="h-7 w-auto max-w-[180px]" />
+                <BrandLogo onDark fullClassName="h-10 sm:h-11 w-auto max-w-[240px]" />
               </div>
               <p className="text-xs leading-relaxed text-ink-400">
                 Digital trust infrastructure for nonprofits. Building the missing layer between intention and trust.

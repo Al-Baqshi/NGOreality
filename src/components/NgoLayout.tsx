@@ -19,7 +19,7 @@ export default function NgoLayout() {
       <header className="sticky top-0 z-40 border-b-3 border-ink-950 bg-surface-raised">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4">
           <Link to="/ngo" className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <BrandLogo variant="icon" iconClassName="h-8 w-8 sm:h-9 sm:w-9" />
+            <BrandLogo fullClassName="h-11 sm:h-12 w-auto max-w-[220px]" />
             <span className="text-sm sm:text-base font-black uppercase tracking-[0.12em] text-ink-950 truncate">
               NGO Portal
             </span>

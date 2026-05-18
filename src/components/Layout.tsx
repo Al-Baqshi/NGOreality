@@ -53,9 +53,9 @@ export default function CRMLayout() {
         <div className={`flex items-center border-b border-ink-700 px-4 py-5 ${collapsed ? 'justify-center' : ''}`}>
           <div className={collapsed ? '' : 'flex items-center gap-3'}>
             {collapsed ? (
-              <BrandLogo variant="icon" onDark iconClassName="h-8 w-8" />
+              <BrandLogo variant="icon" onDark iconClassName="h-10 w-10" />
             ) : (
-              <BrandLogo onDark iconClassName="h-8 w-8" wordmarkClassName="h-7 w-auto max-w-[140px]" />
+              <BrandLogo onDark fullClassName="h-10 sm:h-11 w-auto max-w-[200px]" />
             )}
           </div>
         </div>
