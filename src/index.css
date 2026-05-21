@@ -1,10 +1,39 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import './styles/dark-overrides.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --surface-default: #fafafa;
+    --surface-raised: #ffffff;
+    --surface-overlay: #f5f5f5;
+    --accent-light: #f5e6e3;
+    --teal-light: #e6f2f0;
+    --card-bg: #ffffff;
+    --input-bg: #ffffff;
+    --border-brutal: #0a0a0a;
+    --shadow-brutal: 4px 4px 0px 0px #0a0a0a;
+    --shadow-brutal-sm: 2px 2px 0px 0px #0a0a0a;
+    --shadow-brutal-lg: 6px 6px 0px 0px #0a0a0a;
+  }
+
+  .dark {
+    --surface-default: #121212;
+    --surface-raised: #1c1c1c;
+    --surface-overlay: #161616;
+    --accent-light: #3d221e;
+    --teal-light: #1a2e2b;
+    --card-bg: #1c1c1c;
+    --input-bg: #242424;
+    --border-brutal: #d4d4d4;
+    --shadow-brutal: 4px 4px 0px 0px #000000;
+    --shadow-brutal-sm: 2px 2px 0px 0px #000000;
+    --shadow-brutal-lg: 6px 6px 0px 0px #000000;
+  }
+
   * {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -13,11 +42,16 @@
   html {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     color: #0a0a0a;
-    background-color: #fafafa;
+    background-color: var(--surface-default);
+  }
+
+  .dark html {
+    color: #e8e8e8;
   }
 
   body {
     @apply text-ink-950;
+    background-color: var(--surface-default);
   }
 
   ::selection {
@@ -31,43 +65,50 @@
     @apply border-3 border-ink-950 bg-ink-950 text-white font-semibold px-6 py-3 shadow-brutal
            transition-all duration-150
            hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm
-           active:translate-x-[4px] active:translate-y-[4px] active:shadow-none;
+           active:translate-x-[4px] active:translate-y-[4px] active:shadow-none
+           dark:border-ink-200 dark:hover:bg-ink-200 dark:hover:text-ink-950;
   }
 
   .btn-brutal-outline {
     @apply border-3 border-ink-950 bg-white text-ink-950 font-semibold px-6 py-3 shadow-brutal-sm
            transition-all duration-150
            hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none
-           active:bg-ink-950 active:text-white;
+           active:bg-ink-950 active:text-white
+           dark:bg-[var(--card-bg)] dark:active:bg-ink-200 dark:active:text-ink-950;
   }
 
   .btn-brutal-accent {
     @apply border-3 border-ink-950 bg-accent text-white font-semibold px-6 py-3 shadow-brutal
            transition-all duration-150
            hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm
-           active:translate-x-[4px] active:translate-y-[4px] active:shadow-none;
+           active:translate-x-[4px] active:translate-y-[4px] active:shadow-none
+           dark:border-ink-200;
   }
 
   .btn-brutal-teal {
     @apply border-3 border-ink-950 bg-teal text-white font-semibold px-6 py-3 shadow-brutal
            transition-all duration-150
            hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm
-           active:translate-x-[4px] active:translate-y-[4px] active:shadow-none;
+           active:translate-x-[4px] active:translate-y-[4px] active:shadow-none
+           dark:border-ink-200;
   }
 
   .card-brutal {
-    @apply border-3 border-ink-950 bg-white shadow-brutal;
+    @apply border-3 border-ink-950 bg-white shadow-brutal
+           dark:bg-[var(--card-bg)];
   }
 
   .card-brutal-hover {
     @apply border-3 border-ink-950 bg-white shadow-brutal
            transition-all duration-150
-           hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm;
+           hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm
+           dark:bg-[var(--card-bg)];
   }
 
   .input-brutal {
     @apply border-3 border-ink-950 bg-white px-4 py-3 font-mono text-sm
-           focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2;
+           focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2
+           dark:bg-[var(--input-bg)] dark:focus:ring-offset-[var(--surface-raised)];
   }
 
   .label-brutal {
@@ -85,7 +126,8 @@
 
   .badge-pending {
     @apply inline-flex items-center gap-1.5 border-2 border-ink-300 bg-ink-50 text-ink-500
-           font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1;
+           font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1
+           dark:bg-ink-800 dark:border-ink-500;
   }
 
   .badge-failed {

@@ -10,15 +10,32 @@ import {
   ChevronLeft,
   Menu,
   LogOut,
+  Kanban,
+  ListTodo,
+  Award,
+  Activity,
+  Inbox,
+  UserCheck,
+  CreditCard,
+  LineChart,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import BrandLogo from './BrandLogo';
+import ThemeToggle from './ThemeToggle';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/work-queue', icon: ListTodo, label: 'Work queue' },
+  { to: '/outreach', icon: Kanban, label: 'Outreach' },
+  { to: '/inbound', icon: Inbox, label: 'Inbound' },
+  { to: '/customers', icon: UserCheck, label: 'Customers' },
+  { to: '/payments', icon: CreditCard, label: 'Payments' },
+  { to: '/plan', icon: LineChart, label: 'Business plan' },
   { to: '/organizations', icon: Building2, label: 'Organizations' },
   { to: '/verification', icon: Shield, label: 'Verification' },
+  { to: '/badges', icon: Award, label: 'Badges' },
+  { to: '/monitoring', icon: Activity, label: 'Monitoring' },
   { to: '/contacts', icon: Users, label: 'Contacts' },
   { to: '/inquiries', icon: Mail, label: 'Inquiries' },
   { to: '/blog-manager', icon: FileText, label: 'Blog' },
@@ -55,7 +72,7 @@ export default function CRMLayout() {
             {collapsed ? (
               <BrandLogo variant="icon" onDark iconClassName="h-10 w-10" />
             ) : (
-              <BrandLogo onDark fullClassName="h-10 sm:h-11 w-auto max-w-[200px]" />
+              <BrandLogo onDark showTagline={false} iconClassName="h-9 w-9 sm:h-10 sm:w-10" />
             )}
           </div>
         </div>
@@ -114,6 +131,7 @@ export default function CRMLayout() {
               <div className="h-2 w-2 rounded-full bg-teal animate-pulse" />
               <span className="font-mono text-2xs uppercase tracking-wider text-ink-500">Active</span>
             </div>
+            <ThemeToggle />
             <button
               type="button"
               onClick={handleSignOut}
@@ -126,7 +144,7 @@ export default function CRMLayout() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>

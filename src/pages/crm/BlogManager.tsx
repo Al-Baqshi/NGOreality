@@ -93,20 +93,20 @@ export default function BlogManager() {
   }
 
   return (
-    <div>
+    <div className="min-w-0 w-full max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-black uppercase tracking-tight">Blog Manager</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-3xl font-black uppercase tracking-tight">Blog Manager</h1>
           <p className="text-sm text-ink-500 mt-1">Create and manage blog posts for the public site.</p>
         </div>
-        <button onClick={() => setCreating(true)} className="btn-brutal-accent inline-flex items-center gap-2">
+        <button onClick={() => setCreating(true)} className="btn-brutal-accent inline-flex items-center justify-center gap-2 min-h-[44px] w-full sm:w-auto shrink-0">
           <Plus size={16} /> New Post
         </button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="card-brutal p-4">
           <div className="text-2xl font-black">{posts.length}</div>
           <div className="font-mono text-2xs uppercase tracking-wider text-ink-400">Total Posts</div>
@@ -152,32 +152,34 @@ export default function BlogManager() {
       ) : (
         <div className="space-y-3">
           {filtered.map((post) => (
-            <div key={post.id} className="card-brutal p-4 flex items-center gap-4">
-              <div className="flex h-10 w-10 items-center justify-center border-2 border-ink-200 bg-ink-50 shrink-0">
-                <FileText size={18} className="text-ink-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-sm font-bold truncate">{post.title}</h3>
-                  <span className={`shrink-0 font-mono text-2xs uppercase tracking-wider px-1.5 py-0.5 border ${
-                    post.status === 'published'
-                      ? 'border-teal text-teal bg-teal-light'
-                      : 'border-amber-400 text-amber-600 bg-amber-50'
-                  }`}>
-                    {post.status}
-                  </span>
+            <div key={post.id} className="card-brutal p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 overflow-hidden">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <div className="flex h-10 w-10 items-center justify-center border-2 border-ink-200 bg-ink-50 shrink-0">
+                  <FileText size={18} className="text-ink-400" />
                 </div>
-                <div className="flex items-center gap-4 font-mono text-2xs text-ink-400 uppercase tracking-wider">
-                  <span>/{post.slug}</span>
-                  {post.author && (
-                    <span className="flex items-center gap-1"><User size={10} /> {post.author}</span>
-                  )}
-                  {post.published_at && (
-                    <span className="flex items-center gap-1"><Calendar size={10} /> {new Date(post.published_at).toLocaleDateString()}</span>
-                  )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <h3 className="text-sm font-bold break-words min-w-0 flex-1">{post.title}</h3>
+                    <span className={`shrink-0 font-mono text-2xs uppercase tracking-wider px-1.5 py-0.5 border ${
+                      post.status === 'published'
+                        ? 'border-teal text-teal bg-teal-light'
+                        : 'border-amber-400 text-amber-600 bg-amber-50'
+                    }`}>
+                      {post.status}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-2xs text-ink-400 uppercase tracking-wider">
+                    <span className="break-all">/{post.slug}</span>
+                    {post.author && (
+                      <span className="flex items-center gap-1 shrink-0"><User size={10} /> {post.author}</span>
+                    )}
+                    {post.published_at && (
+                      <span className="flex items-center gap-1 shrink-0"><Calendar size={10} /> {new Date(post.published_at).toLocaleDateString()}</span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                 <button
                   onClick={() => handleTogglePublish(post)}
                   title={post.status === 'published' ? 'Unpublish' : 'Publish'}
@@ -236,17 +238,17 @@ function BlogEditor({ post, saving, onSave, onCancel }: {
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-black uppercase tracking-tight">
+    <div className="min-w-0 w-full max-w-6xl mx-auto">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-3xl font-black uppercase tracking-tight">
             {post ? 'Edit Post' : 'New Post'}
           </h1>
-          <p className="text-sm text-ink-500 mt-1">
+          <p className="text-sm text-ink-500 mt-1 break-words">
             {post ? `Editing: ${post.title}` : 'Create a new blog post.'}
           </p>
         </div>
-        <button onClick={onCancel} className="btn-brutal inline-flex items-center gap-2">
+        <button onClick={onCancel} className="btn-brutal inline-flex items-center justify-center gap-2 min-h-[44px] w-full sm:w-auto shrink-0">
           Cancel
         </button>
       </div>

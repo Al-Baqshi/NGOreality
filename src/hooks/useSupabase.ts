@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Organization, Contact, VerificationCriterion, VerificationBadge, ActivityLogEntry, InquirySubmission, BlogPost } from '../types';
 
@@ -24,17 +24,19 @@ export function useOrganization(id: string | undefined) {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const refetch = useCallback(async () => {
     if (!id) return;
     setLoading(true);
-    supabase.from('organizations').select('*').eq('id', id).maybeSingle()
-      .then(({ data, error }) => {
-        if (!error && data) setOrganization(data);
-        setLoading(false);
-      });
+    const { data, error } = await supabase.from('organizations').select('*').eq('id', id).maybeSingle();
+    if (!error && data) setOrganization(data);
+    setLoading(false);
   }, [id]);
 
-  return { organization, loading };
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  return { organization, loading, refetch };
 }
 
 export function useContacts(organizationId: string | undefined) {
@@ -58,17 +60,23 @@ export function useVerificationCriteria(organizationId: string | undefined) {
   const [criteria, setCriteria] = useState<VerificationCriterion[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const refetch = useCallback(async () => {
     if (!organizationId) return;
     setLoading(true);
-    supabase.from('verification_criteria').select('*').eq('organization_id', organizationId).order('created_at', { ascending: true })
-      .then(({ data, error }) => {
-        if (!error && data) setCriteria(data);
-        setLoading(false);
-      });
+    const { data, error } = await supabase
+      .from('verification_criteria')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .order('created_at', { ascending: true });
+    if (!error && data) setCriteria(data);
+    setLoading(false);
   }, [organizationId]);
 
-  return { criteria, loading };
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  return { criteria, loading, refetch, setCriteria };
 }
 
 export function useBadges(organizationId: string | undefined) {
@@ -240,25 +248,19 @@ export function useAllBlogPosts() {
   return { posts, loading, refetch: fetchAll };
 }
 
+/** @deprecated Use useDirectoryCountryCounts from useDirectory.ts (accurate at 29k+ scale) */
 export function useCountryCounts() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    supabase.from('organizations').select('country, status').in('status', [...DIRECTORY_STATUSES])
-      .then(({ data, error }) => {
-        if (!error && data) {
-          const aggregated: Record<string, number> = {};
-          for (const row of data) {
-            if (row.country) {
-              aggregated[row.country] = (aggregated[row.country] || 0) + 1;
-            }
-          }
-          setCounts(aggregated);
-        }
-        setLoading(false);
-      });
+    supabase.rpc('directory_country_counts').then(({ data, error }) => {
+      if (!error && data && typeof data === 'object') {
+        setCounts(data as Record<string, number>);
+      }
+      setLoading(false);
+    });
   }, []);
 
   return { counts, loading };

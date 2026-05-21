@@ -1,0 +1,108 @@
+/* Utility overrides for brutalist tokens used across pages */
+.dark {
+  color-scheme: dark;
+}
+
+.dark .text-ink-950 {
+  color: #f0f0f0;
+}
+
+.dark .text-ink-900 {
+  color: #e8e8e8;
+}
+
+.dark .text-ink-800 {
+  color: #d4d4d4;
+}
+
+.dark .text-ink-700 {
+  color: #c4c4c4;
+}
+
+.dark .text-ink-600 {
+  color: #a8a8a8;
+}
+
+.dark .text-ink-500 {
+  color: #909090;
+}
+
+.dark .text-ink-400 {
+  color: #787878;
+}
+
+.dark .text-ink-300 {
+  color: #b0b0b0;
+}
+
+.dark .bg-white {
+  background-color: #1c1c1c;
+}
+
+.dark .bg-ink-50 {
+  background-color: #242424;
+}
+
+.dark .bg-ink-100 {
+  background-color: #2a2a2a;
+}
+
+.dark .border-ink-950 {
+  border-color: #d4d4d4;
+}
+
+.dark .border-ink-300 {
+  border-color: #555555;
+}
+
+.dark .border-ink-200 {
+  border-color: #404040;
+}
+
+.dark .border-ink-100 {
+  border-color: #333333;
+}
+
+.dark .border-t-3.border-ink-950,
+.dark .border-b-3.border-ink-950,
+.dark .border-r-3.border-ink-950,
+.dark .border-l-3.border-ink-950 {
+  border-color: #d4d4d4;
+}
+
+.dark .hover\:bg-ink-50:hover {
+  background-color: #2a2a2a;
+}
+
+.dark .hover\:text-ink-950:hover {
+  color: #f0f0f0;
+}
+
+.dark .placeholder\:text-ink-400::placeholder {
+  color: #787878;
+}
+
+.dark .divide-ink-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #333333;
+}
+
+.dark .shadow-brutal {
+  box-shadow: 4px 4px 0 0 #000000;
+}
+
+.dark .shadow-brutal-sm {
+  box-shadow: 2px 2px 0 0 #000000;
+}
+
+.dark .shadow-brutal-lg {
+  box-shadow: 6px 6px 0 0 #000000;
+}
+
+/* CRM sidebar stays dark; main chrome uses inverted borders on hover */
+.dark .hover\:bg-ink-950:hover {
+  background-color: #e8e8e8;
+}
+
+.dark .hover\:text-white:hover {
+  color: #0a0a0a;
+}

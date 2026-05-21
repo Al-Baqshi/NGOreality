@@ -87,22 +87,37 @@ export function CriterionStatus({ status }: { status: 'pass' | 'fail' | 'pending
   return <span className="badge-pending"><AlertCircle size={12} />Pending</span>;
 }
 
-export function MetricCard({ label, value, accent }: { label: string; value: string | number; accent?: boolean }) {
+export function MetricCard({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  accent?: boolean;
+}) {
   return (
     <div className="card-brutal p-6">
       <div className="label-brutal">{label}</div>
       <div className={`text-4xl font-black tracking-tight ${accent ? 'text-accent' : 'text-ink-950'}`}>
         {value}
       </div>
+      {sub ? <div className="font-mono text-2xs text-ink-400 mt-1 uppercase tracking-wider">{sub}</div> : null}
     </div>
   );
 }
 
 export function SectionHeader({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex items-center justify-between border-b-3 border-ink-950 pb-4 mb-6">
-      <h2 className="text-2xl font-black uppercase tracking-tight">{children}</h2>
-      {action && <div>{action}</div>}
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b-3 border-ink-950 pb-4 mb-6 min-w-0">
+      <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight min-w-0 truncate">{children}</h2>
+      {action && (
+        <div className="shrink-0 w-full sm:w-auto [&_a]:w-full sm:[&_a]:w-auto [&_button]:w-full sm:[&_button]:w-auto [&_a]:justify-center sm:[&_a]:justify-start [&_button]:justify-center sm:[&_button]:justify-start">
+          {action}
+        </div>
+      )}
     </div>
   );
 }

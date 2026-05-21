@@ -1,57 +1,117 @@
 import { Link } from 'react-router-dom';
+import { useTheme } from '../contexts/ThemeContext';
 
 type BrandLogoProps = {
-  /** Full horizontal logo, or compact mark (sidebar collapsed only) */
+  /** Icon only, or icon + wordmark */
   variant?: 'full' | 'icon';
   linkToPublic?: boolean;
+  /** Show tagline under the name (full variant only) */
+  showTagline?: boolean;
+  /** Horizontal (header) or stacked icon above wordmark (footer) */
+  layout?: 'horizontal' | 'stacked';
+  /** Allow wordmark / tagline to wrap instead of overflowing */
+  allowWrap?: boolean;
   className?: string;
-  /** Full logo height (width scales with aspect ratio) */
-  fullClassName?: string;
-  /** Compact mark — sidebar collapsed only; not for favicon use in headers */
+  linkClassName?: string;
+  /** Icon mark size */
   iconClassName?: string;
+  /** Footer / CRM dark chrome — light text, light icon strokes */
   onDark?: boolean;
 };
 
-const fullLogoSrc = '/logo.svg';
-const iconLogoSrc = '/logo-icon.svg';
+function iconSrc(onDark: boolean, resolvedTheme: 'light' | 'dark') {
+  return onDark || resolvedTheme === 'dark' ? '/logo-icon-dark.svg' : '/logo-icon.svg';
+}
 
 export default function BrandLogo({
   variant = 'full',
   linkToPublic = false,
+  showTagline = true,
+  layout = 'horizontal',
+  allowWrap = false,
   className = '',
-  fullClassName = 'h-12 sm:h-14 md:h-16 w-auto max-w-[min(320px,72vw)]',
-  iconClassName = 'h-10 w-10 sm:h-11 sm:w-11',
+  linkClassName = '',
+  iconClassName = 'h-12 w-12 sm:h-14 sm:w-14 md:h-[3.75rem] md:w-[3.75rem] shrink-0',
   onDark = false,
 }: BrandLogoProps) {
-  const tone = onDark ? 'brightness-0 invert' : '';
+  const { resolvedTheme } = useTheme();
+  const isDark = onDark || resolvedTheme === 'dark';
+  const src = iconSrc(onDark, resolvedTheme);
 
-  const content =
-    variant === 'icon' ? (
+  const nameClass = isDark
+    ? 'text-white'
+    : 'text-ink-950 dark:text-ink-50';
+
+  const taglineClass = isDark
+    ? 'text-ink-300'
+    : 'text-ink-500 dark:text-ink-400';
+
+  if (variant === 'icon') {
+    const icon = (
       <img
-        src={iconLogoSrc}
+        src={src}
         alt="NGOreality"
-        className={`object-contain shrink-0 ${tone} ${iconClassName}`}
-        decoding="async"
-      />
-    ) : (
-      <img
-        src={fullLogoSrc}
-        alt="NGOreality"
-        className={`object-contain object-left shrink-0 ${tone} ${fullClassName} ${className}`}
+        className={`object-contain ${iconClassName}`}
         decoding="async"
       />
     );
+    if (linkToPublic) {
+      return (
+        <Link
+          to="/public"
+          className={`inline-flex shrink-0 cursor-pointer select-none caret-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 ${linkClassName}`}
+        >
+          {icon}
+        </Link>
+      );
+    }
+    return icon;
+  }
+
+  const nowrap = allowWrap ? '' : 'whitespace-nowrap';
+  const stacked = layout === 'stacked';
+
+  const lockup = (
+    <div
+      className={`inline-flex min-w-0 max-w-full ${
+        stacked ? 'flex-col items-start gap-3' : 'items-center gap-2.5 sm:gap-3'
+      } ${className}`}
+      aria-label="NGOreality — Digital trust infrastructure"
+    >
+      <img
+        src={src}
+        alt=""
+        aria-hidden
+        className={`object-contain shrink-0 ${iconClassName}`}
+        decoding="async"
+      />
+      <div className="flex flex-col justify-center min-w-0 max-w-full gap-0.5 sm:gap-1 leading-snug pointer-events-none select-none">
+        <span
+          className={`font-black uppercase tracking-[0.04em] text-base sm:text-lg md:text-xl ${nowrap} ${nameClass}`}
+        >
+          NGOREALITY
+        </span>
+        {showTagline && (
+          <span
+            className={`font-mono font-medium uppercase tracking-[0.12em] sm:tracking-[0.2em] text-[0.65rem] sm:text-xs ${nowrap} ${taglineClass}`}
+          >
+            Digital trust infrastructure
+          </span>
+        )}
+      </div>
+    </div>
+  );
 
   if (linkToPublic) {
     return (
       <Link
         to="/public"
-        className="inline-flex items-center min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+        className={`inline-flex min-w-0 cursor-pointer select-none caret-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-900 ${linkClassName}`}
       >
-        {content}
+        {lockup}
       </Link>
     );
   }
 
-  return content;
+  return lockup;
 }

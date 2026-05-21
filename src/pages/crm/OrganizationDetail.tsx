@@ -13,16 +13,20 @@ import {
   REGISTRY_SOURCE_LABELS,
 } from '../../types';
 import type { OrgStatus, VerificationLevel, OutreachStatus } from '../../types';
-import { isRegistryListed } from '../../types';
+import { isRegistryListed, OUTREACH_KANBAN_STATUSES } from '../../types';
+import { markRegisteredInbound, registerAsCustomer, setOutreachStatus } from '../../lib/crmOutreach';
 import { FINANCIAL_VERIFICATION_ENABLED, getVerificationLevelOptions } from '../../config/features';
 import FinancialComingSoon from '../../components/FinancialComingSoon';
-import { ArrowLeft, Globe, Mail, Phone, MapPin, CreditCard as Edit3, Save, X, Shield, Clock, User, Plus, Trash2, Award } from 'lucide-react';
+import OrganizationEngagements from '../../components/crm/OrganizationEngagements';
+import OrganizationPayments from '../../components/crm/OrganizationPayments';
+import { updateCriterionStatuses, tryAutoVerifyOrganization, allBaseCriteriaPass } from '../../lib/verification';
+import { ArrowLeft, Globe, Mail, Phone, MapPin, CreditCard as Edit3, Save, X, Shield, Clock, User, Plus, Trash2, Award, CheckCheck } from 'lucide-react';
 
 export default function OrganizationDetail() {
   const { id } = useParams<{ id: string }>();
-  const { organization, loading } = useOrganization(id);
+  const { organization, loading, refetch: refetchOrganization } = useOrganization(id);
   const { contacts, loading: contactsLoading } = useContacts(id);
-  const { criteria, loading: criteriaLoading } = useVerificationCriteria(id);
+  const { criteria, loading: criteriaLoading, refetch: refetchCriteria, setCriteria } = useVerificationCriteria(id);
   const { badges, loading: badgesLoading } = useBadges(id);
   const { entries, loading: logLoading } = useActivityLog(id);
 
@@ -30,6 +34,8 @@ export default function OrganizationDetail() {
   const [editForm, setEditForm] = useState(organization || null);
   const [contactModal, setContactModal] = useState(false);
   const [contactForm, setContactForm] = useState({ name: '', role: '', email: '', phone: '', is_primary: false, notes: '' });
+  const [criteriaBusy, setCriteriaBusy] = useState(false);
+  const [verifyNotice, setVerifyNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (organization) setEditForm(organization);
@@ -59,45 +65,18 @@ export default function OrganizationDetail() {
 
   const handleOutreachChange = async (outreach: OutreachStatus) => {
     if (!id) return;
-    await supabase
-      .from('organizations')
-      .update({ outreach_status: outreach, updated_at: new Date().toISOString() })
-      .eq('id', id);
-    await supabase.from('activity_log').insert({
-      organization_id: id,
-      action: 'outreach_updated',
-      description: `Outreach: ${OUTREACH_STATUS_LABELS[outreach]}`,
-      performed_by: 'staff',
-    });
+    if (outreach === 'registered' || outreach === 'responded') {
+      await markRegisteredInbound(id);
+    } else {
+      await setOutreachStatus(id, outreach);
+    }
     window.location.reload();
   };
 
-  const handleBeginVerification = async () => {
-    if (!id) return;
-    await supabase
-      .from('organizations')
-      .update({
-        status: 'onboarding',
-        onboarding_stage: 'intake',
-        outreach_status: 'responded',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id);
-    const { count } = await supabase
-      .from('verification_criteria')
-      .select('id', { count: 'exact', head: true })
-      .eq('organization_id', id);
-    if (!count) {
-      await supabase.from('verification_criteria').insert(
-        DEFAULT_CRITERIA.map((c) => ({ organization_id: id, ...c })),
-      );
-    }
-    await supabase.from('activity_log').insert({
-      organization_id: id,
-      action: 'verification_started',
-      description: 'Moved from registry listing to NGOreality verification onboarding',
-      performed_by: 'staff',
-    });
+  const handleRegisterAsCustomer = async () => {
+    if (!id || !organization) return;
+    if (!confirm(`Register "${organization.name}" as a customer?`)) return;
+    await registerAsCustomer(id);
     window.location.reload();
   };
 
@@ -117,12 +96,58 @@ export default function OrganizationDetail() {
     window.location.reload();
   };
 
-  const handleCriterionStatus = async (criterionId: string, newStatus: 'pass' | 'fail' | 'pending') => {
-    await supabase.from('verification_criteria').update({
-      status: newStatus,
-      evaluated_at: new Date().toISOString(),
-    }).eq('id', criterionId);
-    window.location.reload();
+  const applyCriteriaUpdates = async (
+    updates: { id: string; status: 'pass' | 'fail' | 'pending' }[],
+  ) => {
+    if (!id || !organization || updates.length === 0) return;
+    setCriteriaBusy(true);
+    setVerifyNotice(null);
+
+    const evaluatedAt = new Date().toISOString();
+    setCriteria((prev) =>
+      prev.map((c) => {
+        const u = updates.find((x) => x.id === c.id);
+        return u ? { ...c, status: u.status, evaluated_at: evaluatedAt } : c;
+      }),
+    );
+
+    const { error } = await updateCriterionStatuses(updates);
+    if (error) {
+      setVerifyNotice(error);
+      await refetchCriteria();
+      setCriteriaBusy(false);
+      return;
+    }
+
+    const merged = criteria.map((c) => {
+      const u = updates.find((x) => x.id === c.id);
+      return u ? { ...c, status: u.status, evaluated_at: evaluatedAt } : c;
+    });
+
+    if (allBaseCriteriaPass(merged)) {
+      const result = await tryAutoVerifyOrganization(id, merged, organization);
+      if (result.verified) {
+        setVerifyNotice(result.message);
+        await refetchOrganization();
+        await refetchCriteria();
+      }
+    }
+
+    setCriteriaBusy(false);
+  };
+
+  const handleCriterionStatus = (criterionId: string, newStatus: 'pass' | 'fail' | 'pending') => {
+    applyCriteriaUpdates([{ id: criterionId, status: newStatus }]);
+  };
+
+  const handlePassAllBase = () => {
+    const base = criteria.filter((c) => DEFAULT_CRITERIA.some((d) => d.criterion_key === c.criterion_key));
+    applyCriteriaUpdates(base.map((c) => ({ id: c.id, status: 'pass' as const })));
+  };
+
+  const handleResetBasePending = () => {
+    const base = criteria.filter((c) => DEFAULT_CRITERIA.some((d) => d.criterion_key === c.criterion_key));
+    applyCriteriaUpdates(base.map((c) => ({ id: c.id, status: 'pending' as const })));
   };
 
   const handleInitializeCriteria = async () => {
@@ -176,30 +201,30 @@ export default function OrganizationDetail() {
   const financialScore = financialCriteriaList.length > 0 ? Math.round((financialCriteriaList.filter((c) => c.status === 'pass').length / financialCriteriaList.length) * 100) : 0;
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto min-w-0 w-full">
       {/* Back */}
       <Link to="/organizations" className="inline-flex items-center gap-2 font-mono text-2xs uppercase tracking-wider text-ink-500 hover:text-ink-950 transition-colors mb-6">
         <ArrowLeft size={14} /> Back to Organizations
       </Link>
 
       {/* Header */}
-      <div className="card-brutal p-6 mb-6">
+      <div className="card-brutal p-4 sm:p-6 mb-6 overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 items-center justify-center border-3 border-ink-950 bg-ink-50 font-mono text-xl font-black text-ink-600 shrink-0">
+          <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
+            <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center border-3 border-ink-950 bg-ink-50 font-mono text-lg sm:text-xl font-black text-ink-600 shrink-0">
               {organization.name.charAt(0)}
             </div>
-            <div>
-              <h1 className="text-2xl font-black uppercase tracking-tight">{organization.name}</h1>
-              <div className="flex items-center gap-3 mt-2">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg sm:text-2xl font-black uppercase tracking-tight break-words">{organization.name}</h1>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
                 <StatusPill status={organization.status} />
                 <VerificationBadge level={organization.verification_level} showDisclaimer />
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap gap-2 w-full md:w-auto shrink-0">
             {!editing ? (
-              <button onClick={() => setEditing(true)} className="btn-brutal-outline text-sm flex items-center gap-2">
+              <button onClick={() => setEditing(true)} className="btn-brutal-outline text-sm flex items-center justify-center gap-2 min-h-[44px] flex-1 sm:flex-none">
                 <Edit3 size={14} /> Edit
               </button>
             ) : (
@@ -241,21 +266,29 @@ export default function OrganizationDetail() {
               <div className="flex-1 min-w-0">
                 <label className="label-brutal">Outreach status</label>
                 <select
-                  className="input-brutal w-full mt-1"
+                  className="input-brutal w-full mt-1 text-base"
                   value={organization.outreach_status}
                   onChange={(e) => handleOutreachChange(e.target.value as OutreachStatus)}
+                  disabled={organization.is_customer}
                 >
-                  {Object.entries(OUTREACH_STATUS_LABELS).map(([k, v]) => (
+                  {[...OUTREACH_KANBAN_STATUSES, 'registered' as const, 'declined' as const].map((k) => (
                     <option key={k} value={k}>
-                      {v}
+                      {OUTREACH_STATUS_LABELS[k]}
                     </option>
                   ))}
+                  {organization.is_customer && (
+                    <option value="not_applicable">{OUTREACH_STATUS_LABELS.not_applicable}</option>
+                  )}
                 </select>
               </div>
-              {organization.status === 'listed' && (
+              {organization.status === 'listed' && !organization.is_customer && (
                 <div className="flex items-end">
-                  <button type="button" onClick={handleBeginVerification} className="btn-brutal-teal w-full sm:w-auto text-sm">
-                    Begin NGOreality verification
+                  <button
+                    type="button"
+                    onClick={handleRegisterAsCustomer}
+                    className="btn-brutal-accent w-full sm:w-auto text-sm min-h-[44px]"
+                  >
+                    Register as customer
                   </button>
                 </div>
               )}
@@ -378,8 +411,28 @@ export default function OrganizationDetail() {
               <h3 className="font-mono text-xs uppercase tracking-wider font-semibold flex items-center gap-2">
                 <Shield size={14} /> Verified Criteria
               </h3>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap justify-end">
                 <span className="font-mono text-sm font-black">{baseScore}%</span>
+                {baseCriteria.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={criteriaBusy}
+                      onClick={handlePassAllBase}
+                      className="btn-brutal-teal text-2xs py-1.5 px-3 flex items-center gap-1 min-h-[36px] disabled:opacity-50"
+                    >
+                      <CheckCheck size={12} /> Pass all
+                    </button>
+                    <button
+                      type="button"
+                      disabled={criteriaBusy}
+                      onClick={handleResetBasePending}
+                      className="btn-brutal-outline text-2xs py-1.5 px-3 min-h-[36px] disabled:opacity-50"
+                    >
+                      Reset pending
+                    </button>
+                  </>
+                )}
                 {baseCriteria.length === 0 && (
                   <button onClick={handleInitializeCriteria} className="btn-brutal-outline text-2xs py-1.5 px-3 flex items-center gap-1">
                     <Plus size={12} /> Initialize
@@ -387,8 +440,12 @@ export default function OrganizationDetail() {
                 )}
               </div>
             </div>
-            <div className="border-b border-ink-100 px-6 py-2 bg-amber-50">
-              <span className="font-mono text-2xs text-amber-700 uppercase tracking-wider">Non-financial verification — digital & operational standards only</span>
+            <div className="border-b border-ink-100 px-6 py-2 bg-amber-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <span className="font-mono text-2xs text-amber-700 uppercase tracking-wider">All base criteria pass → auto-verified + badge</span>
+              {criteriaBusy && <span className="font-mono text-2xs text-ink-500">Saving…</span>}
+              {verifyNotice && !criteriaBusy && (
+                <span className="font-mono text-2xs text-teal">{verifyNotice}</span>
+              )}
             </div>
             <div className="divide-y divide-ink-100">
               {criteriaLoading ? (
@@ -408,8 +465,10 @@ export default function OrganizationDetail() {
                         {(['pass', 'fail', 'pending'] as const).map((s) => (
                           <button
                             key={s}
+                            type="button"
+                            disabled={criteriaBusy}
                             onClick={() => handleCriterionStatus(c.id, s)}
-                            className={`px-2 py-1 font-mono text-2xs uppercase tracking-wider transition-colors
+                            className={`px-2 py-1 font-mono text-2xs uppercase tracking-wider transition-colors min-h-[36px] disabled:opacity-50
                               ${c.status === s
                                 ? s === 'pass' ? 'bg-teal text-white' : s === 'fail' ? 'bg-accent text-white' : 'bg-ink-200 text-ink-700'
                                 : 'bg-white text-ink-400 hover:bg-ink-50'
@@ -461,8 +520,10 @@ export default function OrganizationDetail() {
                         {(['pass', 'fail', 'pending'] as const).map((s) => (
                           <button
                             key={s}
+                            type="button"
+                            disabled={criteriaBusy}
                             onClick={() => handleCriterionStatus(c.id, s)}
-                            className={`px-2 py-1 font-mono text-2xs uppercase tracking-wider transition-colors
+                            className={`px-2 py-1 font-mono text-2xs uppercase tracking-wider transition-colors min-h-[36px] disabled:opacity-50
                               ${c.status === s
                                 ? s === 'pass' ? 'bg-teal text-white' : s === 'fail' ? 'bg-accent text-white' : 'bg-ink-200 text-ink-700'
                                 : 'bg-white text-ink-400 hover:bg-ink-50'
@@ -485,6 +546,15 @@ export default function OrganizationDetail() {
 
         {/* Right column */}
         <div className="space-y-6">
+          {id && <OrganizationEngagements organizationId={id} />}
+          {id && organization && (
+            <OrganizationPayments
+              organizationId={id}
+              organizationName={organization.name}
+              paymentReference={organization.payment_reference}
+            />
+          )}
+
           {/* Contacts */}
           <div className="card-brutal">
             <div className="flex items-center justify-between border-b-3 border-ink-950 px-6 py-4">

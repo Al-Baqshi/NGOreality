@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
@@ -18,19 +19,19 @@ export default {
           50: '#f0f0f0',
         },
         accent: {
-          DEFAULT: '#c23c2a',
+          DEFAULT: '#EC5620',
           hover: '#a83222',
-          light: '#f5e6e3',
+          light: 'var(--accent-light)',
         },
         teal: {
           DEFAULT: '#1a7a6d',
           hover: '#146358',
-          light: '#e6f2f0',
+          light: 'var(--teal-light)',
         },
         surface: {
-          DEFAULT: '#fafafa',
-          raised: '#ffffff',
-          overlay: '#f5f5f5',
+          DEFAULT: 'var(--surface-default)',
+          raised: 'var(--surface-raised)',
+          overlay: 'var(--surface-overlay)',
         },
       },
       fontFamily: {
@@ -49,9 +50,9 @@ export default {
         '3': '3px',
       },
       boxShadow: {
-        brutal: '4px 4px 0px 0px #0a0a0a',
-        'brutal-sm': '2px 2px 0px 0px #0a0a0a',
-        'brutal-lg': '6px 6px 0px 0px #0a0a0a',
+        brutal: 'var(--shadow-brutal)',
+        'brutal-sm': 'var(--shadow-brutal-sm)',
+        'brutal-lg': 'var(--shadow-brutal-lg)',
       },
     },
   },

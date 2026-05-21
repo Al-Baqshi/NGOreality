@@ -3,6 +3,7 @@ import { LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import BrandLogo from './BrandLogo';
+import ThemeToggle from './ThemeToggle';
 
 export default function NgoLayout() {
   const { signOut, user } = useAuth();
@@ -19,7 +20,7 @@ export default function NgoLayout() {
       <header className="sticky top-0 z-40 border-b-3 border-ink-950 bg-surface-raised">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4">
           <Link to="/ngo" className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <BrandLogo fullClassName="h-11 sm:h-12 w-auto max-w-[220px]" />
+            <BrandLogo iconClassName="h-10 w-10 sm:h-11" showTagline={false} />
             <span className="text-sm sm:text-base font-black uppercase tracking-[0.12em] text-ink-950 truncate">
               NGO Portal
             </span>
@@ -46,6 +47,7 @@ export default function NgoLayout() {
           </nav>
 
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <span className="hidden md:block font-mono text-2xs text-ink-400 truncate max-w-[140px]">
               {user?.email}
             </span>

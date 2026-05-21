@@ -9,6 +9,14 @@ import Verification from './pages/crm/Verification';
 import Contacts from './pages/crm/Contacts';
 import Inquiries from './pages/crm/Inquiries';
 import BlogManager from './pages/crm/BlogManager';
+import OutreachBoard from './pages/crm/OutreachBoard';
+import InboundQueue from './pages/crm/InboundQueue';
+import CustomersList from './pages/crm/CustomersList';
+import PaymentsList from './pages/crm/PaymentsList';
+import BusinessPlan from './pages/crm/BusinessPlan';
+import WorkQueue from './pages/crm/WorkQueue';
+import CrmBadges from './pages/crm/CrmBadges';
+import Monitoring from './pages/crm/Monitoring';
 import Homepage from './pages/public/Homepage';
 import HowItWorks from './pages/public/HowItWorks';
 import Directory from './pages/public/Directory';
@@ -52,6 +60,14 @@ export default function App() {
             <Route path="/organizations/new" element={<OrganizationNew />} />
             <Route path="/organizations/:id" element={<OrganizationDetail />} />
             <Route path="/verification" element={<Verification />} />
+            <Route path="/outreach" element={<OutreachBoard />} />
+            <Route path="/inbound" element={<InboundQueue />} />
+            <Route path="/customers" element={<CustomersList />} />
+            <Route path="/payments" element={<PaymentsList />} />
+            <Route path="/plan" element={<BusinessPlan />} />
+            <Route path="/work-queue" element={<WorkQueue />} />
+            <Route path="/badges" element={<CrmBadges />} />
+            <Route path="/monitoring" element={<Monitoring />} />
             <Route path="/contacts" element={<Contacts />} />
             <Route path="/inquiries" element={<Inquiries />} />
             <Route path="/blog-manager" element={<BlogManager />} />

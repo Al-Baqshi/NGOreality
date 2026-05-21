@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><image width="36" height="36" href="data:image/png;base64,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"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="NGOreality">
+  <!-- Handle -->
+  <path
+    d="M20 31c0-10 24-10 24 0"
+    stroke="#141414"
+    stroke-width="4.5"
+    fill="none"
+    stroke-linecap="round"
+  />
+  <!-- Strap anchors -->
+  <path d="M20 31v3M44 31v3" stroke="#141414" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Bag body -->
+  <rect x="11" y="34" width="42" height="24" rx="4" fill="#c23c2a"/>
+  <!-- Front panel -->
+  <rect x="16" y="38" width="32" height="16" rx="2" fill="#ffffff"/>
+</svg>

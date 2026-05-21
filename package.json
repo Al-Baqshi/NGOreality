@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "api": "go run -C backend ./cmd/api",
+    "worker": "go run -C backend ./cmd/worker",
+    "dev:all": "bash scripts/dev.sh",
+    "dev:backend": "make -C backend dev",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",

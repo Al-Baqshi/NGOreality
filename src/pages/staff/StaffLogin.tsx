@@ -4,6 +4,7 @@ import { Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import SEO from '../../components/SEO';
 import BrandLogo from '../../components/BrandLogo';
+import ThemeToggle from '../../components/ThemeToggle';
 
 type StaffLoginLocationState = {
   from?: string;
@@ -54,10 +55,11 @@ export default function StaffLogin() {
         path="/staff/login"
       />
       <div className="min-h-screen bg-surface flex flex-col">
-        <header className="border-b-3 border-ink-950 px-4 sm:px-6 py-4">
+        <header className="border-b-3 border-ink-950 px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
           <Link to="/public" className="inline-flex items-center min-w-0">
-            <BrandLogo fullClassName="h-12 sm:h-14 w-auto max-w-[280px]" />
+            <BrandLogo iconClassName="h-11 w-11 sm:h-12 sm:w-12" />
           </Link>
+          <ThemeToggle />
         </header>
 
         <div className="flex-1 flex items-center justify-center px-4 py-10">
