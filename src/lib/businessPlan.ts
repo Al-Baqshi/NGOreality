@@ -28,6 +28,17 @@ export function recentMonthKeys(count: number): string[] {
   return keys;
 }
 
+/** Next N months from the current month (forward forecast), oldest first. */
+export function forecastMonthKeys(count: number): string[] {
+  const keys: string[] = [];
+  const now = new Date();
+  for (let i = 0; i < count; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + i, 1));
+    keys.push(monthKey(d.getUTCFullYear(), d.getUTCMonth()));
+  }
+  return keys;
+}
+
 export function formatMonthLabel(periodKey: string): string {
   const [y, m] = periodKey.split('-').map((n) => parseInt(n, 10));
   if (!y || !m) return periodKey;

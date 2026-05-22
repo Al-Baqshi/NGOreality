@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useOrganizationsPage, type OrganizationsPageFilters } from '../../hooks/useCrm';
-import { StatusPill, VerificationBadge, SectionHeader, EmptyState } from '../../components/ui';
+import { OrgTrustStatusBadge, SectionHeader, EmptyState } from '../../components/ui';
 import { Plus, Search, Building2, LayoutGrid, List, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { OrgStatus, OutreachStatus } from '../../types';
 import { OUTREACH_STATUS_LABELS } from '../../types';
@@ -198,7 +198,7 @@ export default function OrganizationsList() {
                 <span className="font-mono text-2xs text-ink-500 truncate">
                   {org.charity_registration_number || org.external_id || '—'}
                 </span>
-                <StatusPill status={org.status} />
+                <OrgTrustStatusBadge org={org} showHint={false} />
                 <span className="font-mono text-2xs uppercase text-ink-500">
                   {OUTREACH_STATUS_LABELS[org.outreach_status]}
                 </span>
@@ -248,14 +248,13 @@ function OrgCard({ org }: { org: import('../../types').Organization }) {
     <Link to={`/organizations/${org.id}`} className="card-brutal-hover p-5 block">
       <div className="flex items-start justify-between gap-2 mb-2">
         <h3 className="text-sm font-bold leading-tight">{org.name}</h3>
-        <StatusPill status={org.status} />
+        <OrgTrustStatusBadge org={org} showHint={false} />
       </div>
       {(org.charity_registration_number || org.external_id) && (
         <p className="font-mono text-2xs text-ink-400 mb-2">
           #{org.charity_registration_number || org.external_id}
         </p>
       )}
-      <VerificationBadge level={org.verification_level} showDisclaimer />
     </Link>
   );
 }

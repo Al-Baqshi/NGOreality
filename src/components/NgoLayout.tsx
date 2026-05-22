@@ -1,111 +1,193 @@
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo } from 'react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Globe, LogOut, PanelLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import BrandLogo from './BrandLogo';
 import ThemeToggle from './ThemeToggle';
+import {
+  NGO_PORTAL_NAV,
+  NGO_PORTAL_NAV_ONBOARDING,
+  ngoNavIdFromPathname,
+  ngoNavItemById,
+} from './ngo/ngo-nav';
+import { useNgoPortal } from '../hooks/useNgoPortal';
+import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+  useSidebar,
+} from '@/components/ui/sidebar';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import PortalNotificationBell from './notifications/PortalNotificationBell';
 
-export default function NgoLayout() {
+/** Legacy hash links → route paths */
+const NGO_HASH_REDIRECTS: Record<string, string> = {
+  profile: '/ngo/profile',
+  'setup-request': '/ngo/setup-request',
+  membership: '/ngo/membership',
+  standards: '/ngo/standards',
+  badge: '/ngo/badge',
+  monitoring: '/ngo/monitoring',
+  requests: '/ngo/requests',
+  registration: '/ngo/signup',
+};
+
+function NgoPortalFrame() {
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const { pathname, hash } = useLocation();
+  const { isMobile, setOpenMobile } = useSidebar();
+  const { hasOrganization, needsRegistration, loading: portalLoading } = useNgoPortal();
+
+  const onboarding = !portalLoading && needsRegistration;
+  const navItems = useMemo(
+    () => (onboarding ? NGO_PORTAL_NAV_ONBOARDING : NGO_PORTAL_NAV),
+    [onboarding],
+  );
+
+  const activeId = ngoNavIdFromPathname(pathname);
+  const activeItem = ngoNavItemById(activeId, onboarding);
+  const pageTitle = activeItem?.label ?? 'Member portal';
+
+  useEffect(() => {
+    const sectionId = hash.replace('#', '');
+    if (!sectionId) return;
+    const target = NGO_HASH_REDIRECTS[sectionId];
+    if (target) {
+      navigate(target, { replace: true });
+    }
+  }, [hash, navigate]);
+
+  const goToNavItem = (item: (typeof navItems)[number]) => {
+    if (item.path.startsWith('http')) return;
+    navigate(item.path);
+    if (isMobile) setOpenMobile(false);
+  };
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/ngo/login');
+    navigate('/ngo/login', { replace: true });
   };
 
   return (
-    <div className="min-h-screen bg-surface">
-      <header className="sticky top-0 z-40 border-b-3 border-ink-950 bg-surface-raised">
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4">
-          <Link to="/ngo" className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <BrandLogo iconClassName="h-10 w-10 sm:h-11" showTagline={false} />
-            <span className="text-sm sm:text-base font-black uppercase tracking-[0.12em] text-ink-950 truncate">
-              NGO Portal
-            </span>
-          </Link>
+    <>
+      <Sidebar collapsible="icon" variant="sidebar" className="border-sidebar-border">
+        <SidebarHeader className="border-b border-sidebar-border">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                size="lg"
+                className="data-[slot=sidebar-menu-button]:!p-2"
+                isActive={activeId === 'overview'}
+                onClick={() => goToNavItem(navItems[0])}
+              >
+                <img src="/logo-icon-dark.svg" alt="" className="size-8 shrink-0 rounded-md object-contain" />
+                <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">NGOreality</span>
+                  <span className="truncate text-xs opacity-70">Member portal</span>
+                </div>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
 
-          <nav className="hidden sm:flex items-center gap-1">
-            <NavLink
-              to="/ngo"
-              end
-              className={({ isActive }) =>
-                `px-3 py-2 font-mono text-2xs sm:text-xs uppercase tracking-wider ${
-                  isActive ? 'bg-ink-950 text-white' : 'text-ink-600 hover:bg-ink-50'
-                }`
-              }
-            >
-              Dashboard
-            </NavLink>
-            <Link
-              to="/public"
-              className="px-3 py-2 font-mono text-2xs sm:text-xs uppercase tracking-wider text-ink-600 hover:bg-ink-50"
-            >
-              Public site
-            </Link>
-          </nav>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Your organisation</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {navItems.map((item) => (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton
+                      isActive={activeId === item.id}
+                      tooltip={item.label}
+                      onClick={() => goToNavItem(item)}
+                    >
+                      <item.icon className="size-4 shrink-0" />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          <SidebarGroup className="mt-auto">
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    render={<Link to="/public" className="flex w-full items-center gap-2" />}
+                  >
+                    <Globe className="size-4 shrink-0" />
+                    <span>Public site</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
 
-          <div className="flex items-center gap-2">
+        <SidebarFooter className="border-t border-sidebar-border">
+          <div className="mb-2 px-1 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
             <ThemeToggle />
-            <span className="hidden md:block font-mono text-2xs text-ink-400 truncate max-w-[140px]">
-              {user?.email}
-            </span>
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="hidden sm:inline-flex items-center gap-1.5 border-2 border-ink-950 px-3 py-2 font-mono text-2xs uppercase tracking-wider hover:bg-ink-950 hover:text-white transition-colors min-h-[44px]"
-              aria-label="Sign out"
-            >
-              <LogOut size={14} aria-hidden />
-              Sign out
-            </button>
-            <button
-              type="button"
-              onClick={() => setMobileOpen(!mobileOpen)}
-              className="sm:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-ink-950"
-              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-            >
-              {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-            </button>
+          </div>
+          <div className="px-2 py-2 text-sm group-data-[collapsible=icon]:hidden">
+            <p className="truncate font-medium text-sidebar-foreground">Signed in</p>
+            <p className="truncate text-xs text-sidebar-foreground/60">{user?.email}</p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleSignOut}
+            className="mx-2 mb-2 h-9 w-[calc(100%-1rem)] border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent"
+          >
+            <LogOut className="size-4" />
+            Sign out
+          </Button>
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
+
+      <SidebarInset className="flex h-svh min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3 sm:h-16 sm:px-4">
+          <SidebarTrigger className="-ml-1 size-9" aria-label="Toggle menu">
+            <PanelLeft className="size-4" />
+          </SidebarTrigger>
+          <Separator orientation="vertical" className="mx-1 hidden h-4 sm:block" />
+          <h1 className="min-w-0 flex-1 truncate text-base font-medium">{pageTitle}</h1>
+          {!onboarding && <PortalNotificationBell audience="ngo" to="/ngo/notifications" />}
+        </header>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
+          <div className="p-3 sm:p-6 lg:p-8">
+            <div className="mx-auto w-full min-w-0 max-w-3xl">
+              <Outlet />
+            </div>
           </div>
         </div>
+      </SidebarInset>
+    </>
+  );
+}
 
-        {mobileOpen && (
-          <nav className="sm:hidden border-t-3 border-ink-950 bg-surface-raised px-4 py-2">
-            <NavLink
-              to="/ngo"
-              end
-              onClick={() => setMobileOpen(false)}
-              className="block py-3 font-mono text-xs uppercase tracking-wider border-b border-ink-100"
-            >
-              Dashboard
-            </NavLink>
-            <Link
-              to="/public"
-              onClick={() => setMobileOpen(false)}
-              className="block py-3 font-mono text-xs uppercase tracking-wider border-b border-ink-100"
-            >
-              Public site
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                setMobileOpen(false);
-                handleSignOut();
-              }}
-              className="w-full flex items-center gap-2 py-3 font-mono text-xs uppercase tracking-wider text-accent"
-            >
-              <LogOut size={14} />
-              Sign out
-            </button>
-          </nav>
-        )}
-      </header>
-
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-        <Outlet />
-      </main>
-    </div>
+export default function NgoLayout() {
+  return (
+    <TooltipProvider delay={0}>
+      <SidebarProvider defaultOpen>
+        <NgoPortalFrame />
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }

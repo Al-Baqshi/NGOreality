@@ -192,8 +192,24 @@ Do **not** commit `backend/.env` or database passwords.
 
 ---
 
+## Email notifications (Resend)
+
+Set in `backend/.env`:
+
+```env
+RESEND_API_KEY=re_...
+NOTIFY_FROM_EMAIL=NGOreality <notifications@onboarding.ngoreality.com>
+NOTIFY_STAFF_EMAIL=ops@ngoreality.com   # optional BCC
+```
+
+The worker (and `POST /v1/notifications/process` on the API) sends rows from `notification_events`:
+
+- **site_down** — when a paying member’s site fails checks (queued on new incident)
+- **membership_welcome** / **badge_issued** — queued from CRM when membership is recorded
+
+CRM: `/notifications` → **Send pending now** (needs `VITE_MONITOR_API_URL` + `VITE_MONITOR_API_KEY` in frontend `.env.local`).
+
 ## Roadmap (same repo)
 
-- Resend/Postmark notifier for open incidents (`internal/notify`)
-- Outreach email queue and daily caps
+- Outreach email campaigns (daily caps)
 - AI draft endpoints (still writing to Supabase)

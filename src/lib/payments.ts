@@ -1,9 +1,11 @@
 import { supabase } from './supabase';
 import {
+  MEMBERSHIP_ANNUAL_CENTS,
   MONITORING_MONTHLY_CENTS,
   PRICING_CURRENCY,
   VERIFICATION_ANNUAL_CENTS,
 } from '../config/pricing';
+import { activateMembershipBenefits, isMembershipProduct } from './membershipBenefits';
 import type { OrganizationPayment, PaymentProductType, PaymentStatus } from '../types';
 
 export function paymentReferenceFromOrgId(orgId: string): string {
@@ -31,12 +33,19 @@ export async function ensurePaymentReference(orgId: string): Promise<string> {
 function periodForProduct(productType: PaymentProductType, paidAt: Date) {
   const start = new Date(paidAt);
   const end = new Date(paidAt);
-  if (productType === 'verification_annual') {
-    end.setFullYear(end.getFullYear() + 1);
-  } else {
+  if (productType === 'monitoring_monthly') {
     end.setMonth(end.getMonth() + 1);
+  } else {
+    end.setFullYear(end.getFullYear() + 1);
   }
   return { period_start: start.toISOString(), period_end: end.toISOString() };
+}
+
+function amountForProduct(productType: PaymentProductType, amountCents?: number): number {
+  if (amountCents != null) return amountCents;
+  if (productType === 'monitoring_monthly') return MONITORING_MONTHLY_CENTS;
+  if (productType === 'membership_annual') return MEMBERSHIP_ANNUAL_CENTS;
+  return VERIFICATION_ANNUAL_CENTS;
 }
 
 export async function recordPayment(input: {
@@ -49,14 +58,12 @@ export async function recordPayment(input: {
   bankTransferReference?: string;
   stripeCheckoutSessionId?: string;
   recordedBy?: string;
-}): Promise<{ payment: OrganizationPayment | null; error: string | null }> {
+}): Promise<{ payment: OrganizationPayment | null; error: string | null; message?: string }> {
   const paidAt = new Date();
   const status = input.status ?? 'paid';
-  const amountCents =
-    input.amountCents ??
-    (input.productType === 'verification_annual'
-      ? VERIFICATION_ANNUAL_CENTS
-      : MONITORING_MONTHLY_CENTS);
+  const productType =
+    input.productType === 'verification_annual' ? 'membership_annual' : input.productType;
+  const amountCents = amountForProduct(productType, input.amountCents);
 
   const reference = await ensurePaymentReference(input.organizationId);
   const bankRef =
@@ -64,13 +71,13 @@ export async function recordPayment(input: {
     (input.paymentMethod === 'bank_transfer' ? reference : '');
 
   const periods =
-    status === 'paid' ? periodForProduct(input.productType, paidAt) : { period_start: null, period_end: null };
+    status === 'paid' ? periodForProduct(productType, paidAt) : { period_start: null, period_end: null };
 
   const { data, error } = await supabase
     .from('organization_payments')
     .insert({
       organization_id: input.organizationId,
-      product_type: input.productType,
+      product_type: productType,
       amount_cents: amountCents,
       currency: PRICING_CURRENCY,
       status,
@@ -92,12 +99,25 @@ export async function recordPayment(input: {
     await supabase.from('activity_log').insert({
       organization_id: input.organizationId,
       action: 'payment_recorded',
-      description: `${input.productType} marked paid (${(amountCents / 100).toFixed(2)} ${PRICING_CURRENCY})`,
+      description: `${productType} marked paid (${(amountCents / 100).toFixed(2)} ${PRICING_CURRENCY})`,
       performed_by: input.recordedBy ?? 'staff',
       metadata: { payment_id: data?.id, method: input.paymentMethod },
     });
 
-    if (input.productType === 'monitoring_monthly') {
+    if (isMembershipProduct(productType)) {
+      const benefits = await activateMembershipBenefits({
+        organizationId: input.organizationId,
+        paidAt,
+        recordedBy: input.recordedBy,
+      });
+      return {
+        payment: data as OrganizationPayment,
+        error: benefits.error,
+        message: benefits.message,
+      };
+    }
+
+    if (productType === 'monitoring_monthly') {
       const { count } = await supabase
         .from('service_engagements')
         .select('id', { count: 'exact', head: true })
@@ -113,9 +133,17 @@ export async function recordPayment(input: {
           fee_cents: MONITORING_MONTHLY_CENTS,
           currency: PRICING_CURRENCY,
           started_at: paidAt.toISOString(),
-          notes: 'Created from monitoring payment',
+          notes: 'Legacy monitoring-only payment',
         });
       }
+      await supabase
+        .from('website_monitors')
+        .update({
+          tier: 'paid_live',
+          check_interval_minutes: 60,
+          updated_at: paidAt.toISOString(),
+        })
+        .eq('organization_id', input.organizationId);
     }
   }
 
@@ -128,3 +156,16 @@ export const BANK_TRANSFER_INSTRUCTIONS = {
   accountNumber: '(configure in CRM settings / env)',
   referenceHint: 'Use payment reference exactly as shown (NGR-…)',
 };
+
+export function hasActiveMembershipPayment(
+  payments: OrganizationPayment[],
+  now = new Date(),
+): boolean {
+  return payments.some(
+    (p) =>
+      isMembershipProduct(p.product_type) &&
+      p.status === 'paid' &&
+      p.period_end &&
+      new Date(p.period_end) > now,
+  );
+}

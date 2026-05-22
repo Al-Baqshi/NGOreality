@@ -5,6 +5,17 @@ function generateSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
+async function notifyStaffPortalRegistration(
+  organizationId: string,
+  description: string,
+): Promise<void> {
+  await supabase.rpc('notify_staff_ngo_portal_event', {
+    p_organization_id: organizationId,
+    p_action: 'ngo_portal_registration',
+    p_description: description,
+  });
+}
+
 async function uniqueSlug(base: string): Promise<string> {
   let slug = base;
   let attempt = 0;
@@ -59,32 +70,25 @@ export async function provisionNgoOrganization(input: {
     return { organizationId: null, error: memberError.message };
   }
 
-  const expiresAt = new Date();
-  expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-
-  const { error: membershipError } = await supabase.from('organization_memberships').insert({
-    organization_id: org.id,
-    expires_at: expiresAt.toISOString(),
-    status: 'active',
-  });
-
-  if (membershipError) {
-    return { organizationId: null, error: membershipError.message };
-  }
-
   const criteriaRows = DEFAULT_CRITERIA.map((c) => ({
     organization_id: org.id,
     ...c,
   }));
-  await supabase.from('verification_criteria').insert(criteriaRows);
+  const { error: criteriaError } = await supabase.from('verification_criteria').insert(criteriaRows);
+  if (criteriaError) {
+    return { organizationId: null, error: criteriaError.message };
+  }
 
-  await supabase.from('contacts').insert({
+  const { error: contactError } = await supabase.from('contacts').insert({
     organization_id: org.id,
     name: input.contactName,
     email: input.email,
     is_primary: true,
     role: 'Primary contact',
   });
+  if (contactError) {
+    return { organizationId: null, error: contactError.message };
+  }
 
   await supabase.from('activity_log').insert({
     organization_id: org.id,
@@ -92,6 +96,11 @@ export async function provisionNgoOrganization(input: {
     description: 'Organization registered via NGO portal',
     performed_by: input.contactName,
   });
+
+  await notifyStaffPortalRegistration(
+    org.id,
+    `New organization registered via portal: ${input.organizationName}`,
+  );
 
   return { organizationId: org.id, error: null };
 }
@@ -167,22 +176,24 @@ export async function linkExistingOrganization(input: {
     performed_by: input.email,
   });
 
-  const { data: existingMembership } = await supabase
-    .from('organization_memberships')
-    .select('id')
-    .eq('organization_id', org.id)
-    .limit(1)
-    .maybeSingle();
+  const { count: criteriaCount } = await supabase
+    .from('verification_criteria')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', org.id);
 
-  if (!existingMembership) {
-    const expiresAt = new Date();
-    expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-    await supabase.from('organization_memberships').insert({
-      organization_id: org.id,
-      expires_at: expiresAt.toISOString(),
-      status: 'active',
-    });
+  if (!criteriaCount) {
+    const { error: criteriaError } = await supabase.from('verification_criteria').insert(
+      DEFAULT_CRITERIA.map((c) => ({ organization_id: org.id, ...c })),
+    );
+    if (criteriaError) {
+      return { organizationId: null, error: criteriaError.message };
+    }
   }
+
+  await notifyStaffPortalRegistration(
+    org.id,
+    'Existing directory organization linked to a new NGO portal account',
+  );
 
   return { organizationId: org.id, error: null };
 }

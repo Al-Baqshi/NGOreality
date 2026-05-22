@@ -12,6 +12,7 @@ import (
 
 	"ngoreality/backend/internal/config"
 	"ngoreality/backend/internal/monitor"
+	"ngoreality/backend/internal/notify"
 	"ngoreality/backend/internal/store"
 )
 
@@ -33,6 +34,7 @@ func main() {
 	defer st.Close()
 
 	runner := monitor.NewRunner(cfg, st, log)
+	notifier := notify.New(log, cfg)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
@@ -50,6 +52,34 @@ func main() {
 			return
 		}
 		writeJSON(w, http.StatusOK, stats)
+	})
+
+	mux.HandleFunc("POST /v1/notifications/process", func(w http.ResponseWriter, r *http.Request) {
+		if !authorize(r, cfg.APIKey) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		procCtx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+		defer cancel()
+		if err := notifier.ProcessOpenIncidents(procCtx, st); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sum, _ := st.NotificationSummary(procCtx)
+		writeJSON(w, http.StatusOK, sum)
+	})
+
+	mux.HandleFunc("GET /v1/notifications/summary", func(w http.ResponseWriter, r *http.Request) {
+		if !authorize(r, cfg.APIKey) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		sum, err := st.NotificationSummary(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, sum)
 	})
 
 	mux.HandleFunc("POST /v1/monitor/run", func(w http.ResponseWriter, r *http.Request) {

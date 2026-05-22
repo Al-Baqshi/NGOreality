@@ -1,13 +1,18 @@
 import { Link } from 'react-router-dom';
 import { useCrmDashboardStats, useWorkQueue } from '../../hooks/useCrm';
 import { SectionHeader } from '../../components/ui';
-import { BADGE_REQUEST_STATUS_LABELS, ENGAGEMENT_STATUS_LABELS, ENGAGEMENT_TYPE_LABELS } from '../../types';
-import { Calendar, Award, AlertTriangle, Phone, CheckCircle2 } from 'lucide-react';
+import {
+  BADGE_REQUEST_STATUS_LABELS,
+  ENGAGEMENT_STATUS_LABELS,
+  ENGAGEMENT_TYPE_LABELS,
+  NGO_SETUP_REQUEST_STATUS_LABELS,
+} from '../../types';
+import { Calendar, Award, AlertTriangle, Phone, CheckCircle2, Sparkles } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 export default function WorkQueue() {
   const { stats, loading: statsLoading } = useCrmDashboardStats();
-  const { followUps, tasks, badgeRequests, incidents, loading, refetch } = useWorkQueue();
+  const { followUps, tasks, badgeRequests, setupRequests, incidents, loading, refetch } = useWorkQueue();
 
   const completeTask = async (taskId: string) => {
     await supabase
@@ -18,13 +23,13 @@ export default function WorkQueue() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="w-full min-w-0 max-w-4xl">
       <SectionHeader>Work queue</SectionHeader>
       <p className="font-mono text-2xs text-ink-500 uppercase tracking-wider -mt-4 mb-6">
         Your daily operating list
       </p>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3 mb-8 lg:grid-cols-4">
         <div className="card-brutal p-4 text-center">
           <div className="text-2xl font-black">{statsLoading ? '—' : stats.outreach_due}</div>
           <div className="label-brutal mt-1">Outreach due</div>
@@ -36,6 +41,10 @@ export default function WorkQueue() {
         <div className="card-brutal p-4 text-center">
           <div className="text-2xl font-black">{statsLoading ? '—' : stats.badge_requests_pending}</div>
           <div className="label-brutal mt-1">Badge requests</div>
+        </div>
+        <div className="card-brutal p-4 text-center">
+          <div className="text-2xl font-black">{statsLoading ? '—' : stats.ngo_setup_requests_pending ?? 0}</div>
+          <div className="label-brutal mt-1">NGO setup</div>
         </div>
         <div className="card-brutal p-4 text-center">
           <div className="text-2xl font-black text-accent">{statsLoading ? '—' : stats.incidents_open}</div>
@@ -93,6 +102,29 @@ export default function WorkQueue() {
                 title={r.organizations?.name ?? 'Organization'}
                 meta={BADGE_REQUEST_STATUS_LABELS[r.status]}
                 sub={r.request_type}
+              />
+            ))}
+          </QueueSection>
+
+          <QueueSection
+            title="NGO setup requests"
+            icon={<Sparkles size={14} />}
+            empty="No pending setup requests"
+            count={setupRequests.length}
+          >
+            {setupRequests.map((r) => (
+              <QueueRow
+                key={r.id}
+                to={`/organizations/${r.organization_id}`}
+                title={r.organizations?.name ?? 'Organization'}
+                meta={NGO_SETUP_REQUEST_STATUS_LABELS[r.status]}
+                sub={
+                  r.wants_landing_package
+                    ? 'Landing + standards'
+                    : r.has_existing_website
+                      ? 'Has website'
+                      : r.request_kind.replace('_', ' ')
+                }
               />
             ))}
           </QueueSection>

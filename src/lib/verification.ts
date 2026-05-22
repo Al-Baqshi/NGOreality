@@ -1,16 +1,14 @@
 import { supabase } from './supabase';
-import { DEFAULT_CRITERIA, type Organization, type VerificationCriterion } from '../types';
+import { allPublicCriteriaPass } from './criteria';
+import type { Organization, VerificationCriterion } from '../types';
 
 export type CriterionStatus = VerificationCriterion['status'];
 
-export function isBaseCriterion(c: VerificationCriterion): boolean {
-  return DEFAULT_CRITERIA.some((d) => d.criterion_key === c.criterion_key);
-}
+export { allPublicCriteriaPass, isPublicCriterion, isMemberCriterion } from './criteria';
 
+/** @deprecated Use allPublicCriteriaPass */
 export function allBaseCriteriaPass(criteria: VerificationCriterion[]): boolean {
-  const base = criteria.filter(isBaseCriterion);
-  if (base.length < DEFAULT_CRITERIA.length) return false;
-  return base.every((c) => c.status === 'pass');
+  return allPublicCriteriaPass(criteria);
 }
 
 export async function updateCriterionStatuses(
@@ -36,14 +34,21 @@ export type AutoVerifyResult = {
   message: string;
 };
 
-/** When every base criterion is pass, mark org verified and issue badge if needed. */
+/**
+ * When all public trust standards pass, mark org verified.
+ * Badge is issued on membership payment (not automatically here).
+ */
 export async function tryAutoVerifyOrganization(
   organizationId: string,
   criteria: VerificationCriterion[],
   organization: Pick<Organization, 'status' | 'verification_level' | 'name'>,
 ): Promise<AutoVerifyResult> {
-  if (!allBaseCriteriaPass(criteria)) {
-    return { verified: false, badgeIssued: false, message: 'Not all base criteria are pass' };
+  if (!allPublicCriteriaPass(criteria)) {
+    return {
+      verified: false,
+      badgeIssued: false,
+      message: 'Not all public trust standards are pass',
+    };
   }
 
   const now = new Date().toISOString();
@@ -63,51 +68,15 @@ export async function tryAutoVerifyOrganization(
     }
     await supabase.from('activity_log').insert({
       organization_id: organizationId,
-      action: 'auto_verified',
-      description: 'All verification criteria passed — status set to Verified',
+      action: 'standards_met',
+      description: 'All public trust standards passed — ready for membership / badge on payment',
       performed_by: 'system',
     });
   }
 
-  const { data: activeBadges } = await supabase
-    .from('verification_badges')
-    .select('id')
-    .eq('organization_id', organizationId)
-    .eq('is_active', true);
-
-  let badgeIssued = false;
-  if (!activeBadges?.length) {
-    const { count } = await supabase
-      .from('verification_badges')
-      .select('id', { count: 'exact', head: true })
-      .eq('organization_id', organizationId);
-    const verificationId = `REAL-${new Date().getFullYear()}-${String((count ?? 0) + 1).padStart(3, '0')}`;
-    const expiresAt = new Date();
-    expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-
-    const { error: badgeError } = await supabase.from('verification_badges').insert({
-      organization_id: organizationId,
-      verification_id: verificationId,
-      level: 'verified',
-      issued_at: now,
-      expires_at: expiresAt.toISOString(),
-      is_active: true,
-    });
-
-    if (!badgeError) {
-      badgeIssued = true;
-      await supabase.from('activity_log').insert({
-        organization_id: organizationId,
-        action: 'badge_issued',
-        description: `Auto-issued badge: ${verificationId}`,
-        performed_by: 'system',
-      });
-    }
-  }
-
   return {
     verified: true,
-    badgeIssued,
-    message: badgeIssued ? 'Organization verified and badge issued' : 'Organization verified',
+    badgeIssued: false,
+    message: 'Public standards met — record $100 membership payment to issue badge and enable alerts',
   };
 }

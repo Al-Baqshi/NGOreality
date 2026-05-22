@@ -1,9 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import './styles/dark-overrides.css';
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {
@@ -37,12 +38,14 @@
   * {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    @apply border-border outline-ring/50;
   }
 
   html {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     color: #0a0a0a;
     background-color: var(--surface-default);
+    @apply font-sans;
   }
 
   .dark html {
@@ -50,7 +53,7 @@
   }
 
   body {
-    @apply text-ink-950;
+    @apply bg-background text-foreground;
     background-color: var(--surface-default);
   }
 
@@ -62,19 +65,20 @@
 
 @layer components {
   .btn-brutal {
-    @apply border-3 border-ink-950 bg-ink-950 text-white font-semibold px-6 py-3 shadow-brutal
+    @apply border-3 border-ink-950 bg-ink-950 font-semibold px-6 py-3 text-white shadow-brutal
            transition-all duration-150
            hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm
            active:translate-x-[4px] active:translate-y-[4px] active:shadow-none
-           dark:border-ink-200 dark:hover:bg-ink-200 dark:hover:text-ink-950;
+           dark:border-border dark:hover:bg-muted dark:hover:text-foreground;
   }
 
   .btn-brutal-outline {
-    @apply border-3 border-ink-950 bg-white text-ink-950 font-semibold px-6 py-3 shadow-brutal-sm
+    @apply border-3 border-ink-950 bg-white font-semibold px-6 py-3 text-ink-950 shadow-brutal-sm
            transition-all duration-150
            hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none
            active:bg-ink-950 active:text-white
-           dark:bg-[var(--card-bg)] dark:active:bg-ink-200 dark:active:text-ink-950;
+           dark:border-border dark:bg-card dark:text-foreground
+           dark:hover:bg-muted dark:active:bg-primary dark:active:text-primary-foreground;
   }
 
   .btn-brutal-accent {
@@ -112,7 +116,31 @@
   }
 
   .label-brutal {
-    @apply text-2xs font-mono font-semibold uppercase tracking-widest text-ink-500 mb-2 block;
+    @apply mb-2 block text-2xs font-mono font-semibold uppercase tracking-widest text-ink-500
+           leading-snug break-words dark:text-muted-foreground;
+  }
+
+  /* Responsive stat blocks — avoids clipped numbers in narrow grids */
+  .stat-card {
+    @apply min-w-0 overflow-hidden;
+  }
+
+  .stat-value {
+    @apply font-black tabular-nums tracking-tight leading-none mt-1.5 sm:mt-2;
+    font-size: clamp(1.125rem, 4.5vw + 0.5rem, 2.25rem);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  /* Currency KPIs — never break mid-dollar amount */
+  .stat-value-currency {
+    @apply font-black tabular-nums tracking-tight leading-none whitespace-nowrap;
+    font-size: clamp(0.95rem, 1.8vw + 0.55rem, 1.65rem);
+  }
+
+  .stat-sub {
+    @apply mt-1.5 font-mono text-2xs uppercase tracking-wider leading-snug break-words text-ink-400
+           dark:text-muted-foreground;
   }
 
   .section-brutal {
@@ -136,8 +164,227 @@
   }
 }
 
+@layer components {
+  /* Default responsive page shells — wrap CRM pages so grids/tables adapt without per-page tweaks */
+  .page-shell {
+    @apply mx-auto flex w-full min-w-0 max-w-[90rem] flex-col gap-4 sm:gap-6;
+  }
+
+  .page-header {
+    @apply flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between;
+  }
+
+  .page-title {
+    @apply min-w-0 text-xl font-bold tracking-tight sm:text-2xl;
+  }
+
+  .responsive-grid {
+    @apply grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4;
+  }
+
+  .responsive-grid-2 {
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4;
+  }
+
+  .stack-responsive {
+    @apply flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3;
+  }
+
+  .table-scroll {
+    @apply -mx-1 min-w-0 overflow-x-auto px-1 sm:mx-0 sm:px-0;
+  }
+
+  /* Outreach kanban — one board, columns scroll horizontally, cards scroll inside column */
+  .kanban-shell {
+    @apply w-full min-w-0 overflow-hidden border-3 border-ink-950 bg-[var(--card-bg)] shadow-brutal;
+  }
+
+  .kanban-board {
+    @apply flex min-h-[360px] w-full min-w-0 flex-nowrap overflow-x-auto overflow-y-hidden;
+  }
+
+  /* Outreach: tall board so each column scrolls cards (not clipped) */
+  .kanban-board-tall {
+    height: clamp(420px, calc(100svh - 18rem), 900px);
+  }
+
+  .kanban-column {
+    @apply flex h-full min-h-0 w-[min(88vw,18rem)] shrink-0 flex-col border-r-3 border-ink-950 bg-[var(--card-bg)] last:border-r-0 sm:w-72;
+  }
+
+  .kanban-column-header {
+    @apply shrink-0 border-b-3 border-ink-950 bg-ink-950 px-3 py-3 text-white;
+  }
+
+  .kanban-column-body {
+    @apply min-h-0 flex-1 space-y-2 overflow-x-hidden overflow-y-auto overscroll-y-contain p-2;
+  }
+
+  .kanban-column-footer {
+    @apply shrink-0 border-t-2 border-ink-200 px-3 py-2 font-mono text-2xs uppercase tracking-wider text-ink-500 hover:text-accent;
+  }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+}
+
+@media print {
+  aside,
+  header.border-b-3,
+  .print\\:hidden,
+  [data-pdf-exclude] {
+    display: none !important;
+  }
+
+  main {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  body > div.flex.min-h-screen {
+    display: block !important;
+  }
+
+  #business-plan-export,
+  .pdf-export-content {
+    max-width: none !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .card-brutal {
+    break-inside: avoid;
+    box-shadow: none !important;
+  }
+
+  .pdf-export-content .text-ink-500,
+  .pdf-export-content .text-ink-600,
+  .pdf-export-content .text-ink-700 {
+    color: #262626 !important;
+  }
+
+  .pdf-export-content .bg-ink-950 {
+    background: #0a0a0a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+@theme inline {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 0.875rem;
+  --spacing-18: 4.5rem;
+  --width-88: 22rem;
+  --width-128: 32rem;
+  --border-width-3: 3px;
+  --shadow-brutal: 4px 4px 0px 0px #0a0a0a;
+  --shadow-brutal-sm: 2px 2px 0px 0px #0a0a0a;
+  --shadow-brutal-lg: 6px 6px 0px 0px #0a0a0a;
+  --color-ink-950: #0a0a0a;
+  --color-ink-900: #141414;
+  --color-ink-800: #1e1e1e;
+  --color-ink-700: #2a2a2a;
+  --color-ink-600: #3a3a3a;
+  --color-ink-500: #555555;
+  --color-ink-400: #777777;
+  --color-ink-300: #999999;
+  --color-ink-200: #bbbbbb;
+  --color-ink-100: #d4d4d4;
+  --color-ink-50: #f0f0f0;
+  --color-accent: #ec5620;
+  --color-accent-hover: #a83222;
+  --color-accent-light: var(--accent-light);
+  --color-teal: #1a7a6d;
+  --color-teal-hover: #146358;
+  --color-teal-light: var(--teal-light);
+  --color-surface: var(--surface-default);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+}
+
+:root {
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.45 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.9 0 0);
+  --input: oklch(0.9 0 0);
+  --ring: oklch(0.55 0.12 35);
+  --radius: 0.5rem;
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #f0f0f0;
+  --sidebar-primary: #ec5620;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e1e1e;
+  --sidebar-accent-foreground: #f0f0f0;
+  --sidebar-border: #2a2a2a;
+  --sidebar-ring: #ec5620;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.2 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.2 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.92 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.65 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.65 0.15 35);
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #f0f0f0;
+  --sidebar-primary: #ec5620;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e1e1e;
+  --sidebar-accent-foreground: #f0f0f0;
+  --sidebar-border: #2a2a2a;
+  --sidebar-ring: #ec5620;
 }

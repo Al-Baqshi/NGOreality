@@ -9,6 +9,7 @@ import type {
   StaffTask,
   VerificationBadge,
   BadgeRequest,
+  NgoSetupRequest,
 } from '../types';
 
 export interface CrmDashboardStats {
@@ -24,6 +25,7 @@ export interface CrmDashboardStats {
   badges_expiring_30d: number;
   badges_expired: number;
   badge_requests_pending: number;
+  ngo_setup_requests_pending: number;
   monitors_total: number;
   monitors_up: number;
   monitors_down: number;
@@ -49,6 +51,7 @@ const EMPTY_STATS: CrmDashboardStats = {
   badges_expiring_30d: 0,
   badges_expired: 0,
   badge_requests_pending: 0,
+  ngo_setup_requests_pending: 0,
   monitors_total: 0,
   monitors_up: 0,
   monitors_down: 0,
@@ -261,6 +264,7 @@ export function useWorkQueue() {
   const [followUps, setFollowUps] = useState<(ServiceEngagement & { organizations: { name: string } })[]>([]);
   const [tasks, setTasks] = useState<(StaffTask & { organizations: { name: string } })[]>([]);
   const [badgeRequests, setBadgeRequests] = useState<(BadgeRequest & { organizations: { name: string } })[]>([]);
+  const [setupRequests, setSetupRequests] = useState<(NgoSetupRequest & { organizations: { name: string } })[]>([]);
   const [incidents, setIncidents] = useState<WebsiteIncidentRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -268,7 +272,7 @@ export function useWorkQueue() {
     setLoading(true);
     const today = new Date().toISOString().slice(0, 10);
 
-    const [fu, tk, br, inc] = await Promise.all([
+    const [fu, tk, br, setup, inc] = await Promise.all([
       supabase
         .from('service_engagements')
         .select('*, organizations(name)')
@@ -291,6 +295,12 @@ export function useWorkQueue() {
         .order('created_at', { ascending: true })
         .limit(15),
       supabase
+        .from('ngo_setup_requests')
+        .select('*, organizations(name)')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true })
+        .limit(15),
+      supabase
         .from('website_incidents')
         .select('id, organization_id, opened_at, closed_at, error_message, organizations(name, website_url)')
         .is('closed_at', null)
@@ -301,6 +311,7 @@ export function useWorkQueue() {
     if (!fu.error && fu.data) setFollowUps(fu.data as typeof followUps);
     if (!tk.error && tk.data) setTasks(tk.data as typeof tasks);
     if (!br.error && br.data) setBadgeRequests(br.data as typeof badgeRequests);
+    if (!setup.error && setup.data) setSetupRequests(setup.data as typeof setupRequests);
     if (!inc.error && inc.data) setIncidents(inc.data as WebsiteIncidentRow[]);
     setLoading(false);
   }, []);
@@ -309,7 +320,7 @@ export function useWorkQueue() {
     refetch();
   }, [refetch]);
 
-  return { followUps, tasks, badgeRequests, incidents, loading, refetch };
+  return { followUps, tasks, badgeRequests, setupRequests, incidents, loading, refetch };
 }
 
 export function useExpiringBadges(mode: 'expiring' | 'expired') {

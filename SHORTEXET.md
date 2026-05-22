@@ -1,108 +1,123 @@
 # SHORTEXET — NGOreality session status
 
-_Last updated: 2026-05-18_
+_Last updated: 2026-05-21_
 
 ## Where we are
 
-Launch-focused build on **main** (uncommitted local changes). Core product direction: **NZ-first directory** + **Reality Badge** (digital trust) first; **financial transparency tier hidden** until NGOs are ready.
+**NZ launch product** is aligned in code + remote DB: **$100/year membership** (badge + monitoring + alert emails), **public trust standards before badge**, **passive monitoring for listed charities** (outreach data), **member-only security checklist** after login.
 
-Supabase project ref: `cpbilbskfbzqlynjhdvm`
+Supabase: `cpbilbskfbzqlynjhdvm` — migrations **`021`–`023`** applied via Supabase MCP (2026-05-21): claim search RLS, `ngo_setup_requests`, `portal_notifications` + triggers.
 
----
+**If CRM shows “schema cache” / missing table:** run `npm run db:verify` after `npx supabase db push` or MCP `apply_migration`. See `docs/DATABASE.md`.
 
-## Done (this arc)
+**If browser shows `ERR_CONNECTION_REFUSED` on :5173:** run `npm run dev` (Vite was stopped).
 
-### Registry & directory
-- Migration `008_registry_listed_orgs.sql`: `listed` status, registry fields (`source_registry`, `external_id`, `registry_url`, charity #, NZBN, outreach).
-- **~29,227 NZ charities** imported via `scripts/import-nz-charities.mjs` (`npm run import:nz-charities`).
-- Public directory: default country **NZ**, **tags** (not categories), map **focus on NZ**, listed vs verified badges.
-- Public org profile `/public/org/:slug`, contact prefill `?org=slug`.
-- Staff CRM: listed orgs, outreach status, “Begin NGOreality verification”.
-
-### Staff auth (in progress on branch files)
-- `StaffProtectedRoute`, `StaffLogin`, profile helpers, CRM RLS migration `007_staff_crm_rls.sql` (not fully summarized in UI—verify applied on remote).
-
-### Financial tier — hidden, not deleted
-- `src/config/features.ts`: `FINANCIAL_VERIFICATION_ENABLED = false`
-- `FinancialComingSoon` component; public + CRM UI gated.
-- `FINANCIAL_CRITERIA` + types + DB support **kept** for later.
-- **To enable tier 2:** set flag to `true` in `features.ts`.
-
-### Launch narrative (product)
-1. Directory lists orgs (registry **listed**).
-2. Onboard → technical verification (website, security, privacy, accessibility) → **Reality Badge**.
-3. Later → offer **Transparent Financial** to interested NGOs.
+### CRM plan split (sidebar)
+- **Business plan** (`/plan`) — narrative, MSD checklist **with full answers**, infographics, services (CRM, landing pages, membership). **Download PDF** = full plan only (no CRM sidebar/header, no back/theme/download chrome; multi-page A4; darker contrast).
+- **Cash flow** (`/cash-flow`) — **Volume units drive expected $**: badges→membership, packages→$650, workspace_active→MRR; (A) total receipts and profit/loss roll up; **Overheads** has office rent placeholder from month 10; linked to **Business plan** financial snapshot card.
 
 ---
 
-## Not done / verify next session
+## What was implemented (latest — NGO portal onboarding)
 
-| Item | Action |
-|------|--------|
-| Tag backfill | **Done** (background task succeeded). Spot-check Directory → “All tags” filter in dev. |
-| Migrations on remote | Ensure `007` + `008` applied (`npx supabase db push` or MCP). |
-| Commit & push | Large uncommitted diff on `main`—commit when ready. |
-| Staff login E2E | Test `/staff/login` + CRM routes with staff user in `profiles`. |
-| `.env` | `SUPABASE_SERVICE_ROLE_KEY` for import scripts (see `.env.example`). |
-| Vercel CLI | Not installed locally—optional for `vercel env pull` / deploy. |
+- **Link existing org:** directory search preview (`NgoDirectoryOrgPreview`) shows registry fields + profile % before submit.
+- **After link:** **Profile** section — completion checklist, edit mission/description/logo/brand colours/website.
+- **Setup request:** questionnaire (has website? → skip landing ask; else $650 landing package); logo required unless they have a site; creates `ngo_setup_requests` row.
+- **Staff:** `notify_staff_ngo_portal_event` RPC + auto task on registration (signup) and setup request; **Work queue → NGO setup requests**; dashboard stat `ngo_setup_requests_pending`.
+
+Key files: `src/components/ngo/NgoProfileSection.tsx`, `src/lib/ngoProfileCompletion.ts`, `supabase/migrations/20260522130000_022_ngo_setup_requests.sql`.
 
 ---
 
-## Key commands
+## What was implemented (earlier session)
+
+### Product
+- **Single SKU:** `membership_annual` = **$100 NZD/year** (`src/config/pricing.ts`)
+- **Flow:** Public standards pass → staff records membership → membership row + **paid_live** monitoring + **badge** (if standards pass) + welcome emails queued
+- **No free membership on signup** — payment activates benefits (`src/lib/ngoSignup.ts`)
+
+### Standards split
+| Tier | Where | Examples |
+|------|--------|----------|
+| **Public** | CRM + NGO portal (outreach-safe) | Website, mission, contact, privacy, mobile, tone |
+| **Member** | NGO portal + CRM (not public marketing) | Code repo, security baseline, shared credentials, donation copy |
+
+### Monitoring tiers
+| Tier | Who | Cadence |
+|------|-----|---------|
+| **passive** | Listed registry (no membership) | ~7 days — marketing / outreach stats |
+| **active** | Verified, no membership | ~24h |
+| **paid_live** | Paid membership | ~1h + down-alert queue |
+
+### CRM
+- **Registry insights** on Dashboard + Outreach (`RegistryInsights` + `registry_readiness_stats` RPC)
+- **One button:** “Record membership paid ($100)” on org detail
+- Org detail: **Public trust standards** + **Member security checklist**
+
+### Email (queue, not SMTP yet)
+- `notification_events` table + templates in `src/lib/notifications.ts`
+- Queued on: membership welcome, badge issued
+- **Next:** wire Go worker or Resend to send `pending` rows; queue `site_down` on incident open
+
+### Backend
+- `has_active_membership()` drives **paid_live** tier in Go worker (`backend/internal/store/store.go`)
+
+---
+
+## Your outreach script (NZ)
+
+1. Use **Dashboard / Outreach → NZ registry insights** (% no site, % down, % profile-ready).
+2. Call listed charity — share what you already know from the directory.
+3. **Initialize criteria** on org → walk **public** standards.
+4. When all public = pass → invoice **$100** with **NGR-…** reference.
+5. **Record membership paid** → badge + hourly monitoring + emails (when sender wired).
+
+**Separate products (later):** consulting, custom site, NGO CRM build, **hourly support** when site is down.
+
+---
+
+## Verify locally
 
 ```bash
-# Import (needs service role in env)
-npm run import:nz-charities
-IMPORT_LIMIT=100 npm run import:nz-charities   # smoke test
-
-# Tags for existing rows
-npm run backfill:nz-tags
-
-# Dev / build
 npm run dev
+# Staff: /staff/login → /dashboard (registry insights)
+# Org: /organizations/:id → public standards → record membership
+# NGO: /ngo/signup → link org → /ngo → Profile + Setup request sections
+# Apply: npx supabase db push  (021 claim search RLS, 022 setup requests)
 npm run build
-
-# DB
-npx supabase@2.67.1 db push
 ```
 
 ---
 
-## Key files (quick nav)
+## Email (implemented)
+
+- **Resend** in Go: `backend/internal/notify` + `RESEND_API_KEY` in `backend/.env`
+- **Site down:** queued when incident opens for **paying members** (deduped 24h)
+- **Welcome / badge:** queued on membership payment; optional instant send if API configured
+- **CRM:** `/notifications` → Send pending now (`VITE_MONITOR_API_URL` + `VITE_MONITOR_API_KEY`)
+
+## Still to do
+
+| Item | Notes |
+|------|--------|
+| Resend domain verify | Verify `NOTIFY_FROM_EMAIL` domain in Resend dashboard |
+| Stripe checkout | Optional; bank transfer OK for first cohort |
+| Supabase Auth URLs | Production + preview redirects |
+| Daily volume actuals | `business_cashflow_units.actual_count` is monthly for now; day-by-day log + roll-up TBD |
+| Commit & deploy | All changes local on `main` until you commit |
+
+---
+
+## Key files
 
 | Area | Path |
 |------|------|
-| Feature flag | `src/config/features.ts` |
-| Coming soon UI | `src/components/FinancialComingSoon.tsx` |
-| Listed org migration | `supabase/migrations/20260518120000_008_registry_listed_orgs.sql` |
-| NZ import | `scripts/import-nz-charities.mjs` |
-| Directory | `src/pages/public/Directory.tsx` |
-| Reality Badge page | `src/pages/public/RealityBadge.tsx` |
-| Org profile | `src/pages/public/OrganizationProfile.tsx` |
-| CRM org detail | `src/pages/crm/OrganizationDetail.tsx` |
-
----
-
-## SEO (canonical domain)
-
-- Primary: **`https://ngoreality.com`** (`src/config/site.ts`, optional `VITE_SITE_URL`)
-- `public/sitemap.xml` — homepage `/` is priority 1.0
-- `vercel.json` — 301 from `www`, `.org` → `ngoreality.com`
-- After deploy: [Google Search Console](https://search.google.com/search-console) → add property → submit `https://ngoreality.com/sitemap.xml` → request indexing for `/`
-
----
-
-## Suggested next steps (priority)
-
-1. **Smoke-test public flow:** Directory (NZ) → org profile → Contact with claim CTA.
-2. **Confirm tags** in directory filters after backfill.
-3. **Staff path:** login, open listed org, start verification workflow.
-4. **Commit** logical chunks (registry/import, directory UX, financial flag, staff auth) if splitting PRs.
-5. When first NGOs are verified, **keep financial flag off** until you pitch tier 2; then flip `FINANCIAL_VERIFICATION_ENABLED`.
-
----
-
-## Notes
-
-- Do not delete financial code—only the flag controls visibility.
-- `transparent_financial` orgs in DB (if any) still show as **Verified** on public Verified page while flag is off.
+| Pricing | `src/config/pricing.ts` |
+| Payment → benefits | `src/lib/payments.ts`, `src/lib/membershipBenefits.ts` |
+| Criteria | `src/types/index.ts` (`PUBLIC_BADGE_CRITERIA`, `MEMBER_CRITERIA`), `src/lib/criteria.ts` |
+| Verification | `src/lib/verification.ts` (no auto-badge on pass) |
+| Registry stats | `src/components/crm/RegistryInsights.tsx` |
+| Business plan PDF | `src/lib/businessPlanPdf.ts`, `src/pages/crm/BusinessPlan.tsx` |
+| Cashflow funnel | `src/config/salesFunnelModel.ts`, `src/config/cashflowAssumptions.ts` |
+| Cashflow UI | `src/pages/crm/CashFlow.tsx`, `src/components/crm/CashflowForecastTable.tsx` |
+| Migration 019–020 | `supabase/migrations/20260521130000_019_*.sql`, `20260521140000_020_business_cashflow_units.sql` |

@@ -1,392 +1,220 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Circle, Download, FileSpreadsheet, Loader2 } from 'lucide-react';
+import BusinessPlanFinancialSnapshot from '../../components/crm/BusinessPlanFinancialSnapshot';
+import BusinessPlanInfographics from '../../components/crm/BusinessPlanInfographics';
 import { SectionHeader } from '../../components/ui';
 import {
-  BUSINESS_PLAN_METRIC_LABELS,
-  BUSINESS_PLAN_METRIC_ORDER,
-  MONEY_METRICS,
-  type BusinessExpense,
-  type BusinessPlanActual,
-  type BusinessPlanMetric,
-  type BusinessPlanTarget,
-} from '../../types';
-import {
-  actualForMetric,
-  currentMonthKey,
-  deleteExpense,
-  fetchActuals,
-  fetchRecentExpenses,
-  fetchTargets,
-  formatMetricDelta,
-  formatMetricValue,
-  formatMonthLabel,
-  insertExpense,
-  recentMonthKeys,
-  upsertTarget,
-} from '../../lib/businessPlan';
+  LANDING_STANDARDS_PACKAGE_CENTS,
+  MEMBER_MONITORING_SUMMARY,
+  ORGANISATION_WORKSPACE_NAME,
+} from '../../config/customerProducts';
+import { MSD_FLEXIWAGE_CHECKLIST } from '../../config/businessPlanRef';
+import { MSD_CHECKLIST_ANSWERS } from '../../config/businessPlanNarrative';
+import { downloadElementAsPdf } from '../../lib/businessPlanPdf';
 
-const MONTHS_WINDOW = 6;
-
-type TargetMap = Record<string, Record<BusinessPlanMetric, BusinessPlanTarget | undefined>>;
-type ActualMap = Record<string, BusinessPlanActual | undefined>;
-
-function indexTargets(rows: BusinessPlanTarget[]): TargetMap {
-  const out: TargetMap = {};
-  for (const t of rows) {
-    if (!out[t.period]) out[t.period] = {} as Record<BusinessPlanMetric, BusinessPlanTarget | undefined>;
-    out[t.period][t.metric] = t;
-  }
-  return out;
-}
-
-function indexActuals(rows: BusinessPlanActual[]): ActualMap {
-  const out: ActualMap = {};
-  for (const a of rows) out[a.period] = a;
-  return out;
-}
-
-function isTargetMet(metric: BusinessPlanMetric, expected: number, actual: number): boolean {
-  if (expected <= 0) return false;
-  if (metric === 'expense_cents') return actual <= expected; // lower is better
-  return actual >= expected;
-}
+const MSD_REVIEW_KEY = 'ngoreality_msd_reviewed_v1';
 
 export default function BusinessPlan() {
-  const periods = useMemo(() => recentMonthKeys(MONTHS_WINDOW), []);
-  const currentPeriod = useMemo(() => currentMonthKey(), []);
-
-  const [targets, setTargets] = useState<TargetMap>({});
-  const [actuals, setActuals] = useState<ActualMap>({});
-  const [expenses, setExpenses] = useState<BusinessExpense[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [editing, setEditing] = useState<{ metric: BusinessPlanMetric; period: string } | null>(null);
-  const [editValue, setEditValue] = useState('');
-
-  const [newExpense, setNewExpense] = useState({
-    incurred_on: new Date().toISOString().slice(0, 10),
-    category: '',
-    amount: '',
-    vendor: '',
-    notes: '',
-  });
-  const [savingExpense, setSavingExpense] = useState(false);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const exportRef = useRef<HTMLDivElement>(null);
+  const [reviewed, setReviewed] = useState<Record<string, boolean>>(() => {
     try {
-      const [t, a, e] = await Promise.all([
-        fetchTargets(periods),
-        fetchActuals(periods),
-        fetchRecentExpenses(50),
-      ]);
-      setTargets(indexTargets(t));
-      setActuals(indexActuals(a));
-      setExpenses(e);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load business plan');
-    } finally {
-      setLoading(false);
+      const raw = localStorage.getItem(MSD_REVIEW_KEY);
+      return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+    } catch {
+      return {};
     }
-  }, [periods]);
+  });
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    localStorage.setItem(MSD_REVIEW_KEY, JSON.stringify(reviewed));
+  }, [reviewed]);
 
-  const handleSaveTarget = async () => {
-    if (!editing) return;
-    const numeric = parseFloat(editValue);
-    if (Number.isNaN(numeric)) return;
-    const value = MONEY_METRICS.has(editing.metric) ? Math.round(numeric * 100) : Math.round(numeric);
-    const { error: err } = await upsertTarget({
-      period: editing.period,
-      metric: editing.metric,
-      expected_value: value,
-    });
-    if (err) {
-      setError(err);
-      return;
+  const reviewedCount = Object.values(reviewed).filter(Boolean).length;
+  const total = MSD_CHECKLIST_ANSWERS.length;
+
+  const handleDownloadPdf = async () => {
+    const el = exportRef.current;
+    if (!el) return;
+    setPdfLoading(true);
+    setPdfError(null);
+    try {
+      const date = new Date().toISOString().slice(0, 10);
+      await downloadElementAsPdf(el, `NGOreality-business-plan-${date}.pdf`);
+    } catch (err) {
+      setPdfError(err instanceof Error ? err.message : 'PDF export failed');
+    } finally {
+      setPdfLoading(false);
     }
-    setEditing(null);
-    setEditValue('');
-    refresh();
   };
-
-  const handleAddExpense = async (ev: React.FormEvent) => {
-    ev.preventDefault();
-    const amount = parseFloat(newExpense.amount);
-    if (!newExpense.category.trim() || Number.isNaN(amount) || amount <= 0) return;
-    setSavingExpense(true);
-    const { error: err } = await insertExpense({
-      incurred_on: newExpense.incurred_on,
-      category: newExpense.category,
-      amount_cents: Math.round(amount * 100),
-      vendor: newExpense.vendor,
-      notes: newExpense.notes,
-    });
-    setSavingExpense(false);
-    if (err) {
-      setError(err);
-      return;
-    }
-    setNewExpense({
-      incurred_on: new Date().toISOString().slice(0, 10),
-      category: '',
-      amount: '',
-      vendor: '',
-      notes: '',
-    });
-    refresh();
-  };
-
-  const handleDeleteExpense = async (id: string) => {
-    const { error: err } = await deleteExpense(id);
-    if (err) {
-      setError(err);
-      return;
-    }
-    refresh();
-  };
-
-  const currentScore = useMemo(() => {
-    const periodTargets = targets[currentPeriod];
-    const periodActual = actuals[currentPeriod];
-    if (!periodTargets) return { met: 0, total: 0 };
-    let met = 0;
-    let total = 0;
-    for (const metric of BUSINESS_PLAN_METRIC_ORDER) {
-      const t = periodTargets[metric];
-      if (!t || t.expected_value <= 0) continue;
-      total++;
-      const actual = actualForMetric(metric, periodActual);
-      if (isTargetMet(metric, t.expected_value, actual)) met++;
-    }
-    return { met, total };
-  }, [targets, actuals, currentPeriod]);
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <Link
-        to="/dashboard"
-        className="inline-flex items-center gap-2 font-mono text-2xs uppercase tracking-wider text-ink-500 hover:text-ink-950 mb-6"
-      >
-        <ArrowLeft size={14} /> Dashboard
-      </Link>
+    <div className="max-w-5xl mx-auto pb-16 min-w-0 w-full">
+      <div className="print:hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <Link
+          to="/dashboard"
+          className="inline-flex items-center gap-2 font-mono text-2xs uppercase tracking-wider text-ink-500 hover:text-ink-950"
+        >
+          <ArrowLeft size={14} /> Dashboard
+        </Link>
+        <div className="flex flex-col items-stretch sm:items-end gap-1">
+          <button
+            type="button"
+            onClick={handleDownloadPdf}
+            disabled={pdfLoading}
+            className="btn-brutal-outline text-2xs py-2.5 px-4 inline-flex items-center justify-center gap-2 min-h-[44px] disabled:opacity-50"
+          >
+            {pdfLoading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Download full plan PDF
+          </button>
+          <p className="font-mono text-2xs text-ink-500 text-center sm:text-end max-w-xs">
+            Infographics, How the business works, and all {total} MSD checklist answers
+          </p>
+        </div>
+      </div>
 
-      <SectionHeader>Business plan</SectionHeader>
-      <p className="font-mono text-2xs text-ink-500 -mt-4 mb-6">
-        Monthly cash flow: expected vs actual. Revenue is read from the payments ledger; record expenses below.
-      </p>
-
-      {error && (
-        <div className="border-2 border-accent bg-accent-light text-accent px-4 py-3 mb-6 font-mono text-2xs">
-          {error}
+      {pdfError && (
+        <div className="print:hidden border-2 border-accent bg-accent-light text-accent px-4 py-3 mb-6 font-mono text-2xs">
+          {pdfError}
         </div>
       )}
 
-      {/* Header: current-month scorecard */}
-      <div className="card-brutal p-6 mb-8">
-        <div className="font-mono text-2xs uppercase tracking-wider text-ink-500 mb-1">
-          {formatMonthLabel(currentPeriod)}
-        </div>
-        <div className="text-3xl font-semibold">
-          {currentScore.total === 0 ? (
-            <span className="text-ink-400">No targets set for this month</span>
-          ) : (
-            <>
-              {currentScore.met}/{currentScore.total}{' '}
-              <span className="text-ink-500 text-base font-normal">targets met</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Grid */}
-      <div className="card-brutal overflow-hidden mb-12">
-        {loading ? (
-          <p className="p-8 text-center text-sm text-ink-400">Loading…</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b-3 border-ink-950 font-mono text-2xs uppercase tracking-wider text-left">
-                  <th className="p-3">Metric</th>
-                  {periods.map((p) => (
-                    <th key={p} className="p-3 text-right whitespace-nowrap">
-                      {formatMonthLabel(p)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100">
-                {BUSINESS_PLAN_METRIC_ORDER.map((metric) => (
-                  <tr key={metric}>
-                    <td className="p-3 font-medium align-top">
-                      {BUSINESS_PLAN_METRIC_LABELS[metric]}
-                    </td>
-                    {periods.map((period) => {
-                      const target = targets[period]?.[metric];
-                      const actual = actualForMetric(metric, actuals[period]);
-                      const expected = target?.expected_value ?? 0;
-                      const delta = actual - expected;
-                      const met = expected > 0 && isTargetMet(metric, expected, actual);
-                      const isEditing = editing?.metric === metric && editing.period === period;
-
-                      const displayedExpected = MONEY_METRICS.has(metric)
-                        ? (expected / 100).toString()
-                        : expected.toString();
-
-                      return (
-                        <td key={period} className="p-3 align-top whitespace-nowrap text-right">
-                          {isEditing ? (
-                            <div className="flex items-center gap-1 justify-end">
-                              <input
-                                type="number"
-                                value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') handleSaveTarget();
-                                  if (e.key === 'Escape') setEditing(null);
-                                }}
-                                autoFocus
-                                className="w-24 border-2 border-ink-950 px-2 py-1 text-right font-mono text-xs"
-                                placeholder={MONEY_METRICS.has(metric) ? '$' : '#'}
-                              />
-                              <button
-                                onClick={handleSaveTarget}
-                                className="border-2 border-ink-950 bg-ink-950 text-white font-mono text-2xs uppercase px-2 py-1"
-                              >
-                                Save
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                setEditing({ metric, period });
-                                setEditValue(displayedExpected);
-                              }}
-                              className="text-left w-full hover:bg-ink-50 -m-1 p-1"
-                              title="Click to set target"
-                            >
-                              <div className="font-mono text-2xs text-ink-500 text-right">
-                                target {expected > 0 ? formatMetricValue(metric, expected) : '—'}
-                              </div>
-                              <div className="text-right font-semibold">{formatMetricValue(metric, actual)}</div>
-                              {expected > 0 && (
-                                <div
-                                  className={`font-mono text-2xs text-right ${
-                                    met ? 'text-teal' : 'text-accent'
-                                  }`}
-                                >
-                                  {formatMetricDelta(metric, delta)}
-                                </div>
-                              )}
-                            </button>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div id="business-plan-export" ref={exportRef} className="pdf-export-content bg-white">
+        <section data-pdf-section className="card-brutal border-3 border-ink-950 overflow-hidden mb-10">
+          <div className="bg-ink-950 text-white px-6 py-8 sm:py-12" data-pdf-hero>
+            <p className="font-mono text-2xs uppercase tracking-[0.25em] text-teal mb-3">Flexi-Wage · PSG narrative</p>
+            <h1 className="text-3xl sm:text-4xl font-black uppercase tracking-tight leading-tight max-w-2xl">
+              Trust platform + services for NZ nonprofits
+            </h1>
+            <p className="text-ink-300 mt-4 max-w-xl text-sm sm:text-base leading-relaxed">
+              We are <strong className="text-white">not only</strong> verifiers or uptime ping services. NGOreality
+              uses registry intelligence, standards education, the <strong className="text-white">Reality Badge</strong>
+              , {MEMBER_MONITORING_SUMMARY.toLowerCase()}, phone consultation, the{' '}
+              <strong className="text-white">{ORGANISATION_WORKSPACE_NAME}</strong> (their portal — not our internal
+              staff CRM), and a <strong className="text-white">${LANDING_STANDARDS_PACKAGE_CENTS / 100}</strong> landing +
+              standards package.
+            </p>
+            <div className="print:hidden flex flex-wrap gap-3 mt-6" data-pdf-exclude>
+              <Link
+                to="/cash-flow"
+                className="inline-flex items-center gap-2 border-2 border-teal bg-teal text-white font-mono text-2xs uppercase tracking-wider px-4 py-3 min-h-[44px] hover:bg-teal/90"
+              >
+                <FileSpreadsheet size={16} /> Cash flow worksheet
+              </Link>
+              <Link
+                to="/outreach"
+                className="inline-flex items-center gap-2 border-2 border-white font-mono text-2xs uppercase tracking-wider px-4 py-3 min-h-[44px] hover:bg-white/10"
+              >
+                Registry outreach →
+              </Link>
+            </div>
           </div>
-        )}
-      </div>
+        </section>
 
-      {/* Expenses */}
-      <SectionHeader>Expenses</SectionHeader>
+        <BusinessPlanInfographics />
 
-      <form onSubmit={handleAddExpense} className="card-brutal p-4 mb-6 grid gap-3 md:grid-cols-6">
-        <input
-          type="date"
-          value={newExpense.incurred_on}
-          onChange={(e) => setNewExpense({ ...newExpense, incurred_on: e.target.value })}
-          className="border-2 border-ink-950 px-3 py-2 text-sm"
-          required
-        />
-        <input
-          type="text"
-          value={newExpense.category}
-          onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
-          placeholder="Category (e.g. hosting)"
-          className="border-2 border-ink-950 px-3 py-2 text-sm md:col-span-2"
-          required
-        />
-        <input
-          type="number"
-          step="0.01"
-          min="0.01"
-          value={newExpense.amount}
-          onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
-          placeholder="NZD"
-          className="border-2 border-ink-950 px-3 py-2 text-sm"
-          required
-        />
-        <input
-          type="text"
-          value={newExpense.vendor}
-          onChange={(e) => setNewExpense({ ...newExpense, vendor: e.target.value })}
-          placeholder="Vendor (optional)"
-          className="border-2 border-ink-950 px-3 py-2 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={savingExpense}
-          className="border-2 border-ink-950 bg-ink-950 text-white font-mono text-2xs uppercase tracking-wider px-3 py-2 inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
-        >
-          <Plus size={14} /> Add
-        </button>
-      </form>
+        <div className="mt-10">
+          <BusinessPlanFinancialSnapshot />
+        </div>
 
-      <div className="card-brutal overflow-hidden">
-        {expenses.length === 0 ? (
-          <p className="p-8 text-center text-sm text-ink-400">No expenses recorded yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b-3 border-ink-950 font-mono text-2xs uppercase tracking-wider text-left">
-                  <th className="p-3">Date</th>
-                  <th className="p-3">Category</th>
-                  <th className="p-3">Vendor</th>
-                  <th className="p-3 text-right">Amount</th>
-                  <th className="p-3">Notes</th>
-                  <th className="p-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100">
-                {expenses.map((x) => (
-                  <tr key={x.id}>
-                    <td className="p-3 font-mono text-2xs whitespace-nowrap">{x.incurred_on}</td>
-                    <td className="p-3">{x.category}</td>
-                    <td className="p-3 text-ink-500">{x.vendor || '—'}</td>
-                    <td className="p-3 text-right font-mono">
-                      {new Intl.NumberFormat('en-NZ', {
-                        style: 'currency',
-                        currency: x.currency || 'NZD',
-                      }).format(x.amount_cents / 100)}
-                    </td>
-                    <td className="p-3 text-ink-500 text-xs">{x.notes || '—'}</td>
-                    <td className="p-3 text-right">
-                      <button
-                        onClick={() => handleDeleteExpense(x.id)}
-                        className="text-ink-400 hover:text-accent"
-                        title="Delete expense"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <section data-pdf-section className="mt-12">
+          <SectionHeader>How the business works</SectionHeader>
+          <div className="space-y-4 text-sm text-ink-700 leading-relaxed">
+            <p>
+              <strong className="text-ink-950">1. Data advantage.</strong> NZ Charities Register (~29k orgs) plus
+              monitoring shows who has no website, whose site looks down, and who is close to public trust standards.
+            </p>
+            <p>
+              <strong className="text-ink-950">2. $650 landing + standards package.</strong> For many NGOs we build a
+              trust landing page, teach how standards and the badge work, and wire the checklist — not just a verifier
+              tick-box.
+            </p>
+            <p>
+              <strong className="text-ink-950">3. {ORGANISATION_WORKSPACE_NAME}.</strong> Charities use their own
+              organisation portal to track progress (criteria, documents, readiness). Our sidebar “CRM” is internal staff
+              tooling only — we do not sell it as a CRM to avoid confusion.
+            </p>
+            <p>
+              <strong className="text-ink-950">4. Membership ($100/year).</strong> When public standards pass: Reality
+              Badge, {MEMBER_MONITORING_SUMMARY.toLowerCase()}, periodic reporting rhythm, and{' '}
+              <strong>email if something looks wrong</strong>. They can always call for consultation.
+            </p>
+            <p>
+              <strong className="text-ink-950">5. Already have a website?</strong> We help them meet standards in place,
+              then membership. Larger needs → custom solutions with flexible pricing.
+            </p>
+            <p>
+              <strong className="text-ink-950">6. Numbers.</strong> Flexi-Wage and cashflow on the{' '}
+              <span className="font-medium text-ink-950">Cash flow worksheet</span> page (CSV export; open in CRM
+              when editing).
+            </p>
           </div>
-        )}
+        </section>
+
+        <section className="mt-12">
+          <div data-pdf-section className="mb-6">
+            <SectionHeader>MSD submission checklist ({total} items)</SectionHeader>
+            <p className="print:hidden font-mono text-2xs text-ink-500 mt-2">
+              Reviewed {reviewedCount}/{total}
+            </p>
+            <p className="text-xs text-ink-500 mt-3 leading-relaxed">
+              Full written answers for MSD / Flexi-Wage vetting. Financial tables and CSV export live on
+              the Cash flow page.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {MSD_CHECKLIST_ANSWERS.map((item, index) => {
+              const meta = MSD_FLEXIWAGE_CHECKLIST.find((c) => c.id === item.id);
+              const isReviewed = Boolean(reviewed[item.id]);
+              return (
+                <article
+                  key={item.id}
+                  data-pdf-section
+                  className={`card-brutal overflow-hidden ${isReviewed ? 'ring-2 ring-teal ring-offset-2' : ''}`}
+                >
+                  <header className="flex items-start gap-3 border-b-3 border-ink-950 px-4 py-3 bg-ink-50">
+                    <span className="font-mono text-2xs text-ink-400 w-6 shrink-0 pt-0.5">{index + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-mono text-2xs uppercase text-teal">{item.section}</p>
+                      <h3 className="font-semibold text-sm mt-0.5 leading-snug">{item.label}</h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReviewed((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
+                      className="print:hidden shrink-0 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                      aria-pressed={isReviewed}
+                    >
+                      {isReviewed ? (
+                        <CheckCircle2 size={22} className="text-teal" />
+                      ) : (
+                        <Circle size={22} className="text-ink-300" />
+                      )}
+                    </button>
+                  </header>
+                  <div className="px-4 py-4 text-sm text-ink-700 leading-relaxed">{item.answer}</div>
+                  {item.id === 'financials' && (
+                    <div className="px-4 pb-4 print:hidden">
+                      <Link to="/cash-flow" className="inline-flex items-center gap-2 btn-brutal-outline text-2xs py-2 px-3">
+                        <FileSpreadsheet size={14} /> Open 12-month cashflow →
+                      </Link>
+                    </div>
+                  )}
+                  {meta?.docSection && item.id !== 'financials' && (
+                    <p className="px-4 pb-3 font-mono text-2xs text-ink-400">PSG: {meta.docSection}</p>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <section data-pdf-section className="mt-10 card-brutal p-6 bg-teal/5 border-teal text-sm text-ink-700">
+          <p className="font-mono text-2xs uppercase text-ink-500 mb-2">NGOreality · Business plan export</p>
+          <p>Generated from CRM Business plan. Financial detail: Cash flow worksheet.</p>
+        </section>
       </div>
     </div>
   );

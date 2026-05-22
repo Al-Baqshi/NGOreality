@@ -3,6 +3,7 @@ import { useInquiries } from '../../hooks/useSupabase';
 import { MetricCard, SectionHeader } from '../../components/ui';
 import { Mail, ArrowRight, Globe, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import RegistryInsights from '../../components/crm/RegistryInsights';
 
 export default function Dashboard() {
   const { stats, loading: statsLoading, error: statsError, websitePct, monitorPct } = useCrmDashboardStats();
@@ -30,7 +31,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="w-full min-w-0">
       <SectionHeader>Dashboard</SectionHeader>
 
       {statsError && (
@@ -76,6 +77,17 @@ export default function Dashboard() {
         <MetricCard label="Active badges" value={statsLoading ? '—' : stats.badges_active} />
         <MetricCard label="Expiring (30d)" value={statsLoading ? '—' : stats.badges_expiring_30d} />
         <MetricCard label="Expired badges" value={statsLoading ? '—' : stats.badges_expired} />
+      </div>
+
+      <div className="card-brutal mb-8">
+        <div className="border-b-3 border-ink-950 px-6 py-4">
+          <h3 className="font-mono text-xs uppercase tracking-wider font-semibold">
+            NZ registry insights (outreach)
+          </h3>
+        </div>
+        <div className="p-6">
+          <RegistryInsights country="NZ" />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -155,14 +167,14 @@ export default function Dashboard() {
         <div className="border-b-3 border-ink-950 px-6 py-4">
           <h3 className="font-mono text-xs uppercase tracking-wider font-semibold">Pipeline overview</h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-ink-100">
+        <div className="grid grid-cols-2 gap-px bg-ink-100 sm:grid-cols-3 lg:grid-cols-6 dark:bg-border">
           {pipelineStatuses.map((status) => {
             const count = stats.pipeline[status] ?? 0;
             return (
               <Link
                 key={status}
                 to={`/organizations?status=${status}`}
-                className="px-4 py-6 text-center hover:bg-ink-50 transition-colors"
+                className="bg-[var(--card-bg)] px-3 py-5 text-center transition-colors hover:bg-ink-50 dark:hover:bg-muted sm:px-4 sm:py-6"
               >
                 <div className={`text-2xl sm:text-3xl font-black ${pipelineColors[status]}`}>
                   {statsLoading ? '—' : count.toLocaleString()}

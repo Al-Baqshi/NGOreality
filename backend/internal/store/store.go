@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -68,7 +69,7 @@ type Monitor struct {
 // SyncMonitors upserts website_monitors from organizations and derives each
 // row's tier + interval from current org state:
 //
-//	paid_live (60m)  — org has an active 'monitoring_monthly' payment
+//	paid_live (60m)  — org has active annual membership (membership_annual or legacy verification_annual)
 //	active    (1d)   — org.status in ('verified','active')
 //	passive   (7d)   — everything else in the eligible status set
 func (s *Store) SyncMonitors(ctx context.Context, statuses []string) (int, error) {
@@ -78,14 +79,7 @@ func (s *Store) SyncMonitors(ctx context.Context, statuses []string) (int, error
 		    o.id AS organization_id,
 		    trim(o.website_url) AS url,
 		    CASE
-		      WHEN EXISTS (
-		        SELECT 1 FROM organization_payments p
-		        WHERE p.organization_id = o.id
-		          AND p.product_type = 'monitoring_monthly'
-		          AND p.status = 'paid'
-		          AND p.period_end IS NOT NULL
-		          AND p.period_end > now()
-		      ) THEN 'paid_live'
+		      WHEN public.has_active_membership(o.id) THEN 'paid_live'
 		      WHEN o.status IN ('verified', 'active') THEN 'active'
 		      ELSE 'passive'
 		    END AS tier
@@ -246,10 +240,13 @@ func (s *Store) RecordCheck(ctx context.Context, rec CheckRecord, failureThresho
 	wasDown := prevStatus == "down"
 	nowDown := newStatus == "down"
 
+	var newIncidentID string
 	if !wasDown && nowDown {
-		if err := openIncident(ctx, tx, rec); err != nil {
+		incidentID, err := openIncident(ctx, tx, rec)
+		if err != nil {
 			return err
 		}
+		newIncidentID = incidentID
 		if err := logActivity(ctx, tx, rec.OrganizationID, "website_down",
 			fmt.Sprintf("Website reported down (%s)", rec.ErrorMessage)); err != nil {
 			return err
@@ -266,26 +263,38 @@ func (s *Store) RecordCheck(ctx context.Context, rec CheckRecord, failureThresho
 		}
 	}
 
-	return tx.Commit(ctx)
-}
-
-func openIncident(ctx context.Context, tx pgx.Tx, rec CheckRecord) error {
-	var openCount int
-	err := tx.QueryRow(ctx, `
-		SELECT count(*)::int FROM website_incidents
-		WHERE organization_id = $1 AND closed_at IS NULL
-	`, rec.OrganizationID).Scan(&openCount)
-	if err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
-	if openCount > 0 {
-		return nil
+
+	if newIncidentID != "" {
+		if err := s.QueueSiteDownAlert(ctx, rec.OrganizationID, newIncidentID); err != nil {
+			// Non-fatal: incident is recorded; email can be retried from CRM or next cycle.
+			_ = err
+		}
 	}
-	_, err = tx.Exec(ctx, `
+	return nil
+}
+
+func openIncident(ctx context.Context, tx pgx.Tx, rec CheckRecord) (string, error) {
+	var openID string
+	err := tx.QueryRow(ctx, `
+		SELECT id::text FROM website_incidents
+		WHERE organization_id = $1 AND closed_at IS NULL
+		LIMIT 1
+	`, rec.OrganizationID).Scan(&openID)
+	if err == nil {
+		return openID, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
+	}
+	err = tx.QueryRow(ctx, `
 		INSERT INTO website_incidents (organization_id, last_status_code, error_message)
 		VALUES ($1, $2, $3)
-	`, rec.OrganizationID, rec.StatusCode, rec.ErrorMessage)
-	return err
+		RETURNING id::text
+	`, rec.OrganizationID, rec.StatusCode, rec.ErrorMessage).Scan(&openID)
+	return openID, err
 }
 
 func closeOpenIncidents(ctx context.Context, tx pgx.Tx, orgID string) error {

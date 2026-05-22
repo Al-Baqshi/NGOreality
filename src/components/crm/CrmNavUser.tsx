@@ -1,0 +1,54 @@
+import { LogOut } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { SidebarMenu, SidebarMenuItem } from '@/components/ui/sidebar';
+
+function staffInitials(name: string | undefined): string {
+  if (!name?.trim()) return 'ST';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+type CrmNavUserProps = {
+  onSignOut: () => void;
+};
+
+/** Staff footer — name + sign out only (no account/billing menu). */
+export default function CrmNavUser({ onSignOut }: CrmNavUserProps) {
+  const { profile, user } = useAuth();
+
+  const name = profile?.full_name?.trim() || 'Staff';
+  const email = user?.email ?? 'Signed in';
+
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <div className="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+          <Avatar className="size-8 shrink-0 rounded-lg">
+            <AvatarFallback className="rounded-lg bg-sidebar-primary text-xs text-sidebar-primary-foreground">
+              {staffInitials(profile?.full_name)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="grid min-w-0 flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+            <span className="truncate font-medium text-sidebar-foreground">{name}</span>
+            <span className="truncate text-xs text-sidebar-foreground/60">{email}</span>
+          </div>
+        </div>
+      </SidebarMenuItem>
+      <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onSignOut}
+          className="h-9 w-full border-sidebar-border bg-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:w-9 group-data-[collapsible=icon]:p-0"
+        >
+          <LogOut className="size-4 shrink-0" />
+          <span className="group-data-[collapsible=icon]:sr-only">Sign out</span>
+        </Button>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}

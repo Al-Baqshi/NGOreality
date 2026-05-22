@@ -3,10 +3,12 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type {
   BadgeRequest,
+  NgoSetupRequest,
   Organization,
   OrganizationMember,
   OrganizationMembership,
   VerificationBadge,
+  VerificationCriterion,
 } from '../types';
 
 export function useNgoPortal() {
@@ -16,6 +18,8 @@ export function useNgoPortal() {
   const [memberships, setMemberships] = useState<OrganizationMembership[]>([]);
   const [badges, setBadges] = useState<VerificationBadge[]>([]);
   const [badgeRequests, setBadgeRequests] = useState<BadgeRequest[]>([]);
+  const [setupRequests, setSetupRequests] = useState<NgoSetupRequest[]>([]);
+  const [criteria, setCriteria] = useState<VerificationCriterion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,6 +30,8 @@ export function useNgoPortal() {
       setMemberships([]);
       setBadges([]);
       setBadgeRequests([]);
+      setSetupRequests([]);
+      setCriteria([]);
       setLoading(false);
       return;
     }
@@ -55,7 +61,7 @@ export function useNgoPortal() {
     setMember(memberRow);
 
     const orgId = memberRow.organization_id;
-    const [orgRes, membershipsRes, badgesRes, requestsRes] = await Promise.all([
+    const [orgRes, membershipsRes, badgesRes, requestsRes, setupRes, criteriaRes] = await Promise.all([
       supabase.from('organizations').select('*').eq('id', orgId).maybeSingle(),
       supabase
         .from('organization_memberships')
@@ -72,6 +78,15 @@ export function useNgoPortal() {
         .select('*')
         .eq('organization_id', orgId)
         .order('created_at', { ascending: false }),
+      supabase
+        .from('ngo_setup_requests')
+        .select('*')
+        .eq('organization_id', orgId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('verification_criteria')
+        .select('*')
+        .eq('organization_id', orgId),
     ]);
 
     if (orgRes.error) setError(orgRes.error.message);
@@ -80,6 +95,8 @@ export function useNgoPortal() {
     if (!membershipsRes.error && membershipsRes.data) setMemberships(membershipsRes.data);
     if (!badgesRes.error && badgesRes.data) setBadges(badgesRes.data);
     if (!requestsRes.error && requestsRes.data) setBadgeRequests(requestsRes.data);
+    if (!setupRes.error && setupRes.data) setSetupRequests(setupRes.data as NgoSetupRequest[]);
+    if (!criteriaRes.error && criteriaRes.data) setCriteria(criteriaRes.data);
 
     setLoading(false);
   }, [user]);
@@ -115,16 +132,24 @@ export function useNgoPortal() {
     return null;
   };
 
+  const isLinked = Boolean(member);
+  const hasOrganization = Boolean(organization);
+  const needsRegistration = Boolean(user) && !isLinked && !loading;
+
   return {
     member,
     organization,
     memberships,
     badges,
     badgeRequests,
+    setupRequests,
+    criteria,
     loading,
     error,
     refetch: fetchPortal,
     submitBadgeRequest,
-    hasOrganization: Boolean(organization),
+    isLinked,
+    hasOrganization,
+    needsRegistration,
   };
 }

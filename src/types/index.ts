@@ -14,6 +14,8 @@ export interface Organization {
   verification_level: VerificationLevel;
   onboarding_stage: string;
   logo_url: string;
+  brand_primary?: string;
+  brand_secondary?: string;
   tags: string[];
   source_registry: string;
   external_id: string;
@@ -28,7 +30,7 @@ export interface Organization {
   updated_at: string;
 }
 
-export type PaymentProductType = 'verification_annual' | 'monitoring_monthly';
+export type PaymentProductType = 'membership_annual' | 'verification_annual' | 'monitoring_monthly';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled';
 export type PaymentMethod = 'stripe' | 'bank_transfer' | 'manual';
 
@@ -61,8 +63,71 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
 };
 
 export const PAYMENT_PRODUCT_LABELS: Record<PaymentProductType, string> = {
-  verification_annual: 'Reality Badge — $50/year',
-  monitoring_monthly: 'Monitoring — $13/month',
+  membership_annual: 'Annual membership — $100/year',
+  verification_annual: 'Reality Badge (legacy)',
+  monitoring_monthly: 'Monitoring only (legacy)',
+};
+
+export type NotificationTemplate = 'site_down' | 'badge_issued' | 'membership_welcome';
+export type NotificationStatus = 'pending' | 'sent' | 'failed' | 'skipped';
+
+export interface NotificationEvent {
+  id: string;
+  organization_id: string;
+  incident_id: string | null;
+  channel: string;
+  template: NotificationTemplate;
+  recipient_email: string;
+  subject: string;
+  body_text: string;
+  status: NotificationStatus;
+  sent_at: string | null;
+  error_message: string;
+  created_at: string;
+  organizations?: { name: string } | null;
+}
+
+export const NOTIFICATION_TEMPLATE_LABELS: Record<NotificationTemplate, string> = {
+  site_down: 'Site down alert',
+  badge_issued: 'Badge issued',
+  membership_welcome: 'Membership welcome',
+};
+
+export type PortalNotificationAudience = 'staff' | 'ngo';
+
+export interface PortalNotification {
+  id: string;
+  audience: PortalNotificationAudience;
+  organization_id: string | null;
+  event_type: string;
+  title: string;
+  body: string;
+  link_path: string;
+  metadata: Record<string, unknown>;
+  read_at: string | null;
+  created_at: string;
+  organizations?: { name: string } | null;
+}
+
+export const PORTAL_NOTIFICATION_EVENT_LABELS: Record<string, string> = {
+  inquiry_new: 'New inquiry',
+  ngo_setup_request: 'NGO setup request',
+  ngo_portal_registration: 'Portal registration',
+  badge_request: 'Badge request',
+  setup_request_submitted: 'Setup submitted',
+  setup_request_updated: 'Setup update',
+  badge_request_submitted: 'Request submitted',
+  badge_request_updated: 'Request update',
+  membership_updated: 'Membership',
+  standards_updated: 'Trust standards',
+  general: 'Update',
+};
+
+export const NOTIFICATION_STATUS_LABELS: Record<NotificationStatus, string> = {
+  pending: 'Pending',
+  sent: 'Sent',
+  failed: 'Failed',
+  skipped: 'Skipped',
 };
 
 export type OrgStatus =
@@ -115,6 +180,7 @@ export interface VerificationCriterion {
   status: 'pass' | 'fail' | 'pending';
   notes: string;
   evaluated_at: string | null;
+  criterion_tier?: 'public' | 'member';
   created_at: string;
 }
 
@@ -155,9 +221,10 @@ export interface InquirySubmission {
 export const ORG_STATUS_LABELS: Record<OrgStatus, string> = {
   listed: 'Listed (registry)',
   onboarding: 'Onboarding',
-  under_review: 'Under Review',
-  verified: 'Verified',
-  active: 'Active',
+  under_review: 'Under review',
+  /** Internal status when criteria pass; use trust stage UI — not the public “NGOreality verified” badge. */
+  verified: 'Standards passed',
+  active: 'Active customer',
   lapsed: 'Lapsed',
 };
 
@@ -203,9 +270,9 @@ export function isRegistryListed(org: Pick<Organization, 'status' | 'source_regi
 }
 
 export const VERIFICATION_LEVEL_LABELS: Record<VerificationLevel, string> = {
-  none: 'None',
-  verified: 'Verified',
-  transparent_financial: 'Transparent Financial',
+  none: 'No public badge',
+  verified: 'NGOreality verified',
+  transparent_financial: 'Transparent financial',
 };
 
 export const CATEGORIES = [
@@ -222,16 +289,107 @@ export const CATEGORIES = [
   'Other',
 ];
 
-export const DEFAULT_CRITERIA: Omit<VerificationCriterion, 'id' | 'organization_id' | 'created_at'>[] = [
-  { criterion_key: 'website_functional', criterion_label: 'Website is functional and live', status: 'pending', notes: '', evaluated_at: null },
-  { criterion_key: 'mission_clear', criterion_label: 'Mission statement is clear and present', status: 'pending', notes: '', evaluated_at: null },
-  { criterion_key: 'contact_accessible', criterion_label: 'Contact information is accessible', status: 'pending', notes: '', evaluated_at: null },
-  { criterion_key: 'mobile_responsive', criterion_label: 'Website is mobile responsive', status: 'pending', notes: '', evaluated_at: null },
-  { criterion_key: 'legal_pages', criterion_label: 'Privacy policy and terms are present', status: 'pending', notes: '', evaluated_at: null },
-  { criterion_key: 'donation_transparency', criterion_label: 'Donation usage is clearly explained', status: 'pending', notes: '', evaluated_at: null },
-  { criterion_key: 'uptime_reliable', criterion_label: 'Website has reliable uptime', status: 'pending', notes: '', evaluated_at: null },
-  { criterion_key: 'communication_clear', criterion_label: 'Communication is clear and professional', status: 'pending', notes: '', evaluated_at: null },
+/** Public trust standards — reviewed before badge; safe to reference in outreach. */
+export const PUBLIC_BADGE_CRITERIA: Omit<
+  VerificationCriterion,
+  'id' | 'organization_id' | 'created_at'
+>[] = [
+  {
+    criterion_key: 'website_functional',
+    criterion_label: 'Website is functional and live',
+    criterion_tier: 'public',
+    status: 'pending',
+    notes: '',
+    evaluated_at: null,
+  },
+  {
+    criterion_key: 'mission_clear',
+    criterion_label: 'Mission / description is clear (what you do)',
+    criterion_tier: 'public',
+    status: 'pending',
+    notes: '',
+    evaluated_at: null,
+  },
+  {
+    criterion_key: 'contact_accessible',
+    criterion_label: 'Contact information is accessible',
+    criterion_tier: 'public',
+    status: 'pending',
+    notes: '',
+    evaluated_at: null,
+  },
+  {
+    criterion_key: 'legal_pages',
+    criterion_label: 'Privacy policy is present',
+    criterion_tier: 'public',
+    status: 'pending',
+    notes: '',
+    evaluated_at: null,
+  },
+  {
+    criterion_key: 'mobile_responsive',
+    criterion_label: 'Website is mobile responsive',
+    criterion_tier: 'public',
+    status: 'pending',
+    notes: '',
+    evaluated_at: null,
+  },
+  {
+    criterion_key: 'communication_clear',
+    criterion_label: 'Communication is clear and professional',
+    criterion_tier: 'public',
+    status: 'pending',
+    notes: '',
+    evaluated_at: null,
+  },
 ];
+
+/** Member-only standards — shown after login (security, repo, ops). */
+export const MEMBER_CRITERIA: Omit<VerificationCriterion, 'id' | 'organization_id' | 'created_at'>[] = [
+  {
+    criterion_key: 'code_repository',
+    criterion_label: 'Independent code repository (org-owned)',
+    criterion_tier: 'member',
+    status: 'pending',
+    notes: '',
+    evaluated_at: null,
+  },
+  {
+    criterion_key: 'security_baseline',
+    criterion_label: 'Security baseline (HTTPS, headers, patches)',
+    criterion_tier: 'member',
+    status: 'pending',
+    notes: '',
+    evaluated_at: null,
+  },
+  {
+    criterion_key: 'uptime_monitoring_config',
+    criterion_label: 'Uptime monitoring configured (NGOreality or equivalent)',
+    criterion_tier: 'member',
+    status: 'pending',
+    notes: '',
+    evaluated_at: null,
+  },
+  {
+    criterion_key: 'shared_credentials',
+    criterion_label: 'Shared org credentials (not personal email for critical services)',
+    criterion_tier: 'member',
+    status: 'pending',
+    notes: '',
+    evaluated_at: null,
+  },
+  {
+    criterion_key: 'donation_transparency',
+    criterion_label: 'Donation usage is clearly explained',
+    criterion_tier: 'member',
+    status: 'pending',
+    notes: '',
+    evaluated_at: null,
+  },
+];
+
+/** All criteria templates for Initialize in CRM. */
+export const DEFAULT_CRITERIA = [...PUBLIC_BADGE_CRITERIA, ...MEMBER_CRITERIA];
 
 export const FINANCIAL_CRITERIA: Omit<VerificationCriterion, 'id' | 'organization_id' | 'created_at'>[] = [
   { criterion_key: 'financial_public', criterion_label: 'Financial records are publicly accessible', status: 'pending', notes: '', evaluated_at: null },
@@ -274,6 +432,34 @@ export interface BadgeRequest {
   created_at: string;
   updated_at: string;
 }
+
+export type NgoSetupRequestKind = 'landing_standards' | 'brand_assets' | 'general';
+export type NgoSetupRequestStatus = 'pending' | 'in_review' | 'approved' | 'completed' | 'cancelled';
+
+export interface NgoSetupRequest {
+  id: string;
+  organization_id: string;
+  requested_by: string;
+  request_kind: NgoSetupRequestKind;
+  status: NgoSetupRequestStatus;
+  has_existing_website: boolean;
+  wants_landing_package: boolean;
+  logo_url: string;
+  brand_primary: string;
+  brand_secondary: string;
+  notes: string;
+  questionnaire: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export const NGO_SETUP_REQUEST_STATUS_LABELS: Record<NgoSetupRequestStatus, string> = {
+  pending: 'Pending',
+  in_review: 'In review',
+  approved: 'Approved',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+};
 
 export const BADGE_REQUEST_TYPE_LABELS: Record<BadgeRequestType, string> = {
   new_badge: 'New Reality Badge',
@@ -378,13 +564,13 @@ export const MONEY_METRICS: ReadonlySet<BusinessPlanMetric> = new Set<BusinessPl
 ]);
 
 export const BUSINESS_PLAN_METRIC_LABELS: Record<BusinessPlanMetric, string> = {
-  total_revenue_cents: 'Total revenue',
-  badge_revenue_cents: 'Badge revenue',
-  monitoring_revenue_cents: 'Monitoring revenue',
-  badges_sold: 'Badges sold',
-  monitoring_subs: 'Monitoring subscriptions',
-  expense_cents: 'Expenses',
-  net_cents: 'Net (revenue − expenses)',
+  total_revenue_cents: 'Sales (all paid revenue)',
+  badge_revenue_cents: 'Membership / badge revenue',
+  monitoring_revenue_cents: 'Monitoring only (legacy)',
+  badges_sold: 'Memberships sold',
+  monitoring_subs: 'Monitoring subscriptions (legacy)',
+  expense_cents: 'Expenses (logged)',
+  net_cents: 'Net (sales − logged expenses)',
 };
 
 /** Display order for the monthly plan grid. */

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useOrganizationsPage } from '../../hooks/useCrm';
-import { SectionHeader, StatusPill } from '../../components/ui';
+import { SectionHeader, OrgTrustStatusBadge } from '../../components/ui';
 import PipelineGuide from '../../components/crm/PipelineGuide';
 import { Mail, Copy, ArrowLeft } from 'lucide-react';
 
@@ -83,7 +83,7 @@ export default function CustomersList() {
                     )}
                   </p>
                 </div>
-                <StatusPill status={org.status} />
+                <OrgTrustStatusBadge org={org} showHint={false} />
               </Link>
             ))}
           </div>

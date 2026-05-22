@@ -22,7 +22,7 @@ export default function PaymentsList() {
 
       <SectionHeader>Payments</SectionHeader>
       <p className="font-mono text-2xs text-ink-500 -mt-4 mb-6">
-        Badge $50/year · Monitoring $13/month · Record bank transfers on each org, or Stripe when connected.
+        Annual membership $100 NZD (badge + monitoring) · Record on each org after standards pass.
       </p>
 
       <div className="card-brutal overflow-hidden">

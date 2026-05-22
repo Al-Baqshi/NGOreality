@@ -6,6 +6,7 @@ import OutreachKanbanCard from '../../components/crm/OutreachKanbanCard';
 import { OUTREACH_KANBAN_STATUSES, OUTREACH_STATUS_LABELS, type OutreachStatus } from '../../types';
 import { setOutreachStatus } from '../../lib/crmOutreach';
 import { ArrowRight, Inbox, Users } from 'lucide-react';
+import RegistryInsights from '../../components/crm/RegistryInsights';
 
 function OutreachColumn({
   status,
@@ -41,9 +42,9 @@ function OutreachColumn({
         e.dataTransfer.dropEffect = 'move';
       }}
       onDrop={handleDrop}
-      className="flex flex-col min-w-[272px] max-w-[320px] flex-1 border-3 border-ink-950 bg-surface-raised min-h-[320px]"
+      className="kanban-column"
     >
-      <div className="border-b-3 border-ink-950 px-3 py-3 bg-ink-950 text-white">
+      <div className="kanban-column-header">
         <h3 className="font-mono text-2xs uppercase tracking-wider font-semibold">
           {OUTREACH_STATUS_LABELS[status]}
         </h3>
@@ -51,7 +52,7 @@ function OutreachColumn({
           {loading ? '…' : `${totalCount.toLocaleString()} leads`}
         </p>
       </div>
-      <div className="flex-1 overflow-y-auto max-h-[calc(100vh-300px)] p-2 space-y-2">
+      <div className="kanban-column-body">
         {loading ? (
           <p className="font-mono text-2xs text-ink-400 p-2">Loading…</p>
         ) : organizations.length === 0 ? (
@@ -64,7 +65,7 @@ function OutreachColumn({
       </div>
       <Link
         to={`/organizations?status=listed&outreach=${status}`}
-        className="border-t-2 border-ink-200 px-3 py-2 font-mono text-2xs uppercase tracking-wider text-ink-500 hover:text-accent flex items-center gap-1"
+        className="kanban-column-footer flex items-center gap-1"
       >
         View all <ArrowRight size={12} />
       </Link>
@@ -78,7 +79,7 @@ export default function OutreachBoard() {
   const bump = () => setTick((t) => t + 1);
 
   return (
-    <div className="max-w-[1500px] mx-auto">
+    <div className="page-shell w-full min-w-0 max-w-none">
       <SectionHeader>Outreach — leads</SectionHeader>
       <p className="font-mono text-2xs text-ink-500 uppercase tracking-wider -mt-4 mb-4">
         All registry NGOs are leads until they become customers. Drag between columns or use the move menu.
@@ -105,10 +106,16 @@ export default function OutreachBoard() {
         </div>
       </div>
 
-      <div key={tick} className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory">
-        {OUTREACH_KANBAN_STATUSES.map((status) => (
-          <OutreachColumn key={status} status={status} onGlobalRefresh={() => { bump(); refetch(); }} />
-        ))}
+      <div className="card-brutal mb-6 p-4 sm:p-6">
+        <RegistryInsights country="NZ" />
+      </div>
+
+      <div key={tick} className="kanban-shell">
+        <div className="kanban-board kanban-board-tall">
+          {OUTREACH_KANBAN_STATUSES.map((status) => (
+            <OutreachColumn key={status} status={status} onGlobalRefresh={() => { bump(); refetch(); }} />
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -9,6 +9,13 @@ export interface ClaimSearchOrganization {
   location: string;
   country: string;
   status: string;
+  description?: string;
+  mission_statement?: string;
+  website_url?: string;
+  logo_url?: string;
+  category?: string;
+  email?: string;
+  phone?: string;
 }
 
 const DIRECTORY_STATUSES = ['listed', 'verified', 'active'] as const;
@@ -21,6 +28,7 @@ export function useOrganizationClaimSearch(query: string) {
   const [results, setResults] = useState<ClaimSearchOrganization[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
     const q = sanitizeIlikeQuery(query);
@@ -28,25 +36,30 @@ export function useOrganizationClaimSearch(query: string) {
       setResults([]);
       setLoading(false);
       setSearched(false);
+      setSearchError(null);
       return;
     }
 
     const timer = window.setTimeout(async () => {
       setLoading(true);
       setSearched(true);
+      setSearchError(null);
       const pattern = `%${q}%`;
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, name, slug, charity_registration_number, location, country, status')
+        .select(
+          'id, name, slug, charity_registration_number, location, country, status, description, mission_statement, website_url, logo_url, category, email, phone',
+        )
         .in('status', [...DIRECTORY_STATUSES])
         .or(`name.ilike.${pattern},charity_registration_number.ilike.${pattern}`)
         .order('name', { ascending: true })
         .limit(12);
 
-      if (!error && data) {
-        setResults(data as ClaimSearchOrganization[]);
-      } else {
+      if (error) {
         setResults([]);
+        setSearchError(error.message);
+      } else {
+        setResults((data ?? []) as ClaimSearchOrganization[]);
       }
       setLoading(false);
     }, 300);
@@ -54,5 +67,5 @@ export function useOrganizationClaimSearch(query: string) {
     return () => window.clearTimeout(timer);
   }, [query]);
 
-  return { results, loading, searched };
+  return { results, loading, searched, searchError };
 }

@@ -34,7 +34,7 @@ func main() {
 	defer st.Close()
 
 	runner := monitor.NewRunner(cfg, st, log)
-	notifier := notify.New(log)
+	notifier := notify.New(log, cfg)
 
 	runCycle := func() {
 		cycleCtx, cycleCancel := context.WithTimeout(ctx, 30*time.Minute)

@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useOrganizationPayments } from '../../hooks/useCrm';
-import { BANK_TRANSFER_INSTRUCTIONS, ensurePaymentReference, recordPayment } from '../../lib/payments';
 import {
-  MONITORING_MONTHLY_CENTS,
-  PRICING_CURRENCY,
-  VERIFICATION_ANNUAL_CENTS,
-} from '../../config/pricing';
-import {
-  PAYMENT_PRODUCT_LABELS,
-  PAYMENT_STATUS_LABELS,
-  type PaymentProductType,
-} from '../../types';
+  BANK_TRANSFER_INSTRUCTIONS,
+  ensurePaymentReference,
+  hasActiveMembershipPayment,
+  recordPayment,
+} from '../../lib/payments';
+import { isMonitorApiConfigured } from '../../lib/monitorApi';
+import { MEMBERSHIP_ANNUAL_CENTS, MEMBERSHIP_LABEL, PRICING_CURRENCY } from '../../config/pricing';
+import { PAYMENT_STATUS_LABELS } from '../../types';
 import { CreditCard, Copy, Check } from 'lucide-react';
 
 function formatMoney(cents: number, currency: string) {
@@ -29,7 +27,7 @@ export default function OrganizationPayments({
   const { payments, loading, refetch } = useOrganizationPayments(organizationId);
   const [reference, setReference] = useState(paymentReference ?? '');
   const [copied, setCopied] = useState(false);
-  const [recording, setRecording] = useState<PaymentProductType | null>(null);
+  const [recording, setRecording] = useState(false);
   const [notes, setNotes] = useState('');
   const [message, setMessage] = useState<string | null>(null);
 
@@ -48,71 +46,71 @@ export default function OrganizationPayments({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleRecordPaid = async (productType: PaymentProductType) => {
-    setRecording(productType);
+  const handleRecordMembership = async () => {
+    setRecording(true);
     setMessage(null);
-    const { error } = await recordPayment({
+    const { error, message: resultMsg } = await recordPayment({
       organizationId,
-      productType,
+      productType: 'membership_annual',
       paymentMethod: 'bank_transfer',
       status: 'paid',
-      notes: notes.trim() || `Bank transfer recorded for ${organizationName}`,
+      notes: notes.trim() || `Annual membership for ${organizationName}`,
     });
-    setRecording(null);
+    setRecording(false);
     if (error) {
       setMessage(error);
     } else {
       setNotes('');
-      setMessage('Payment recorded');
+      let msg = resultMsg ?? 'Membership recorded — badge and monitoring updated.';
+      if (isMonitorApiConfigured()) {
+        msg += ' Welcome emails queued (send via Email notifications if still pending).';
+      }
+      setMessage(msg);
       refetch();
     }
   };
 
-  const latestVerification = payments.find(
-    (p) => p.product_type === 'verification_annual' && p.status === 'paid',
-  );
-  const activeMonitoring = payments.find(
+  const membershipActive = hasActiveMembershipPayment(payments);
+  const latestMembership = payments.find(
     (p) =>
-      p.product_type === 'monitoring_monthly' &&
-      p.status === 'paid' &&
-      p.period_end &&
-      new Date(p.period_end) > new Date(),
+      (p.product_type === 'membership_annual' || p.product_type === 'verification_annual') &&
+      p.status === 'paid',
   );
 
   return (
     <div className="card-brutal">
       <div className="border-b-3 border-ink-950 px-4 py-3">
         <h3 className="font-mono text-xs uppercase tracking-wider font-semibold flex items-center gap-2">
-          <CreditCard size={14} /> Payments
+          <CreditCard size={14} /> Membership
         </h3>
       </div>
 
       <div className="p-4 space-y-4 border-b border-ink-100">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-          <div>
-            <span className="label-brutal">Reality Badge</span>
-            <p className="font-semibold">{formatMoney(VERIFICATION_ANNUAL_CENTS, PRICING_CURRENCY)} / year</p>
-            <p className="font-mono text-2xs text-ink-500 mt-1">
-              {latestVerification
-                ? `Paid · covers until ${latestVerification.period_end ? new Date(latestVerification.period_end).toLocaleDateString() : '—'}`
-                : 'Not paid this period'}
-            </p>
-          </div>
-          <div>
-            <span className="label-brutal">Monitoring (optional)</span>
-            <p className="font-semibold">{formatMoney(MONITORING_MONTHLY_CENTS, PRICING_CURRENCY)} / month</p>
-            <p className="font-mono text-2xs text-ink-500 mt-1">
-              {activeMonitoring
-                ? `Active until ${activeMonitoring.period_end ? new Date(activeMonitoring.period_end).toLocaleDateString() : '—'}`
-                : 'No active monitoring — badge year does not include uptime alerts'}
-            </p>
-          </div>
+        <div className="text-sm">
+          <span className="label-brutal">Annual membership (NZ)</span>
+          <p className="font-semibold text-lg mt-1">
+            {formatMoney(MEMBERSHIP_ANNUAL_CENTS, PRICING_CURRENCY)} / year
+          </p>
+          <p className="text-xs text-ink-600 mt-2 leading-relaxed">{MEMBERSHIP_LABEL}</p>
+          <ul className="text-xs text-ink-500 mt-2 list-disc pl-4 space-y-1">
+            <li>Public trust standards review + Reality Badge (when criteria pass)</li>
+            <li>Website monitoring with email alerts if site goes down</li>
+            <li>Member portal for security checklist (repository, baseline, etc.)</li>
+          </ul>
+          <p className="font-mono text-2xs text-ink-400 mt-2">
+            Consulting, custom sites, and hands-on support are billed separately.
+          </p>
+          <p className="font-mono text-2xs text-ink-500 mt-2">
+            {membershipActive && latestMembership?.period_end
+              ? `Paid · active until ${new Date(latestMembership.period_end).toLocaleDateString()}`
+              : 'Not paid — record payment after standards pass'}
+          </p>
         </div>
 
         <div className="p-3 bg-ink-50 border-2 border-ink-200">
           <span className="label-brutal">Bank transfer reference</span>
           <p className="text-xs text-ink-600 mt-1 mb-2">
-            Ask the NGO to use this code as payment reference (not only org name). Matches bank deposits in CRM.
+            Ask the NGO to use this code as payment reference (not only org name).
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <code className="font-mono text-sm font-bold px-2 py-1 bg-white border-2 border-ink-950">
@@ -133,11 +131,6 @@ export default function OrganizationPayments({
           </p>
         </div>
 
-        <p className="font-mono text-2xs text-ink-500">
-          Stripe checkout (card) — connect VITE_STRIPE_PUBLISHABLE_KEY and a checkout edge function next; until then
-          record bank transfers below.
-        </p>
-
         <textarea
           className="input-brutal w-full text-base min-h-[72px]"
           placeholder="Payment notes (optional)"
@@ -145,25 +138,19 @@ export default function OrganizationPayments({
           onChange={(e) => setNotes(e.target.value)}
         />
 
-        <div className="flex flex-col sm:flex-row gap-2">
-          <button
-            type="button"
-            disabled={recording !== null}
-            onClick={() => handleRecordPaid('verification_annual')}
-            className="btn-brutal-teal text-xs flex-1 min-h-[44px]"
-          >
-            {recording === 'verification_annual' ? 'Saving…' : 'Record badge paid ($50)'}
-          </button>
-          <button
-            type="button"
-            disabled={recording !== null}
-            onClick={() => handleRecordPaid('monitoring_monthly')}
-            className="btn-brutal-outline text-xs flex-1 min-h-[44px]"
-          >
-            {recording === 'monitoring_monthly' ? 'Saving…' : 'Record monitoring paid ($13)'}
-          </button>
-        </div>
-        {message && <p className="font-mono text-2xs text-teal">{message}</p>}
+        <button
+          type="button"
+          disabled={recording}
+          onClick={handleRecordMembership}
+          className="btn-brutal-teal text-xs w-full sm:w-auto min-h-[48px] px-6"
+        >
+          {recording ? 'Saving…' : `Record membership paid (${formatMoney(MEMBERSHIP_ANNUAL_CENTS, PRICING_CURRENCY)})`}
+        </button>
+        {message && (
+          <p className={`font-mono text-2xs ${message.includes('error') ? 'text-accent' : 'text-teal'}`}>
+            {message}
+          </p>
+        )}
       </div>
 
       <div className="divide-y divide-ink-100">
@@ -174,7 +161,13 @@ export default function OrganizationPayments({
         ) : (
           payments.map((p) => (
             <div key={p.id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm">
-              <span className="font-medium">{PAYMENT_PRODUCT_LABELS[p.product_type]}</span>
+              <span className="font-medium">
+                {p.product_type === 'membership_annual'
+                  ? 'Annual membership'
+                  : p.product_type === 'verification_annual'
+                    ? 'Membership (legacy)'
+                    : 'Monitoring (legacy)'}
+              </span>
               <span>{formatMoney(p.amount_cents, p.currency)}</span>
               <span className="font-mono text-2xs uppercase">{PAYMENT_STATUS_LABELS[p.status]}</span>
               <span className="font-mono text-2xs text-ink-400 sm:ml-auto">

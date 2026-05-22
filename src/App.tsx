@@ -14,9 +14,12 @@ import InboundQueue from './pages/crm/InboundQueue';
 import CustomersList from './pages/crm/CustomersList';
 import PaymentsList from './pages/crm/PaymentsList';
 import BusinessPlan from './pages/crm/BusinessPlan';
+import CashFlow from './pages/crm/CashFlow';
 import WorkQueue from './pages/crm/WorkQueue';
 import CrmBadges from './pages/crm/CrmBadges';
 import Monitoring from './pages/crm/Monitoring';
+import CrmNotificationInbox from './pages/crm/CrmNotificationInbox';
+import EmailNotifications from './pages/crm/EmailNotifications';
 import Homepage from './pages/public/Homepage';
 import HowItWorks from './pages/public/HowItWorks';
 import Directory from './pages/public/Directory';
@@ -31,8 +34,17 @@ import OrganizationProfile from './pages/public/OrganizationProfile';
 import NotFound from './pages/public/NotFound';
 import NgoLogin from './pages/ngo/NgoLogin';
 import NgoSignup from './pages/ngo/NgoSignup';
-import NgoDashboard from './pages/ngo/NgoDashboard';
 import NgoLayout from './components/NgoLayout';
+import NgoPortalGate from './components/ngo/NgoPortalGate';
+import NgoOverviewPage from './pages/ngo/portal/NgoOverviewPage';
+import NgoProfilePage from './pages/ngo/portal/NgoProfilePage';
+import NgoSetupRequestPage from './pages/ngo/portal/NgoSetupRequestPage';
+import NgoMembershipPage from './pages/ngo/portal/NgoMembershipPage';
+import NgoStandardsPage from './pages/ngo/portal/NgoStandardsPage';
+import NgoBadgePage from './pages/ngo/portal/NgoBadgePage';
+import NgoMonitoringPage from './pages/ngo/portal/NgoMonitoringPage';
+import NgoRequestsPage from './pages/ngo/portal/NgoRequestsPage';
+import NgoNotificationsPage from './pages/ngo/portal/NgoNotificationsPage';
 import NgoProtectedRoute from './components/NgoProtectedRoute';
 import StaffProtectedRoute from './components/StaffProtectedRoute';
 import StaffLogin from './pages/staff/StaffLogin';
@@ -65,9 +77,12 @@ export default function App() {
             <Route path="/customers" element={<CustomersList />} />
             <Route path="/payments" element={<PaymentsList />} />
             <Route path="/plan" element={<BusinessPlan />} />
+            <Route path="/cash-flow" element={<CashFlow />} />
             <Route path="/work-queue" element={<WorkQueue />} />
             <Route path="/badges" element={<CrmBadges />} />
             <Route path="/monitoring" element={<Monitoring />} />
+            <Route path="/notifications" element={<CrmNotificationInbox />} />
+            <Route path="/email-notifications" element={<EmailNotifications />} />
             <Route path="/contacts" element={<Contacts />} />
             <Route path="/inquiries" element={<Inquiries />} />
             <Route path="/blog-manager" element={<BlogManager />} />
@@ -78,8 +93,18 @@ export default function App() {
         <Route path="/ngo/login" element={<NgoLogin />} />
         <Route path="/ngo/signup" element={<NgoSignup />} />
         <Route element={<NgoProtectedRoute />}>
-          <Route element={<NgoLayout />}>
-            <Route path="/ngo" element={<NgoDashboard />} />
+          <Route path="/ngo" element={<NgoLayout />}>
+            <Route element={<NgoPortalGate />}>
+              <Route index element={<NgoOverviewPage />} />
+              <Route path="profile" element={<NgoProfilePage />} />
+              <Route path="setup-request" element={<NgoSetupRequestPage />} />
+              <Route path="membership" element={<NgoMembershipPage />} />
+              <Route path="standards" element={<NgoStandardsPage />} />
+              <Route path="badge" element={<NgoBadgePage />} />
+              <Route path="monitoring" element={<NgoMonitoringPage />} />
+              <Route path="requests" element={<NgoRequestsPage />} />
+              <Route path="notifications" element={<NgoNotificationsPage />} />
+            </Route>
           </Route>
         </Route>
 

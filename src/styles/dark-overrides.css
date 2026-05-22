@@ -106,3 +106,25 @@
 .dark .hover\:text-white:hover {
   color: #0a0a0a;
 }
+
+/* Brutal buttons bake ink colors via @apply — ensure readable labels in dark mode */
+.dark .btn-brutal-outline,
+.dark .btn-brutal-teal,
+.dark .btn-brutal-accent {
+  color: var(--foreground);
+}
+
+.dark .btn-brutal-outline:active,
+.dark .btn-brutal-outline.active {
+  color: var(--primary-foreground);
+}
+
+.dark .input-brutal {
+  color: var(--foreground);
+}
+
+.dark .card-brutal,
+.dark .card-brutal-hover {
+  color: var(--foreground);
+  border-color: var(--border);
+}

@@ -4,6 +4,7 @@ import type { OrgStatus, VerificationLevel } from '../../types';
 import { ORG_STATUS_LABELS, VERIFICATION_LEVEL_LABELS, isNgorealityVerified } from '../../types';
 import { FINANCIAL_VERIFICATION_ENABLED } from '../../config/features';
 import type { Organization } from '../../types';
+import { getOrgTrustDisplay } from '../../lib/orgTrustStatus';
 
 export function StatusPill({ status }: { status: OrgStatus }) {
   const styles: Record<OrgStatus, string> = {
@@ -23,16 +24,47 @@ export function StatusPill({ status }: { status: OrgStatus }) {
   );
 }
 
+/** Single trust + pipeline badge for CRM and public directory. */
+export function OrgTrustStatusBadge({
+  org,
+  showHint = true,
+}: {
+  org: Pick<Organization, 'status' | 'verification_level'>;
+  showHint?: boolean;
+}) {
+  const { label, hint, tone } = getOrgTrustDisplay(org);
+
+  const toneClass =
+    tone === 'trust'
+      ? 'badge-verified'
+      : tone === 'warn'
+        ? 'border-2 border-amber-400 bg-amber-50 text-amber-900 font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1 inline-flex items-center gap-1.5 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-100'
+        : tone === 'muted'
+          ? 'inline-flex items-center gap-1.5 border border-dashed border-ink-300 bg-ink-50 text-ink-500 font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1 dark:border-border dark:bg-muted dark:text-muted-foreground'
+          : 'inline-flex items-center gap-1.5 border border-ink-300 bg-ink-50 text-ink-600 font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1 dark:border-border dark:bg-muted dark:text-muted-foreground';
+
+  const Icon =
+    tone === 'trust' ? ShieldCheck : tone === 'warn' ? AlertCircle : Clock;
+
+  return (
+    <span className={`${toneClass} max-w-full`}>
+      <Icon size={12} className="shrink-0" />
+      <span className="truncate">{label}</span>
+      {showHint && hint ? (
+        <span className="normal-case tracking-normal font-medium opacity-80 hidden sm:inline">
+          · {hint}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 export function DirectoryTrustBadge({ org }: { org: Pick<Organization, 'status' | 'verification_level'> }) {
   if (isNgorealityVerified(org)) {
-    return (
-      <span className="badge-verified">
-        <ShieldCheck size={10} /> NGOreality Verified
-      </span>
-    );
+    return <OrgTrustStatusBadge org={org} showHint={false} />;
   }
   return (
-    <span className="inline-flex items-center gap-1.5 border border-ink-300 bg-ink-50 text-ink-600 font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1">
+    <span className="inline-flex items-center gap-1.5 border border-ink-300 bg-ink-50 text-ink-600 font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1 dark:border-border dark:bg-muted dark:text-muted-foreground">
       <AlertCircle size={10} />
       Listed · Not verified
     </span>
@@ -87,24 +119,41 @@ export function CriterionStatus({ status }: { status: 'pass' | 'fail' | 'pending
   return <span className="badge-pending"><AlertCircle size={12} />Pending</span>;
 }
 
+export function formatStatValue(value: string | number): string {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value.toLocaleString('en-NZ') : '—';
+  }
+  return value;
+}
+
 export function MetricCard({
   label,
   value,
   sub,
   accent,
+  compact,
+  currency,
 }: {
   label: string;
   value: string | number;
   sub?: string;
   accent?: boolean;
+  /** Tighter padding for dense grids (e.g. registry insights on business plan). */
+  compact?: boolean;
+  /** Use nowrap tabular sizing for NZD amounts */
+  currency?: boolean;
 }) {
+  const display = formatStatValue(value);
+  const valueClass = currency ? 'stat-value-currency' : 'stat-value';
+  const tone = accent ? 'text-emerald-700' : 'text-ink-950';
   return (
-    <div className="card-brutal p-6">
+    <div
+      className={`card-brutal stat-card ${compact ? 'p-3 sm:p-4' : 'p-4 sm:p-5 md:p-6'}`}
+      title={typeof value === 'string' && value.length > 12 ? value : undefined}
+    >
       <div className="label-brutal">{label}</div>
-      <div className={`text-4xl font-black tracking-tight ${accent ? 'text-accent' : 'text-ink-950'}`}>
-        {value}
-      </div>
-      {sub ? <div className="font-mono text-2xs text-ink-400 mt-1 uppercase tracking-wider">{sub}</div> : null}
+      <div className={`${valueClass} ${tone}`}>{display}</div>
+      {sub ? <div className="stat-sub">{sub}</div> : null}
     </div>
   );
 }

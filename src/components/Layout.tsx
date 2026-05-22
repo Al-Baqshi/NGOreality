@@ -1,52 +1,41 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Building2,
-  Shield,
-  Users,
-  Globe,
-  Mail,
-  FileText,
-  ChevronLeft,
-  Menu,
-  LogOut,
-  Kanban,
-  ListTodo,
-  Award,
-  Activity,
-  Inbox,
-  UserCheck,
-  CreditCard,
-  LineChart,
-} from 'lucide-react';
-import { useState } from 'react';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { PanelLeft } from 'lucide-react';
+import PortalNotificationBell from './notifications/PortalNotificationBell';
 import { useAuth } from '../contexts/AuthContext';
-import BrandLogo from './BrandLogo';
 import ThemeToggle from './ThemeToggle';
+import CrmNavUser from './crm/CrmNavUser';
+import { CRM_NAV_GROUPS } from './crm/crm-nav';
+import { getCrmPageTitle } from './crm/crm-page-title';
+import { Separator } from '@/components/ui/separator';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from '@/components/ui/sidebar';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
-const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/work-queue', icon: ListTodo, label: 'Work queue' },
-  { to: '/outreach', icon: Kanban, label: 'Outreach' },
-  { to: '/inbound', icon: Inbox, label: 'Inbound' },
-  { to: '/customers', icon: UserCheck, label: 'Customers' },
-  { to: '/payments', icon: CreditCard, label: 'Payments' },
-  { to: '/plan', icon: LineChart, label: 'Business plan' },
-  { to: '/organizations', icon: Building2, label: 'Organizations' },
-  { to: '/verification', icon: Shield, label: 'Verification' },
-  { to: '/badges', icon: Award, label: 'Badges' },
-  { to: '/monitoring', icon: Activity, label: 'Monitoring' },
-  { to: '/contacts', icon: Users, label: 'Contacts' },
-  { to: '/inquiries', icon: Mail, label: 'Inquiries' },
-  { to: '/blog-manager', icon: FileText, label: 'Blog' },
-  { to: '/public', icon: Globe, label: 'Public Site' },
-];
+function isNavActive(pathname: string, to: string): boolean {
+  if (to === '/dashboard') return pathname === '/dashboard';
+  if (to === '/public') return pathname.startsWith('/public');
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
 
 export default function CRMLayout() {
-  const { profile, signOut } = useAuth();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const { pathname } = useLocation();
+  const pageTitle = getCrmPageTitle(pathname);
 
   const handleSignOut = async () => {
     await signOut();
@@ -54,100 +43,97 @@ export default function CRMLayout() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface">
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 bg-ink-950/50 lg:hidden" onClick={() => setMobileOpen(false)} />
-      )}
+    <TooltipProvider delay={0}>
+      <SidebarProvider defaultOpen>
+        <Sidebar collapsible="icon" variant="sidebar" className="border-sidebar-border">
+          <SidebarHeader className="border-b border-sidebar-border">
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  size="lg"
+                  className="data-[slot=sidebar-menu-button]:!p-2"
+                  render={
+                    <Link
+                      to="/dashboard"
+                      className="flex w-full min-w-0 items-center gap-2"
+                      aria-label="NGOreality CRM home"
+                    />
+                  }
+                >
+                  <img
+                    src="/logo-icon-dark.svg"
+                    alt=""
+                    className="size-8 shrink-0 rounded-md object-contain"
+                    decoding="async"
+                  />
+                  <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold tracking-tight">NGOreality</span>
+                    <span className="truncate text-xs opacity-70">Staff CRM</span>
+                  </div>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarHeader>
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 flex flex-col border-r-3 border-ink-950 bg-ink-950 text-white
-          transition-all duration-200 ${collapsed ? 'w-16' : 'w-56'}
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
-      >
-        {/* Logo */}
-        <div className={`flex items-center border-b border-ink-700 px-4 py-5 ${collapsed ? 'justify-center' : ''}`}>
-          <div className={collapsed ? '' : 'flex items-center gap-3'}>
-            {collapsed ? (
-              <BrandLogo variant="icon" onDark iconClassName="h-10 w-10" />
-            ) : (
-              <BrandLogo onDark showTagline={false} iconClassName="h-9 w-9 sm:h-10 sm:w-10" />
-            )}
-          </div>
-        </div>
+          <SidebarContent className="gap-0">
+            {CRM_NAV_GROUPS.map((group) => (
+              <SidebarGroup key={group.label}>
+                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {group.items.map((item) => (
+                      <SidebarMenuItem key={item.to}>
+                        <SidebarMenuButton
+                          isActive={isNavActive(pathname, item.to)}
+                          tooltip={item.label}
+                          render={
+                            <NavLink
+                              to={item.to}
+                              className="flex w-full min-w-0 items-center gap-2"
+                            >
+                              <item.icon className="size-4 shrink-0" />
+                              <span>{item.label}</span>
+                            </NavLink>
+                          }
+                        />
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))}
+          </SidebarContent>
 
-        {/* Nav */}
-        <nav className="flex-1 py-4 space-y-1 px-2">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              onClick={() => setMobileOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 font-mono text-xs uppercase tracking-wider transition-colors
-                ${isActive
-                  ? 'bg-accent text-white'
-                  : 'text-ink-300 hover:bg-ink-800 hover:text-white'
-                }
-                ${collapsed ? 'justify-center' : ''}`
-              }
-            >
-              <item.icon size={16} />
-              {!collapsed && item.label}
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* Collapse toggle */}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="hidden lg:flex items-center justify-center border-t border-ink-700 py-3 text-ink-400 hover:text-white transition-colors"
-        >
-          <ChevronLeft size={16} className={`transition-transform ${collapsed ? 'rotate-180' : ''}`} />
-        </button>
-      </aside>
-
-      {/* Main content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top bar */}
-        <header className="flex items-center justify-between border-b-3 border-ink-950 bg-surface-raised px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setMobileOpen(true)}
-              className="lg:hidden text-ink-600 hover:text-ink-950"
-            >
-              <Menu size={20} />
-            </button>
-            <div className="label-brutal mb-0">CRM Console</div>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            {profile?.full_name && (
-              <span className="hidden sm:inline font-mono text-2xs uppercase tracking-wider text-ink-500 truncate max-w-[140px]">
-                {profile.full_name}
-              </span>
-            )}
-            <div className="flex items-center gap-2 border-2 border-ink-200 px-3 py-1.5">
-              <div className="h-2 w-2 rounded-full bg-teal animate-pulse" />
-              <span className="font-mono text-2xs uppercase tracking-wider text-ink-500">Active</span>
+          <SidebarFooter className="border-t border-sidebar-border">
+            <div className="mb-2 flex items-center justify-between gap-2 px-1 group-data-[collapsible=icon]:justify-center">
+              <ThemeToggle />
             </div>
-            <ThemeToggle />
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="flex items-center justify-center min-h-[44px] min-w-[44px] border-2 border-ink-950 text-ink-600 hover:bg-ink-950 hover:text-white transition-colors"
-              aria-label="Sign out"
-            >
-              <LogOut size={18} />
-            </button>
-          </div>
-        </header>
+            <CrmNavUser onSignOut={handleSignOut} />
+          </SidebarFooter>
+          <SidebarRail />
+        </Sidebar>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
-          <Outlet />
-        </main>
-      </div>
-    </div>
+        <SidebarInset className="flex h-svh min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:h-16 sm:px-4">
+            <SidebarTrigger className="-ml-1 size-9 sm:size-10" aria-label="Toggle sidebar">
+              <PanelLeft className="size-4" />
+            </SidebarTrigger>
+            <Separator orientation="vertical" className="mx-1 hidden h-4 sm:block" />
+            <h1 className="min-w-0 flex-1 truncate text-base font-medium text-foreground">
+              {pageTitle}
+            </h1>
+            <PortalNotificationBell audience="staff" to="/notifications" />
+          </header>
+
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 lg:p-8">
+              <div className="flex w-full min-w-0 flex-col gap-4 sm:gap-6">
+                <Outlet />
+              </div>
+            </div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }

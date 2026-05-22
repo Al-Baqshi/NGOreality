@@ -1,5 +1,5 @@
 import { useOrganizationsPage } from '../../hooks/useCrm';
-import { StatusPill, VerificationBadge, SectionHeader } from '../../components/ui';
+import { OrgTrustStatusBadge, SectionHeader } from '../../components/ui';
 import { Shield, Landmark, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { FINANCIAL_VERIFICATION_ENABLED } from '../../config/features';
@@ -56,7 +56,7 @@ export default function Verification() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <StatusPill status={org.status} />
+                  <OrgTrustStatusBadge org={org} showHint={false} />
                   <ArrowRight size={16} className="text-ink-300" />
                 </div>
               </Link>
@@ -73,14 +73,14 @@ export default function Verification() {
 
       <div className="mb-8">
         <h3 className="font-mono text-xs uppercase tracking-wider font-semibold text-teal mb-1 flex items-center gap-2">
-          <Shield size={14} /> Verified ({verifiedLoading ? '…' : verified.length}+ on this page)
+          <Shield size={14} /> NGOreality verified ({verifiedLoading ? '…' : verified.length}+ on this page)
         </h3>
         <p className="font-mono text-2xs text-ink-400 mb-4 uppercase tracking-wider">
-          Digital & operational — non-financial
+          Public trust badge issued — includes standards passed with badge
         </p>
         {verified.length === 0 && !verifiedLoading ? (
           <div className="card-brutal p-8 text-center">
-            <p className="text-sm text-ink-400">No verified organizations yet</p>
+            <p className="text-sm text-ink-400">No organisations with the public badge yet</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -97,7 +97,7 @@ export default function Verification() {
                     </div>
                   </div>
                 </div>
-                <VerificationBadge level={org.verification_level} showDisclaimer />
+                <OrgTrustStatusBadge org={org} />
               </Link>
             ))}
           </div>

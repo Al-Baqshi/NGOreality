@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 import SEO from '../../components/SEO';
 import BrandLogo from '../../components/BrandLogo';
 import ThemeToggle from '../../components/ThemeToggle';
@@ -18,7 +19,7 @@ export default function NgoLogin() {
   const [submitting, setSubmitting] = useState(false);
 
   if (!loading && user) {
-    return <Navigate to={from} replace />;
+    return <Navigate to={from === '/ngo/login' ? '/ngo' : from} replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,12 +27,29 @@ export default function NgoLogin() {
     setError('');
     setSubmitting(true);
     const { error: signInError } = await signIn(email, password);
-    setSubmitting(false);
     if (signInError) {
       setError(signInError);
+      setSubmitting(false);
       return;
     }
-    navigate(from, { replace: true });
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id;
+
+    let destination = from;
+    if (userId) {
+      const { data: member } = await supabase
+        .from('organization_members')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (!member) {
+        destination = '/ngo/signup';
+      }
+    }
+
+    setSubmitting(false);
+    navigate(destination, { replace: true });
   };
 
   return (

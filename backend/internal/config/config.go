@@ -19,6 +19,9 @@ type Config struct {
 	CheckTimeout          time.Duration
 	CheckFailureThreshold int
 	MonitorStatuses       []string
+	ResendAPIKey          string
+	NotifyFromEmail       string
+	NotifyStaffEmail      string
 }
 
 func Load() (Config, error) {
@@ -73,6 +76,9 @@ func Load() (Config, error) {
 		CheckTimeout:          envDuration("CHECK_TIMEOUT", 12*time.Second),
 		CheckFailureThreshold: failureThreshold,
 		MonitorStatuses:       trimmed,
+		ResendAPIKey:          strings.TrimSpace(os.Getenv("RESEND_API_KEY")),
+		NotifyFromEmail:       envString("NOTIFY_FROM_EMAIL", "NGOreality <notifications@ngoreality.com>"),
+		NotifyStaffEmail:      strings.TrimSpace(os.Getenv("NOTIFY_STAFF_EMAIL")),
 	}, nil
 }
 

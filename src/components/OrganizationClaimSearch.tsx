@@ -11,7 +11,7 @@ interface OrganizationClaimSearchProps {
 
 export default function OrganizationClaimSearch({ selected, onSelect, onRegisterNew }: OrganizationClaimSearchProps) {
   const [query, setQuery] = useState(selected?.name ?? '');
-  const { results, loading, searched } = useOrganizationClaimSearch(query);
+  const { results, loading, searched, searchError } = useOrganizationClaimSearch(query);
 
   return (
     <div className="space-y-3">
@@ -40,6 +40,13 @@ export default function OrganizationClaimSearch({ selected, onSelect, onRegister
           Search the NZ directory. Type at least 2 characters.
         </p>
       </div>
+
+      {searchError && (
+        <p className="text-accent text-xs font-mono border-2 border-accent px-3 py-2" role="alert">
+          Directory search failed: {searchError}. If this persists, apply Supabase migration{' '}
+          <code className="text-2xs">021_ngo_claim_search_rls</code>.
+        </p>
+      )}
 
       {selected && (
         <div className="border-2 border-teal bg-teal-light p-3 flex items-start gap-2">

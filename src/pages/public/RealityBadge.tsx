@@ -300,12 +300,22 @@ export default function RealityBadge() {
             <h2 className="text-3xl md:text-4xl font-black uppercase tracking-tight mb-6">
               Get your organization verified
             </h2>
-            <p className="text-ink-300 max-w-lg mx-auto mb-8">
-              Earn the NGOreality Reality Badge and join the standard for nonprofit trust.
+            <p className="text-ink-300 max-w-lg mx-auto mb-4">
+              Meet public trust standards first — clear mission, contact, privacy policy, and a working site — then
+              join as a member.
             </p>
-            <Link to="/public/contact" className="btn-brutal-accent text-base inline-flex items-center gap-2">
-              Apply Now <ArrowRight size={18} />
-            </Link>
+            <p className="font-mono text-sm text-teal mb-8">
+              $100 NZD / year — Reality Badge, monitoring, and email alerts if your site goes down. Hands-on support
+              and custom builds are separate.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link to="/ngo/signup" className="btn-brutal-teal text-base inline-flex items-center gap-2 justify-center min-h-[48px]">
+                NGO sign up <ArrowRight size={18} />
+              </Link>
+              <Link to="/public/contact" className="btn-brutal-outline border-ink-600 text-white text-base inline-flex items-center gap-2 justify-center min-h-[48px]">
+                Contact us <ArrowRight size={18} />
+              </Link>
+            </div>
           </div>
         </section>
       </div>

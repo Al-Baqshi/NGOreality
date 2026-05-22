@@ -2,24 +2,33 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useOrganization, useContacts, useVerificationCriteria, useBadges, useActivityLog } from '../../hooks/useSupabase';
-import { StatusPill, VerificationBadge, CriterionStatus, FormField, Modal } from '../../components/ui';
+import { OrgTrustStatusBadge, CriterionStatus, FormField, Modal } from '../../components/ui';
 import {
   DEFAULT_CRITERIA,
   FINANCIAL_CRITERIA,
   CATEGORIES,
-  ORG_STATUS_LABELS,
-  VERIFICATION_LEVEL_LABELS,
   OUTREACH_STATUS_LABELS,
   REGISTRY_SOURCE_LABELS,
 } from '../../types';
-import type { OrgStatus, VerificationLevel, OutreachStatus } from '../../types';
+import {
+  getTrustStageDescription,
+  getTrustStageLabel,
+  getTrustStageOptions,
+  getTrustStageQuickActions,
+  orgToTrustStage,
+  trustStageToFields,
+  type OrgTrustStage,
+} from '../../lib/orgTrustStatus';
+import { isPublicCriterion, isMemberCriterion } from '../../lib/criteria';
+import type { OutreachStatus } from '../../types';
 import { isRegistryListed, OUTREACH_KANBAN_STATUSES } from '../../types';
 import { markRegisteredInbound, registerAsCustomer, setOutreachStatus } from '../../lib/crmOutreach';
-import { FINANCIAL_VERIFICATION_ENABLED, getVerificationLevelOptions } from '../../config/features';
+import { FINANCIAL_VERIFICATION_ENABLED } from '../../config/features';
 import FinancialComingSoon from '../../components/FinancialComingSoon';
 import OrganizationEngagements from '../../components/crm/OrganizationEngagements';
 import OrganizationPayments from '../../components/crm/OrganizationPayments';
-import { updateCriterionStatuses, tryAutoVerifyOrganization, allBaseCriteriaPass } from '../../lib/verification';
+import { updateCriterionStatuses, tryAutoVerifyOrganization, allPublicCriteriaPass } from '../../lib/verification';
+import { publicCriteriaScore } from '../../lib/criteria';
 import { ArrowLeft, Globe, Mail, Phone, MapPin, CreditCard as Edit3, Save, X, Shield, Clock, User, Plus, Trash2, Award, CheckCheck } from 'lucide-react';
 
 export default function OrganizationDetail() {
@@ -51,13 +60,18 @@ export default function OrganizationDetail() {
     window.location.reload();
   };
 
-  const handleStatusChange = async (newStatus: OrgStatus) => {
+  const handleTrustStageChange = async (stage: OrgTrustStage) => {
     if (!id) return;
-    await supabase.from('organizations').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id);
+    const { status, verification_level } = trustStageToFields(stage);
+    const label = getTrustStageLabel(stage);
+    await supabase
+      .from('organizations')
+      .update({ status, verification_level, updated_at: new Date().toISOString() })
+      .eq('id', id);
     await supabase.from('activity_log').insert({
       organization_id: id,
-      action: 'status_change',
-      description: `Status changed to ${ORG_STATUS_LABELS[newStatus]}`,
+      action: 'trust_stage_change',
+      description: `Trust stage set to ${label}`,
       performed_by: 'admin',
     });
     window.location.reload();
@@ -124,10 +138,10 @@ export default function OrganizationDetail() {
       return u ? { ...c, status: u.status, evaluated_at: evaluatedAt } : c;
     });
 
-    if (allBaseCriteriaPass(merged)) {
+    if (allPublicCriteriaPass(merged)) {
       const result = await tryAutoVerifyOrganization(id, merged, organization);
+      setVerifyNotice(result.message);
       if (result.verified) {
-        setVerifyNotice(result.message);
         await refetchOrganization();
         await refetchCriteria();
       }
@@ -140,14 +154,14 @@ export default function OrganizationDetail() {
     applyCriteriaUpdates([{ id: criterionId, status: newStatus }]);
   };
 
-  const handlePassAllBase = () => {
-    const base = criteria.filter((c) => DEFAULT_CRITERIA.some((d) => d.criterion_key === c.criterion_key));
-    applyCriteriaUpdates(base.map((c) => ({ id: c.id, status: 'pass' as const })));
+  const handlePassAllPublic = () => {
+    const pub = criteria.filter(isPublicCriterion);
+    applyCriteriaUpdates(pub.map((c) => ({ id: c.id, status: 'pass' as const })));
   };
 
-  const handleResetBasePending = () => {
-    const base = criteria.filter((c) => DEFAULT_CRITERIA.some((d) => d.criterion_key === c.criterion_key));
-    applyCriteriaUpdates(base.map((c) => ({ id: c.id, status: 'pending' as const })));
+  const handleResetPublicPending = () => {
+    const pub = criteria.filter(isPublicCriterion);
+    applyCriteriaUpdates(pub.map((c) => ({ id: c.id, status: 'pending' as const })));
   };
 
   const handleInitializeCriteria = async () => {
@@ -191,13 +205,40 @@ export default function OrganizationDetail() {
     window.location.reload();
   };
 
+  const handleRevokeBadge = async (badgeId: string, verificationId: string) => {
+    if (!id || !organization) return;
+    if (!window.confirm(`Revoke badge ${verificationId}? This removes public verified status if no other active badge remains.`)) return;
+    await supabase.from('verification_badges').update({ is_active: false }).eq('id', badgeId);
+    const { count: activeCount } = await supabase
+      .from('verification_badges')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', id)
+      .eq('is_active', true);
+    if ((activeCount ?? 0) === 0) {
+      const nextStatus = organization.source_registry ? 'listed' : 'onboarding';
+      await supabase
+        .from('organizations')
+        .update({ verification_level: 'none', status: nextStatus })
+        .eq('id', id);
+    }
+    await supabase.from('activity_log').insert({
+      organization_id: id,
+      action: 'badge_revoked',
+      description: `Badge revoked: ${verificationId}`,
+      performed_by: 'admin',
+    });
+    window.location.reload();
+  };
+
   if (loading) return <div className="text-center py-16 font-mono text-sm text-ink-400">Loading...</div>;
   if (!organization) return <div className="text-center py-16 font-mono text-sm text-ink-400">Organization not found</div>;
 
-  const baseCriteria = criteria.filter((c) => DEFAULT_CRITERIA.some((d) => d.criterion_key === c.criterion_key));
+  const publicCriteria = criteria.filter(isPublicCriterion);
+  const memberCriteria = criteria.filter(isMemberCriterion);
   const financialCriteriaList = criteria.filter((c) => FINANCIAL_CRITERIA.some((f) => f.criterion_key === c.criterion_key));
   const hasFinancialCriteria = financialCriteriaList.length > 0;
-  const baseScore = baseCriteria.length > 0 ? Math.round((baseCriteria.filter((c) => c.status === 'pass').length / baseCriteria.length) * 100) : 0;
+  const publicScore = publicCriteriaScore(criteria);
+  const publicReady = allPublicCriteriaPass(criteria);
   const financialScore = financialCriteriaList.length > 0 ? Math.round((financialCriteriaList.filter((c) => c.status === 'pass').length / financialCriteriaList.length) * 100) : 0;
 
   return (
@@ -216,9 +257,8 @@ export default function OrganizationDetail() {
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="text-lg sm:text-2xl font-black uppercase tracking-tight break-words">{organization.name}</h1>
-              <div className="flex flex-wrap items-center gap-2 mt-2">
-                <StatusPill status={organization.status} />
-                <VerificationBadge level={organization.verification_level} showDisclaimer />
+              <div className="mt-2">
+                <OrgTrustStatusBadge org={organization} />
               </div>
             </div>
           </div>
@@ -323,17 +363,24 @@ export default function OrganizationDetail() {
             <FormField label="Phone">
               <input className="input-brutal w-full" value={editForm?.phone || ''} onChange={(e) => setEditForm({ ...editForm!, phone: e.target.value })} />
             </FormField>
-            <FormField label="Verification Level">
-              <select className="input-brutal w-full" value={editForm?.verification_level || 'none'} onChange={(e) => setEditForm({ ...editForm!, verification_level: e.target.value as VerificationLevel })}>
-                {getVerificationLevelOptions().map(({ value, label }) => (
-                  <option key={value} value={value}>{label}</option>
+            <FormField label="Trust stage">
+              <select
+                className="input-brutal w-full"
+                value={editForm ? orgToTrustStage(editForm) : 'onboarding'}
+                onChange={(e) => {
+                  const fields = trustStageToFields(e.target.value as OrgTrustStage);
+                  setEditForm({ ...editForm!, ...fields });
+                }}
+              >
+                {getTrustStageOptions().map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
                 ))}
               </select>
-            </FormField>
-            <FormField label="Status">
-              <select className="input-brutal w-full" value={editForm?.status || 'onboarding'} onChange={(e) => setEditForm({ ...editForm!, status: e.target.value as OrgStatus })}>
-                {Object.entries(ORG_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
+              <p className="mt-2 font-mono text-2xs text-ink-500 leading-snug">
+                {editForm ? getTrustStageDescription(orgToTrustStage(editForm)) : ''}
+              </p>
             </FormField>
             <div className="md:col-span-2">
               <FormField label="Description">
@@ -383,19 +430,22 @@ export default function OrganizationDetail() {
               )}
             </div>
             <div>
-              <div className="label-brutal">Status Actions</div>
+              <div className="label-brutal">Change trust stage</div>
+              <p className="text-2xs text-ink-500 mt-1 mb-2 leading-snug">
+                One setting for pipeline and public trust. Issuing the NGOreality badge also happens when
+                public criteria pass below.
+              </p>
               <div className="flex flex-wrap gap-2 mt-2">
-                {(['listed', 'onboarding', 'under_review', 'verified', 'active', 'lapsed'] as const)
-                  .filter((s) => s !== organization.status)
-                  .map((status) => (
-                    <button
-                      key={status}
-                      onClick={() => handleStatusChange(status)}
-                      className="btn-brutal-outline text-2xs py-1.5 px-3"
-                    >
-                      Move to {ORG_STATUS_LABELS[status]}
-                    </button>
-                  ))}
+                {getTrustStageQuickActions(organization).map((stage) => (
+                  <button
+                    key={stage.value}
+                    type="button"
+                    onClick={() => handleTrustStageChange(stage.value)}
+                    className="btn-brutal-outline text-2xs py-1.5 px-3"
+                  >
+                    {stage.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -405,20 +455,20 @@ export default function OrganizationDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Verification Criteria */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Base Criteria */}
+          {/* Public trust standards (badge gate) */}
           <div className="card-brutal">
             <div className="flex items-center justify-between border-b-3 border-ink-950 px-6 py-4">
               <h3 className="font-mono text-xs uppercase tracking-wider font-semibold flex items-center gap-2">
-                <Shield size={14} /> Verified Criteria
+                <Shield size={14} /> Public trust standards
               </h3>
               <div className="flex items-center gap-3 flex-wrap justify-end">
-                <span className="font-mono text-sm font-black">{baseScore}%</span>
-                {baseCriteria.length > 0 && (
+                <span className="font-mono text-sm font-black">{publicScore}%</span>
+                {publicCriteria.length > 0 && (
                   <>
                     <button
                       type="button"
                       disabled={criteriaBusy}
-                      onClick={handlePassAllBase}
+                      onClick={handlePassAllPublic}
                       className="btn-brutal-teal text-2xs py-1.5 px-3 flex items-center gap-1 min-h-[36px] disabled:opacity-50"
                     >
                       <CheckCheck size={12} /> Pass all
@@ -426,14 +476,14 @@ export default function OrganizationDetail() {
                     <button
                       type="button"
                       disabled={criteriaBusy}
-                      onClick={handleResetBasePending}
+                      onClick={handleResetPublicPending}
                       className="btn-brutal-outline text-2xs py-1.5 px-3 min-h-[36px] disabled:opacity-50"
                     >
                       Reset pending
                     </button>
                   </>
                 )}
-                {baseCriteria.length === 0 && (
+                {criteria.length === 0 && (
                   <button onClick={handleInitializeCriteria} className="btn-brutal-outline text-2xs py-1.5 px-3 flex items-center gap-1">
                     <Plus size={12} /> Initialize
                   </button>
@@ -441,7 +491,11 @@ export default function OrganizationDetail() {
               </div>
             </div>
             <div className="border-b border-ink-100 px-6 py-2 bg-amber-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <span className="font-mono text-2xs text-amber-700 uppercase tracking-wider">All base criteria pass → auto-verified + badge</span>
+              <span className="font-mono text-2xs text-amber-700 uppercase tracking-wider">
+                {publicReady
+                  ? 'Standards met → record $100 membership to issue badge + monitoring alerts'
+                  : 'All public standards must pass before badge (outreach-safe checklist)'}
+              </span>
               {criteriaBusy && <span className="font-mono text-2xs text-ink-500">Saving…</span>}
               {verifyNotice && !criteriaBusy && (
                 <span className="font-mono text-2xs text-teal">{verifyNotice}</span>
@@ -450,10 +504,10 @@ export default function OrganizationDetail() {
             <div className="divide-y divide-ink-100">
               {criteriaLoading ? (
                 <div className="px-6 py-4 font-mono text-xs text-ink-400">Loading...</div>
-              ) : baseCriteria.length === 0 ? (
-                <div className="px-6 py-6 text-center text-sm text-ink-400">No base criteria. Click Initialize to add.</div>
+              ) : publicCriteria.length === 0 ? (
+                <div className="px-6 py-6 text-center text-sm text-ink-400">No criteria. Click Initialize.</div>
               ) : (
-                baseCriteria.map((c) => (
+                publicCriteria.map((c) => (
                   <div key={c.id} className="flex items-center justify-between px-6 py-3">
                     <div className="flex-1">
                       <div className="text-sm font-medium">{c.criterion_label}</div>
@@ -473,6 +527,49 @@ export default function OrganizationDetail() {
                                 ? s === 'pass' ? 'bg-teal text-white' : s === 'fail' ? 'bg-accent text-white' : 'bg-ink-200 text-ink-700'
                                 : 'bg-white text-ink-400 hover:bg-ink-50'
                               }`}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Member-only standards (portal after login — not for public marketing) */}
+          <div className="card-brutal">
+            <div className="flex items-center justify-between border-b-3 border-ink-950 px-6 py-4">
+              <h3 className="font-mono text-xs uppercase tracking-wider font-semibold flex items-center gap-2">
+                <Shield size={14} /> Member security checklist
+              </h3>
+              <span className="font-mono text-2xs text-ink-400 uppercase">Portal only</span>
+            </div>
+            <div className="border-b border-ink-100 px-6 py-2 bg-ink-50">
+              <span className="font-mono text-2xs text-ink-500 uppercase tracking-wider">
+                Repository, security baseline, credentials — not shown on public directory
+              </span>
+            </div>
+            <div className="divide-y divide-ink-100">
+              {memberCriteria.length === 0 ? (
+                <div className="px-6 py-4 text-sm text-ink-400">Initialize criteria to add member checklist.</div>
+              ) : (
+                memberCriteria.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between px-6 py-3">
+                    <div className="flex-1 text-sm font-medium">{c.criterion_label}</div>
+                    <div className="flex items-center gap-2">
+                      <CriterionStatus status={c.status} />
+                      <div className="flex border-2 border-ink-200">
+                        {(['pass', 'fail', 'pending'] as const).map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            disabled={criteriaBusy}
+                            onClick={() => handleCriterionStatus(c.id, s)}
+                            className={`px-2 py-1 font-mono text-2xs uppercase min-h-[36px] disabled:opacity-50
+                              ${c.status === s ? (s === 'pass' ? 'bg-teal text-white' : s === 'fail' ? 'bg-accent text-white' : 'bg-ink-200') : 'bg-white text-ink-400'}`}
                           >
                             {s}
                           </button>
@@ -608,11 +705,22 @@ export default function OrganizationDetail() {
               ) : (
                 badges.map((b) => (
                   <div key={b.id} className="px-6 py-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="font-mono text-xs font-bold">{b.verification_id}</span>
-                      <span className={`font-mono text-2xs uppercase tracking-wider ${b.is_active ? 'text-teal' : 'text-ink-400'}`}>
-                        {b.is_active ? 'Active' : 'Inactive'}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`font-mono text-2xs uppercase tracking-wider ${b.is_active ? 'text-teal' : 'text-ink-400'}`}>
+                          {b.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                        {b.is_active && (
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeBadge(b.id, b.verification_id)}
+                            className="btn-brutal-outline text-2xs py-1 px-2"
+                          >
+                            Revoke
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="font-mono text-2xs text-ink-400 mt-0.5">
                       {b.level} &middot; Issued {new Date(b.issued_at).toLocaleDateString()}
