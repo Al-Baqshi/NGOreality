@@ -68,7 +68,17 @@ export const PAYMENT_PRODUCT_LABELS: Record<PaymentProductType, string> = {
   monitoring_monthly: 'Monitoring only (legacy)',
 };
 
-export type NotificationTemplate = 'site_down' | 'badge_issued' | 'membership_welcome';
+/** Outreach email templates (queued in notification_events) */
+export type OutreachEmailTemplate =
+  | 'outreach_cold_invite'
+  | 'outreach_no_website'
+  | 'outreach_website_help';
+
+export type NotificationTemplate =
+  | 'site_down'
+  | 'badge_issued'
+  | 'membership_welcome'
+  | OutreachEmailTemplate;
 export type NotificationStatus = 'pending' | 'sent' | 'failed' | 'skipped';
 
 export interface NotificationEvent {
@@ -91,6 +101,9 @@ export const NOTIFICATION_TEMPLATE_LABELS: Record<NotificationTemplate, string> 
   site_down: 'Site down alert',
   badge_issued: 'Badge issued',
   membership_welcome: 'Membership welcome',
+  outreach_cold_invite: 'Outreach — cold invite',
+  outreach_no_website: 'Outreach — no website',
+  outreach_website_help: 'Outreach — website help',
 };
 
 export type PortalNotificationAudience = 'staff' | 'ngo';
@@ -140,6 +153,9 @@ export type OrgStatus =
 
 export type OutreachStatus =
   | 'not_contacted'
+  | 'cold_email'
+  | 'no_website'
+  | 'website_issues'
   | 'contacted'
   | 'follow_up'
   | 'registered'
@@ -150,10 +166,19 @@ export type OutreachStatus =
 /** Kanban columns for registry leads (listed, not yet inbound/customer) */
 export const OUTREACH_KANBAN_STATUSES: OutreachStatus[] = [
   'not_contacted',
+  'cold_email',
+  'no_website',
+  'website_issues',
   'contacted',
   'follow_up',
   'declined',
 ];
+
+export const OUTREACH_EMAIL_BY_COLUMN: Partial<Record<OutreachStatus, OutreachEmailTemplate>> = {
+  cold_email: 'outreach_cold_invite',
+  no_website: 'outreach_no_website',
+  website_issues: 'outreach_website_help',
+};
 
 /** Inbound queue (left kanban, not customers yet) */
 export const OUTREACH_INBOUND_STATUSES: OutreachStatus[] = ['registered', 'responded'];
@@ -230,12 +255,25 @@ export const ORG_STATUS_LABELS: Record<OrgStatus, string> = {
 
 export const OUTREACH_STATUS_LABELS: Record<OutreachStatus, string> = {
   not_contacted: 'Lead — not contacted',
+  cold_email: 'Cold email',
+  no_website: 'No website',
+  website_issues: 'Website issues',
   contacted: 'Contacted',
   follow_up: 'Follow-up',
-  registered: 'Registered (inbound)',
-  responded: 'Registered (inbound)',
+  registered: 'Inbound — interested',
+  responded: 'Inbound — interested',
   declined: 'Declined',
   not_applicable: 'N/A',
+};
+
+export const OUTREACH_COLUMN_HINTS: Partial<Record<OutreachStatus, string>> = {
+  not_contacted: 'Never emailed; still in registry leads',
+  cold_email: 'Drag here to stage — send only when you press Send',
+  no_website: 'No public site — select cards, then Send',
+  website_issues: 'Site problems — select cards, then Send',
+  contacted: 'Reached out; awaiting response',
+  follow_up: 'Needs another touch',
+  declined: 'Not pursuing',
 };
 
 export function isOutreachLead(org: Pick<Organization, 'status' | 'is_customer'>): boolean {

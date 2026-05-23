@@ -6,7 +6,7 @@ _Last updated: 2026-05-21_
 
 **NZ launch product** is aligned in code + remote DB: **$100/year membership** (badge + monitoring + alert emails), **public trust standards before badge**, **passive monitoring for listed charities** (outreach data), **member-only security checklist** after login.
 
-Supabase: `cpbilbskfbzqlynjhdvm` — migrations **`021`–`023`** applied via Supabase MCP (2026-05-21): claim search RLS, `ngo_setup_requests`, `portal_notifications` + triggers.
+Supabase: `cpbilbskfbzqlynjhdvm` — migrations **`021`–`024`** applied via Supabase MCP: claim search RLS, `ngo_setup_requests`, `portal_notifications`, **outreach columns + outreach email templates** (`024_outreach_email_pipeline`).
 
 **If CRM shows “schema cache” / missing table:** run `npm run db:verify` after `npx supabase db push` or MCP `apply_migration`. See `docs/DATABASE.md`.
 
@@ -18,7 +18,22 @@ Supabase: `cpbilbskfbzqlynjhdvm` — migrations **`021`–`023`** applied via Su
 
 ---
 
-## What was implemented (latest — NGO portal onboarding)
+## What was implemented (latest — Outreach v2)
+
+- **Kanban:** 7 lead columns — Not contacted, **Cold email**, **No website**, **Website issues**, Contacted, Follow-up, Declined (20 cards/column, tall scroll).
+- **Multi-select:** per-column All visible / First 50; global “first 50 per column”; checkboxes; **drag moves whole selection**; **named batches** (localStorage) + bulk move toolbar.
+- **Collapsible** top sections: Inbound/customers shortcuts + Registry insights (more board space when collapsed).
+- **Bulk email** (Cold / No website / Website issues): templates → `notification_events`; badges on cards (Queued/Sent/Failed); preview in column header.
+- **Auto-fill:** No website / Website issues columns pull up to 100 matching leads.
+- **Pipeline copy:** Leads until inbound (registered) → customer when verified/services; track sends in **Email notifications** (`/email-notifications`).
+
+Key files: `src/pages/crm/OutreachBoard.tsx`, `src/lib/crmOutreach.ts`, `src/lib/notifications.ts`, `supabase/migrations/20260522150000_024_outreach_email_pipeline.sql`.
+
+**Email sending:** set `VITE_MONITOR_API_URL` + `VITE_MONITOR_API_KEY` (Go API + Resend) and `VITE_SITE_URL` for signup links in templates. Queue still works without API (worker/manual flush).
+
+---
+
+## What was implemented (NGO portal onboarding)
 
 - **Link existing org:** directory search preview (`NgoDirectoryOrgPreview`) shows registry fields + profile % before submit.
 - **After link:** **Profile** section — completion checklist, edit mission/description/logo/brand colours/website.

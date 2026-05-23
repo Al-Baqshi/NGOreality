@@ -106,7 +106,7 @@ export default function CashflowFunnelSummary({
             <dt className="font-semibold text-ink-950">Priority</dt>
             <dd className="mt-1 leading-relaxed">
               Auto-ready NGOs (AI verifier + hybrid review) → badge. Batch without site → $650. All cohorts →
-              Organisation Workspace from month after onboard. Founder + automation until month 9 hires.
+              Organisation Workspace from month after onboard. Staff from month 1 ($1.5–2k/wk); up to 5 with premises.
             </dd>
           </div>
           <div>

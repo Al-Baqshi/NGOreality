@@ -20,8 +20,11 @@ import { NZ_GST_RATE_LABEL } from '../../config/nzCashflowGuide';
 import {
   FLEXI_WAGE_SUMMARY,
   REVENUE_STREAMS,
+  STAFFING_TIMELINE,
+  STAFFING_PLAN_SUMMARY,
   type RevenueStream,
 } from '../../config/businessPlanNarrative';
+import { STAFF_WEEKLY_WAGE_LOW_NZD, STAFF_WEEKLY_WAGE_HIGH_NZD } from '../../config/businessPlanStaffing';
 
 const iconMap = {
   badge: Award,
@@ -79,6 +82,40 @@ export function RevenueMixChart() {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+export function StaffingTimelineDiagram() {
+  return (
+    <div className="card-brutal p-4 sm:p-5 min-w-0" data-pdf-section>
+      <div className="flex items-center gap-2 mb-3">
+        <Users size={16} className="text-teal shrink-0" />
+        <h3 className="font-mono text-2xs uppercase tracking-wider">Staffing — months 1–12</h3>
+      </div>
+      <p className="text-xs text-ink-600 leading-relaxed mb-4">{STAFFING_PLAN_SUMMARY}</p>
+      <p className="font-mono text-2xs text-ink-500 mb-3">
+        Wage band: ${STAFF_WEEKLY_WAGE_LOW_NZD.toLocaleString()}–${STAFF_WEEKLY_WAGE_HIGH_NZD.toLocaleString()}/week per employee
+      </p>
+      <ol className="space-y-3">
+        {STAFFING_TIMELINE.map((row) => (
+          <li
+            key={row.monthNumber}
+            className="border-l-4 border-teal pl-3 py-1 text-xs sm:text-sm text-ink-700"
+          >
+            <span className="font-mono text-2xs uppercase text-ink-950 font-semibold">
+              Month {row.monthNumber}
+            </span>
+            <span className="mx-2 text-ink-300">·</span>
+            <span className="font-semibold text-ink-950">{row.headcount} staff</span>
+            <span className="mx-2 text-ink-300">·</span>
+            <span className="font-mono text-2xs text-teal">
+              ~${row.wagesMonthlyNzd.toLocaleString()}/mo payroll
+            </span>
+            <p className="mt-1 leading-relaxed">{row.summary}</p>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -190,6 +227,10 @@ export default function BusinessPlanInfographics() {
 
       <div data-pdf-section>
         <FlywheelDiagram />
+      </div>
+
+      <div data-pdf-section>
+        <StaffingTimelineDiagram />
       </div>
 
       <div data-pdf-section>

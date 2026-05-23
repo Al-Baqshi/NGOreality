@@ -1,6 +1,16 @@
 import { supabase } from './supabase';
+import type { OutreachEmailTemplate } from '../types';
 
-export type NotificationTemplate = 'site_down' | 'badge_issued' | 'membership_welcome';
+export type NotificationTemplate =
+  | 'site_down'
+  | 'badge_issued'
+  | 'membership_welcome'
+  | OutreachEmailTemplate;
+
+function portalSignupUrl(): string {
+  const base = (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/$/, '');
+  return base ? `${base}/ngo/signup` : 'https://www.ngoreality.com/ngo/signup';
+}
 
 function buildMessage(
   template: NotificationTemplate,
@@ -52,9 +62,64 @@ function buildMessage(
           `— NGOreality`,
         ].join('\n'),
       };
+    case 'outreach_cold_invite':
+      return {
+        subject: `[NGOreality] Claim your organisation profile — ${organizationName}`,
+        body: [
+          `Kia ora,`,
+          ``,
+          `We are reaching out from NGOreality because ${organizationName} is listed on the New Zealand charities register and may benefit from a verified public profile, optional website support, and trust standards that funders recognise.`,
+          ``,
+          `You can claim and onboard your organisation here (free to start):`,
+          portalSignupUrl(),
+          ``,
+          `If you already have a website, you can link it during setup. If not, we can help with a simple landing page as part of onboarding.`,
+          ``,
+          `Reply to this email if you have questions — we are happy to walk you through it.`,
+          ``,
+          `— NGOreality outreach`,
+        ].join('\n'),
+      };
+    case 'outreach_no_website':
+      return {
+        subject: `[NGOreality] A simple web presence for ${organizationName}`,
+        body: [
+          `Kia ora,`,
+          ``,
+          `We noticed ${organizationName} does not currently have a public website listed. Many charities use NGOreality for a lightweight landing page, verified registry details, and optional monitoring once you are ready.`,
+          ``,
+          `Start here when it suits you:`,
+          portalSignupUrl(),
+          ``,
+          `There is no obligation — reply if you would like a short call about options.`,
+          ``,
+          `— NGOreality`,
+        ].join('\n'),
+      };
+    case 'outreach_website_help':
+      return {
+        subject: `[NGOreality] Website help for ${organizationName}`,
+        body: [
+          `Kia ora,`,
+          ``,
+          `Our systems flagged that the website for ${organizationName} may be unreachable or returning errors${extra?.errorDetail ? ` (${extra.errorDetail})` : ''}.`,
+          ``,
+          `NGOreality members receive monitoring alerts; we can also help fix or replace a site as a separate service.`,
+          ``,
+          `If you would like support, reply to this email or claim your profile:`,
+          portalSignupUrl(),
+          ``,
+          `— NGOreality`,
+        ].join('\n'),
+      };
     default:
       return { subject: 'NGOreality', body: '' };
   }
+}
+
+/** Replace placeholders when staff edits the draft before send. */
+export function personalizeOutreachDraft(text: string, organizationName: string): string {
+  return text.replace(/\{name\}/gi, organizationName).replace(/\{organizationName\}/gi, organizationName);
 }
 
 /** Queue an email for the worker / manual send from CRM. */
@@ -65,11 +130,19 @@ export async function queueNotification(input: {
   organizationName: string;
   incidentId?: string;
   extra?: Record<string, string>;
+  subjectOverride?: string;
+  bodyOverride?: string;
 }): Promise<{ error: string | null }> {
   const email = input.recipientEmail.trim();
   if (!email) return { error: 'No recipient email' };
 
-  const { subject, body } = buildMessage(input.template, input.organizationName, input.extra);
+  const built = buildMessage(input.template, input.organizationName, input.extra);
+  const subject = input.subjectOverride
+    ? personalizeOutreachDraft(input.subjectOverride, input.organizationName)
+    : built.subject;
+  const body = input.bodyOverride
+    ? personalizeOutreachDraft(input.bodyOverride, input.organizationName)
+    : built.body;
 
   const { error } = await supabase.from('notification_events').insert({
     organization_id: input.organizationId,
@@ -102,4 +175,12 @@ export async function queueAndTrySend(input: Parameters<typeof queueNotification
       flushError: e instanceof Error ? e.message : 'Could not flush notifications',
     };
   }
+}
+
+export function previewOutreachEmail(
+  template: OutreachEmailTemplate,
+  organizationName: string,
+  extra?: Record<string, string>,
+) {
+  return buildMessage(template, organizationName, extra);
 }

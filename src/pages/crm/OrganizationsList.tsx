@@ -7,7 +7,18 @@ import type { OrgStatus, OutreachStatus } from '../../types';
 import { OUTREACH_STATUS_LABELS } from '../../types';
 
 const STATUSES: (OrgStatus | 'all')[] = ['all', 'listed', 'onboarding', 'under_review', 'verified', 'active', 'lapsed'];
-const OUTREACH_OPTIONS: (OutreachStatus | 'all')[] = ['all', 'not_contacted', 'contacted', 'responded', 'declined', 'not_applicable'];
+const OUTREACH_OPTIONS: (OutreachStatus | 'all')[] = [
+  'all',
+  'not_contacted',
+  'cold_email',
+  'no_website',
+  'website_issues',
+  'contacted',
+  'follow_up',
+  'registered',
+  'declined',
+  'not_applicable',
+];
 
 function parseStatus(v: string | null): OrgStatus | 'all' {
   if (v && STATUSES.includes(v as OrgStatus | 'all')) return v as OrgStatus | 'all';

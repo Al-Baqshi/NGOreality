@@ -115,9 +115,9 @@ Software: Supabase (data/auth), Vercel (hosting), Go worker (checks), Resend (em
 
 | Horizon | Goals |
 |---------|--------|
-| **0–12 months** | 50–200 paying memberships; stable monitoring; grant/reporting compliance |
-| **12–24 months** | Consulting revenue; improved automation; optional Stripe checkout |
-| **24+ months** | AU expansion; API partners; team hire |
+| **0–12 months** | 50–200 paying memberships; stable monitoring; grant/reporting compliance; **payroll from month 1** (see Staffing) |
+| **12–24 months** | Consulting revenue; improved automation; optional Stripe checkout; premises + larger team |
+| **24+ months** | AU expansion; API partners; up to five staff with premises |
 
 Measure: memberships sold, MRR equivalent, churn, outreach conversion, incident SLA.
 
@@ -125,7 +125,20 @@ Measure: memberships sold, MRR equivalent, churn, outreach conversion, incident 
 
 ## Staffing
 
-Year 1: founder-operator. Contractors for design, legal, or accounting as needed. Job descriptions in appendix when hiring.
+**Payroll (Year 1 plan):** Employees (not contractors) on wages of about **$1,500–$2,000 per week** each (~$7,600/mo at the midpoint used in the CRM cashflow).
+
+| Month | Headcount | Notes |
+|-------|-----------|--------|
+| **1** | 1 | First hire — outreach / delivery support alongside founder |
+| **2** | 2 | Second hire — same wage band |
+| **3** | 2 | **Review month** — confirm revenue covers payroll before a third hire |
+| **4–9** | 3 | Third employee when membership + $650 package volume supports it |
+| **10–11** | 4 | **Premises** (shared office) — room for a larger team |
+| **12** | 5 | Target team size with premises if the plan performs |
+
+Founder remains operator; Flexi-Wage and capitalisation grant bridge early months while trading revenue ramps. The **12-month cashflow** in CRM includes **Staff wages and salaries** from month 1 — closing balance is intended to show the business can cover this payroll if volume targets are met.
+
+Contractors still used for design, legal, or accounting as needed. Role descriptions in appendix.
 
 ---
 
@@ -205,8 +218,9 @@ _List laptop, software licences, domains already owned._
 | Hosting & tools | ~$50–150/month |
 | Marketing | Grant-funded + lean paid social |
 | Drawings | Living costs per Flexi-Wage guidance |
+| Staff wages | From month 1: 1 → 2 → (month 3 review) → 3 → up to 5 with premises; ~$1,750/wk midpoint in CRM forecast |
 
-**Breakeven:** memberships + grant + Flexi-Wage cover hosting, tools, tax reserves, and drawings. Recalculate when targets are set in CRM.
+**Breakeven:** memberships + grant + Flexi-Wage cover hosting, tools, **payroll**, tax reserves, and drawings. Recalculate when targets are set in CRM (see closing balance).
 
 **GST:** register when required; include **GST received / paid / net IRD** lines in cashflow.
 

@@ -14,6 +14,7 @@ import {
   FLEXI_WAGE_DEFAULT_MONTHS,
   FLEXI_WAGE_MONTHLY_CENTS,
 } from './businessPlanRef';
+import { staffWagesCentsForMonth, staffWagesNoteForMonth } from './businessPlanStaffing';
 
 export const CAPITALISATION_GRANT_CENTS = 1_000_000;
 export const MAC_STUDIO_M4_MAX_CENTS = 849_900;
@@ -23,8 +24,6 @@ export const OPENING_OWNER_CAPITAL_CENTS = 300_000;
 export const MONTHLY_INTERNET_CENTS = 10_000;
 
 export const SETUP_MONTH_INDEX = 0;
-export const CS_HIRE_MONTH_INDEX = 8;
-export const SCALE_MONTH_INDEX = 9;
 /** Auckland office — add rent into overheads from this month (edit $ on Overheads row). */
 export const OFFICE_RENT_START_MONTH_INDEX = 9;
 export const MONTHLY_OFFICE_RENT_CENTS = 2_200_00; // $2,200/mo placeholder — adjust when lease signed
@@ -87,18 +86,17 @@ function buildMonthFromFunnel(funnel: MonthFunnelSnapshot, monthIndex: number): 
   lines.acc_reserve = nz(90);
   lines.income_tax_reserve = monthIndex < 4 ? 0 : monthIndex < 8 ? nz(350) : nz(750);
 
-  if (monthIndex >= CS_HIRE_MONTH_INDEX) {
-    lines.staff_wages = nz(2_800);
+  const staffCents = staffWagesCentsForMonth(monthIndex);
+  if (staffCents > 0) {
+    lines.staff_wages = staffCents;
+    notes.staff_wages = staffWagesNoteForMonth(monthIndex);
   }
-  if (monthIndex >= SCALE_MONTH_INDEX) {
-    lines.staff_wages = nz(6_400);
+
+  if (monthIndex >= OFFICE_RENT_START_MONTH_INDEX) {
     lines.overheads = nz(2_850) + MONTHLY_OFFICE_RENT_CENTS;
-    notes.overheads = `Home → Auckland office: rent ~$${MONTHLY_OFFICE_RENT_CENTS / 100}/mo + power · edit as lease firms up`;
-  } else if (monthIndex >= OFFICE_RENT_START_MONTH_INDEX) {
-    lines.overheads = (lines.overheads ?? nz(95)) + MONTHLY_OFFICE_RENT_CENTS;
-    notes.overheads = `Office rent placeholder $${MONTHLY_OFFICE_RENT_CENTS / 100}/mo from month ${OFFICE_RENT_START_MONTH_INDEX + 1} — add power, insurance in this line`;
+    notes.overheads = `Premises (month ${OFFICE_RENT_START_MONTH_INDEX + 1}+): rent ~$${MONTHLY_OFFICE_RENT_CENTS / 100}/mo + power · team scales toward 5 @ ~$1.5–2k/wk`;
   } else {
-    notes.overheads = notes.overheads ?? 'Home-based — add office rent on Overheads when you lease space';
+    notes.overheads = notes.overheads ?? 'Home-based until premises — staff wages on separate line from month 1';
   }
 
   return { funnel, lines, notes };

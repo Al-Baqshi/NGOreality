@@ -1,4 +1,5 @@
 import { FLEXI_WAGE_DEFAULT_MONTHS, FLEXI_WAGE_MONTHLY_CENTS } from './businessPlanRef';
+import { STAFFING_PLAN_SUMMARY, STAFFING_TIMELINE } from './businessPlanStaffing';
 import {
   LANDING_STANDARDS_PACKAGE_CENTS,
   LANDING_STANDARDS_PACKAGE_LABEL,
@@ -122,7 +123,7 @@ export const MSD_CHECKLIST_ANSWERS: ChecklistAnswer[] = [
     label: 'Business idea and growth plans',
     section: 'Executive summary / Growth',
     answer:
-      `NGOreality is a trust and implementation partner for nonprofits: badge, standards, ${MEMBER_MONITORING_SUMMARY.toLowerCase()}, plus landing packages and the ${ORGANISATION_WORKSPACE_NAME}. Year 1: memberships + $650 setups + custom projects. Year 2: hire delivery support. Year 3: AU registry. Growth uses live data on which charities have no site or a down site.`,
+      `NGOreality is a trust and implementation partner for nonprofits: badge, standards, ${MEMBER_MONITORING_SUMMARY.toLowerCase()}, plus landing packages and the ${ORGANISATION_WORKSPACE_NAME}. Year 1: memberships + $650 setups + payroll for delivery staff from months 1–2 (${STAFFING_PLAN_SUMMARY}). Year 2–3: premises and AU registry. Growth uses live data on which charities have no site or a down site.`,
   },
   {
     id: 'skills',
@@ -143,7 +144,7 @@ export const MSD_CHECKLIST_ANSWERS: ChecklistAnswer[] = [
     label: 'Equipment owned vs capitalisation grant',
     section: 'Assets / Capitalisation',
     answer:
-      'Year 1 from home in Auckland. Capitalisation grant up to $10,000 funds a Mac Studio M4 Max (64GB/1TB) for local models and monitoring automation, logo/brand refresh, and business cards. Founder operates solo until month 9; then part-time customer care and (month 10+) a contract technical engineer plus a small shared office. Line-by-line forecast on CRM Cash flow — Apply Auckland forecast.',
+      `Year 1 from home in Auckland, then shared premises from ~month 10. Capitalisation grant up to $10,000 funds a Mac Studio M4 Max (64GB/1TB), logo/brand refresh, and business cards. ${STAFFING_PLAN_SUMMARY} Line-by-line payroll on CRM Cash flow — Staff wages row; Apply Auckland forecast.`,
   },
   {
     id: 'product',
@@ -184,7 +185,7 @@ export const MSD_CHECKLIST_ANSWERS: ChecklistAnswer[] = [
     label: 'Financials: forecast, cashflow, P&L, breakeven',
     section: 'Financial information',
     answer:
-      '12-month cashflow on CRM Cash flow page (Excel formulas, CSV export). Revenue: memberships, $650 packages, Flexi-Wage, grants, custom projects. Breakeven when recurring + projects cover costs — see closing balance row.',
+      '12-month cashflow on CRM Cash flow page (Excel formulas, CSV export). Revenue: memberships, $650 packages, Flexi-Wage, grants, custom projects. Staff wages from month 1 (two hires by month 2; month 3 review; up to five with premises). Breakeven when recurring + projects cover payroll — see closing balance row.',
   },
   {
     id: 'tax_acc',
@@ -215,7 +216,7 @@ export const MSD_CHECKLIST_ANSWERS: ChecklistAnswer[] = [
     id: 'staff',
     label: 'Staff and roles',
     section: 'Staffing',
-    answer: 'Year 1 founder; Year 2+ part-time support and contract delivery for landing packages. Payroll when revenue supports it.',
+    answer: STAFFING_PLAN_SUMMARY,
   },
   {
     id: 'community',
@@ -230,3 +231,5 @@ export const FLEXI_WAGE_SUMMARY = {
   months: FLEXI_WAGE_DEFAULT_MONTHS,
   total: (FLEXI_WAGE_MONTHLY_CENTS * FLEXI_WAGE_DEFAULT_MONTHS) / 100,
 };
+
+export { STAFFING_TIMELINE, STAFFING_PLAN_SUMMARY };

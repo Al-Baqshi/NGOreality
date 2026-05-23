@@ -141,7 +141,15 @@ export function useOrganizationsPage(
       query = query
         .eq('status', 'listed')
         .eq('is_customer', false)
-        .in('outreach_status', ['not_contacted', 'contacted', 'follow_up', 'declined']);
+        .in('outreach_status', [
+          'not_contacted',
+          'cold_email',
+          'no_website',
+          'website_issues',
+          'contacted',
+          'follow_up',
+          'declined',
+        ]);
     }
     if (filters.isCustomer === true) {
       query = query.eq('is_customer', true);
