@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import type { OutreachEmailTemplate } from '../types';
+import { OUTREACH_EMAIL_TEMPLATES } from '../types';
 
 export type OrgEmailStatus = {
   organizationId: string;
@@ -8,13 +8,8 @@ export type OrgEmailStatus = {
   status: 'pending' | 'sent' | 'failed' | 'skipped';
   sentAt: string | null;
   createdAt: string;
+  errorMessage: string | null;
 };
-
-const OUTREACH_TEMPLATES: OutreachEmailTemplate[] = [
-  'outreach_cold_invite',
-  'outreach_no_website',
-  'outreach_website_help',
-];
 
 /** Latest outreach email per org (for kanban badges). */
 export function useOutreachEmailStatus(organizationIds: string[]) {
@@ -31,9 +26,9 @@ export function useOutreachEmailStatus(organizationIds: string[]) {
     setLoading(true);
     const { data, error } = await supabase
       .from('notification_events')
-      .select('organization_id, template, status, sent_at, created_at')
+      .select('organization_id, template, status, sent_at, created_at, error_message')
       .in('organization_id', organizationIds)
-      .in('template', OUTREACH_TEMPLATES)
+      .in('template', OUTREACH_EMAIL_TEMPLATES)
       .order('created_at', { ascending: false })
       .limit(500);
 
@@ -47,6 +42,7 @@ export function useOutreachEmailStatus(organizationIds: string[]) {
           status: row.status as OrgEmailStatus['status'],
           sentAt: row.sent_at,
           createdAt: row.created_at,
+          errorMessage: row.error_message?.trim() || null,
         };
       }
       setByOrgId(map);
@@ -59,4 +55,24 @@ export function useOutreachEmailStatus(organizationIds: string[]) {
   }, [refetch]);
 
   return { byOrgId, loading, refetch };
+}
+
+/** Outreach rows that failed at send time (Resend / worker error). */
+export function useOutreachFailedCount() {
+  const [count, setCount] = useState(0);
+
+  const refetch = useCallback(async () => {
+    const { count: n, error } = await supabase
+      .from('notification_events')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'failed')
+      .in('template', OUTREACH_EMAIL_TEMPLATES);
+    if (!error) setCount(n ?? 0);
+  }, []);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  return { count, refetch };
 }

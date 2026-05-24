@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronDown, ChevronRight, Inbox, Mail, Users } from 'lucide-react';
+import { AlertTriangle, ArrowRight, ChevronDown, ChevronRight, Inbox, Mail, Users } from 'lucide-react';
 import { useCrmDashboardStats, useOrganizationsPage } from '../../hooks/useCrm';
-import { useOutreachEmailStatus } from '../../hooks/useOutreachEmail';
+import { useOutreachEmailStatus, useOutreachFailedCount } from '../../hooks/useOutreachEmail';
 import { SectionHeader } from '../../components/ui';
 import OutreachKanbanCard from '../../components/crm/OutreachKanbanCard';
 import OutreachBulkToolbar, { OutreachBatchManager } from '../../components/crm/OutreachBulkToolbar';
@@ -220,12 +220,16 @@ function OutreachColumn({
 
 export default function OutreachBoard() {
   const { stats, loading, refetch } = useCrmDashboardStats();
+  const { count: outreachFailedCount, refetch: refetchFailedCount } = useOutreachFailedCount();
   const [tick, setTick] = useState(0);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const bump = () => setTick((t) => t + 1);
+  const bump = () => {
+    setTick((t) => t + 1);
+    void refetchFailedCount();
+  };
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -304,6 +308,20 @@ export default function OutreachBoard() {
               <span className="block font-mono text-2xs text-ink-400">Outreach + system email queue</span>
             </span>
           </Link>
+          {outreachFailedCount > 0 && (
+            <Link
+              to="/email-notifications?status=failed"
+              className="card-brutal-hover px-4 py-3 flex items-center gap-2 text-sm min-h-[44px] border-2 border-accent"
+            >
+              <AlertTriangle size={16} className="text-accent shrink-0" aria-hidden />
+              <span>
+                <strong className="text-accent">
+                  {outreachFailedCount} outreach send{outreachFailedCount === 1 ? '' : 's'} failed
+                </strong>
+                <span className="block font-mono text-2xs text-ink-400">View errors and requeue</span>
+              </span>
+            </Link>
+          )}
           <div className="card-brutal px-4 py-3 font-mono text-2xs text-ink-500 flex items-center">
             Leads not contacted: {loading ? '…' : stats.outreach_due.toLocaleString()}
           </div>

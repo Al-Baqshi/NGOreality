@@ -7,7 +7,6 @@ import { LANDING_STANDARDS_PACKAGE_CENTS } from '../config/customerProducts';
 import {
   WORKSPACE_MONTHLY_ARPU_CENTS,
   membershipSalesNote,
-  monthlyInfraCostsCents,
   packageSalesNote,
   workspaceSalesNote,
   type MonthFunnelSnapshot,
@@ -88,7 +87,6 @@ export function deriveExpectedLinesFromUnits(
 ): DerivedUnitLines {
   const receipts = deriveReceiptCentsFromUnits(units);
   const f = funnelShapeFromUnits(units, monthIndex);
-  const infra = monthlyInfraCostsCents(monthIndex, units.badges, units.workspace_active);
 
   return {
     lines: {
@@ -96,14 +94,12 @@ export function deriveExpectedLinesFromUnits(
       sales_other: receipts.sales_other,
       workspace_saas: receipts.workspace_saas,
       bank_fees: stripeMerchantFeesCents(receipts.totalReceiptsCents),
-      subscriptions: infra.total,
     },
     notes: {
       sales: `${membershipSalesNote(f)} · from units`,
       sales_other: `${packageSalesNote(f)} · from units`,
       workspace_saas: `${workspaceSalesNote(f)} · from units`,
       bank_fees: 'Stripe on badge + package + workspace MRR (from units)',
-      subscriptions: `${infra.note} · from units`,
     },
   };
 }

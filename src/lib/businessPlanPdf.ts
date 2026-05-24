@@ -65,6 +65,24 @@ function injectPdfStyles(root: HTMLElement): void {
   root.prepend(style);
 }
 
+function resolveComputedColors(root: HTMLElement): void {
+  const props: (keyof CSSStyleDeclaration & string)[] = [
+    'color', 'backgroundColor', 'borderColor',
+    'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor',
+    'outlineColor', 'textDecorationColor',
+  ];
+  root.querySelectorAll('*').forEach((el) => {
+    const htmlEl = el as HTMLElement;
+    const computed = window.getComputedStyle(htmlEl);
+    for (const prop of props) {
+      const val = computed[prop];
+      if (typeof val === 'string' && val) {
+        htmlEl.style[prop as any] = val;
+      }
+    }
+  });
+}
+
 function preparePdfClone(element: HTMLElement): { clone: HTMLElement; wrapper: HTMLDivElement } {
   const clone = element.cloneNode(true) as HTMLElement;
   clone.id = 'business-plan-pdf-clone';
@@ -183,6 +201,7 @@ export async function downloadElementAsPdf(element: HTMLElement, filename: strin
   try {
     await waitForExportReady(clone);
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    resolveComputedColors(clone);
 
     const sections = sectionTargets(clone);
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });

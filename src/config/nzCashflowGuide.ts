@@ -73,6 +73,64 @@ export const NZ_CASHFLOW_RECEIPT_GUIDE: CashflowLineGuide[] = [
 
 export const NZ_CASHFLOW_PAYMENT_GUIDE: CashflowLineGuide[] = [
   {
+    key: 'cog_materials',
+    title: 'COG — materials purchased',
+    summary:
+      'Cost of physical materials you resell or use in delivery (print stock, cards, packaging). Software, hosting, and Claude/Cursor belong on Hosting or AI & dev tools — not here.',
+    gstNote: `${NZ_GST_RATE_LABEL} GST on NZ purchases if you are registered.`,
+  },
+  {
+    key: 'hosting_saas',
+    title: 'Hosting & cloud',
+    summary:
+      'SaaS platform infrastructure: Vercel (app), database (Supabase/Neon), Resend (transactional email), domain. At ~30 NGOs and low workspace count this is roughly $80–120 NZD/mo — edit Expected to match your invoices.',
+    gstNote: 'Often USD invoices; claim GST if supplier charges NZ GST or you use a NZ entity billing.',
+  },
+  {
+    key: 'saas_ai_dev',
+    title: 'AI & dev tools',
+    summary:
+      'Operating the product as a founder: Claude Max subscription, Cursor Pro, and API usage while building. Default ~$360/mo NZD in the forecast — adjust to your Anthropic/Cursor bills.',
+    gstNote: 'Typically no NZ GST on overseas SaaS; still a real cash expense.',
+  },
+  {
+    key: 'subscriptions',
+    title: 'Professional subscriptions (misc)',
+    summary:
+      'Other business software not in Hosting or AI rows: GitHub, accounting add-ons, design tools, monitoring. Small placeholder in the default plan (~$45/mo).',
+  },
+  {
+    key: 'it_internet',
+    title: 'IT & internet',
+    summary: 'Fibre and mobile for home/office — separate from cloud hosting.',
+  },
+  {
+    key: 'bank_fees',
+    title: 'Bank & Stripe merchant fees',
+    summary: 'Stripe ~2.9% + 30¢ per charge on badge, $650 packages, and workspace MRR. Expected auto-calculates from receipt lines when you edit volume units.',
+    gstNote: 'Stripe fees are not GST; they reduce cash from sales.',
+  },
+  {
+    key: 'staff_wages',
+    title: 'Staff wages',
+    summary: 'PAYE wages when you hire (Flexi-Wage is on the receipt side, not wages).',
+  },
+  {
+    key: 'marketing',
+    title: 'Marketing and promotion',
+    summary: 'Ads, events, brand setup in month 1 includes logo/print in the default Auckland forecast.',
+  },
+  {
+    key: 'accountancy',
+    title: 'Accountancy',
+    summary: 'Bookkeeper or accountant for GST returns and year-end.',
+  },
+  {
+    key: 'insurance',
+    title: 'Insurance',
+    summary: 'Public liability / professional indemnity as you scale.',
+  },
+  {
     key: 'overheads',
     title: 'Overheads (rent, power)',
     summary:
@@ -117,3 +175,14 @@ export const CASHFLOW_OUTCOME_FORMULAE = [
 
 export const GLOBAL_TAX_NOTE =
   'Going global in ~6 months: keep NZ GST lines for the NZ entity; add country-specific VAT/GST and currency columns when you open AU/UK/etc. The volume → revenue link stays the same; tax lines duplicate per jurisdiction.';
+
+const ALL_LINE_GUIDES = [...NZ_CASHFLOW_RECEIPT_GUIDE, ...NZ_CASHFLOW_PAYMENT_GUIDE];
+
+/** One-line explanation for a cashflow row (NZ guide + optional def.guide on the line). */
+export function cashflowLineGuideSummary(
+  lineKey: string,
+  defGuide?: string,
+): string | undefined {
+  if (defGuide?.trim()) return defGuide.trim();
+  return ALL_LINE_GUIDES.find((g) => g.key === lineKey)?.summary;
+}

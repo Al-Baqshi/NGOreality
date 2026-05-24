@@ -1,11 +1,12 @@
 /**
- * Cash flow worksheet defaults — units → revenue lines (batch 5–100 NGOs/day).
+ * Cash flow worksheet defaults — 10 NGOs month 1, packages ramp 1→6/mo, badges primary.
  */
 
 import {
   computeAllMonthFunnels,
   membershipSalesNote,
-  monthlyInfraCostsCents,
+  monthlyAiDevCostsCents,
+  monthlyHostingCostsCents,
   packageSalesNote,
   workspaceSalesNote,
   type MonthFunnelSnapshot,
@@ -18,15 +19,15 @@ import { staffWagesCentsForMonth, staffWagesNoteForMonth } from './businessPlanS
 
 export const CAPITALISATION_GRANT_CENTS = 1_000_000;
 export const MAC_STUDIO_M4_MAX_CENTS = 849_900;
-export const SETUP_LOGO_BRAND_CENTS = 120_000;
-export const SETUP_PRINT_CARDS_CENTS = 30_100;
-export const OPENING_OWNER_CAPITAL_CENTS = 300_000;
+export const SETUP_LOGO_BRAND_CENTS = 80_000;
+export const SETUP_PRINT_CARDS_CENTS = 20_000;
+export const OPENING_OWNER_CAPITAL_CENTS = 500_000;
 export const MONTHLY_INTERNET_CENTS = 10_000;
 
 export const SETUP_MONTH_INDEX = 0;
-/** Auckland office — add rent into overheads from this month (edit $ on Overheads row). */
-export const OFFICE_RENT_START_MONTH_INDEX = 9;
-export const MONTHLY_OFFICE_RENT_CENTS = 2_200_00; // $2,200/mo placeholder — adjust when lease signed
+/** Office rent — year 2 consideration; set beyond 12-month forecast. */
+export const OFFICE_RENT_START_MONTH_INDEX = 18;
+export const MONTHLY_OFFICE_RENT_CENTS = 2_200_00;
 
 export interface CashflowMonthAssumptions {
   funnel: MonthFunnelSnapshot;
@@ -46,20 +47,27 @@ export function stripeMerchantFeesCents(receiptsCents: number): number {
 
 function buildMonthFromFunnel(funnel: MonthFunnelSnapshot, monthIndex: number): CashflowMonthAssumptions {
   const totalReceipts = funnel.totalReceiptsCents;
-  const infra = monthlyInfraCostsCents(monthIndex, funnel.badgesThisMonth, funnel.workspaceActiveSubs);
+  const hosting = monthlyHostingCostsCents(
+    monthIndex,
+    funnel.badgesThisMonth,
+    funnel.workspaceActiveSubs,
+  );
+  const aiDev = monthlyAiDevCostsCents(monthIndex);
 
   const lines: Partial<Record<string, number>> = {
     sales: funnel.membershipRevenueCents,
     sales_other: funnel.packageRevenueCents,
     workspace_saas: funnel.workspaceMrrCents,
     it_internet: MONTHLY_INTERNET_CENTS,
-    subscriptions: infra.total,
-    insurance: nz(145),
-    accountancy: nz(275),
-    marketing: nz(monthIndex < 6 ? 200 : 380),
+    hosting_saas: hosting.totalCents,
+    saas_ai_dev: aiDev.totalCents,
+    subscriptions: nz(45),
+    insurance: nz(120),
+    accountancy: nz(200),
+    marketing: nz(monthIndex < 6 ? 150 : 300),
     overheads: nz(95),
     bank_fees: stripeMerchantFeesCents(totalReceipts),
-    training: nz(60),
+    training: nz(monthIndex < 6 ? 0 : 50),
   };
 
   const notes: Partial<Record<string, string>> = {
@@ -68,7 +76,10 @@ function buildMonthFromFunnel(funnel: MonthFunnelSnapshot, monthIndex: number): 
     workspace_saas: workspaceSalesNote(funnel),
     it_internet: 'Fibre + mobile — $100/mo',
     bank_fees: 'Stripe on badge + package + workspace MRR',
-    subscriptions: infra.note,
+    hosting_saas: hosting.summary,
+    saas_ai_dev: aiDev.summary,
+    subscriptions: 'GitHub, misc SaaS (~$45/mo placeholder)',
+    cog_materials: 'Print / physical COG only — leave $0 unless you buy stock',
   };
 
   if (monthIndex < FLEXI_WAGE_DEFAULT_MONTHS) {
@@ -82,9 +93,9 @@ function buildMonthFromFunnel(funnel: MonthFunnelSnapshot, monthIndex: number): 
     lines.marketing = (lines.marketing ?? 0) + SETUP_LOGO_BRAND_CENTS + SETUP_PRINT_CARDS_CENTS;
   }
 
-  lines.drawings = monthIndex < 6 ? nz(2_200) : nz(3_800);
+  lines.drawings = nz(4_333);
   lines.acc_reserve = nz(90);
-  lines.income_tax_reserve = monthIndex < 4 ? 0 : monthIndex < 8 ? nz(350) : nz(750);
+  lines.income_tax_reserve = monthIndex < 3 ? 0 : monthIndex < 8 ? nz(300) : nz(600);
 
   const staffCents = staffWagesCentsForMonth(monthIndex);
   if (staffCents > 0) {
@@ -94,9 +105,9 @@ function buildMonthFromFunnel(funnel: MonthFunnelSnapshot, monthIndex: number): 
 
   if (monthIndex >= OFFICE_RENT_START_MONTH_INDEX) {
     lines.overheads = nz(2_850) + MONTHLY_OFFICE_RENT_CENTS;
-    notes.overheads = `Premises (month ${OFFICE_RENT_START_MONTH_INDEX + 1}+): rent ~$${MONTHLY_OFFICE_RENT_CENTS / 100}/mo + power · team scales toward 5 @ ~$1.5–2k/wk`;
+    notes.overheads = `Premises: rent ~$${MONTHLY_OFFICE_RENT_CENTS / 100}/mo + power`;
   } else {
-    notes.overheads = notes.overheads ?? 'Home-based until premises — staff wages on separate line from month 1';
+    notes.overheads = notes.overheads ?? 'Home-based year 1 — office is a year-2 consideration';
   }
 
   return { funnel, lines, notes };

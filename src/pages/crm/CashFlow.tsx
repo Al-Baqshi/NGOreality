@@ -7,7 +7,7 @@ import CashflowNzGuide from '../../components/crm/CashflowNzGuide';
 import CashflowYearOutlook from '../../components/crm/CashflowYearOutlook';
 import { MetricCard, SectionHeader } from '../../components/ui';
 import { formatNzCurrency } from '../../lib/formatMoney';
-import { CASHFLOW_UNIT_ROWS } from '../../config/salesFunnelModel';
+import { CASHFLOW_UNIT_ROWS, batchRampLabel } from '../../config/salesFunnelModel';
 import { ALL_CASHFLOW_LINES, EXPENSE_CATEGORY_OPTIONS } from '../../config/businessPlanRef';
 import {
   applyLinkedCashflowForecast,
@@ -18,6 +18,7 @@ import {
   fetchCashflowLines,
   syncDerivedLinesForPeriod,
   upsertCashflowLine,
+  withManualCashflowActual,
   type BusinessCashflowLine,
 } from '../../lib/businessCashflow';
 import {
@@ -49,6 +50,8 @@ import {
   forecastMonthKeys,
   upsertTarget,
 } from '../../lib/businessPlan';
+import { downloadCashflowExcel } from '../../lib/businessCashflowExcel';
+import { patchDerivedLinesForPeriod, patchStoredLine, patchStoredUnit } from '../../lib/cashflowLocalPatch';
 
 const MONTHS_WINDOW = 12;
 
@@ -83,7 +86,7 @@ export default function CashFlow() {
   const [targets, setTargets] = useState<TargetMap>({});
   const [actuals, setActuals] = useState<ActualMap>({});
   const [expenses, setExpenses] = useState<BusinessExpense[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [editing, setEditing] = useState<{ metric: BusinessPlanMetric; period: string } | null>(null);
@@ -101,10 +104,11 @@ export default function CashFlow() {
   const [cashflowStored, setCashflowStored] = useState<BusinessCashflowLine[]>([]);
   const [unitsStored, setUnitsStored] = useState<BusinessCashflowUnit[]>([]);
   const [savingWorksheet, setSavingWorksheet] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
   const worksheetFilled = useRef(false);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (opts?: { showSpinner?: boolean }) => {
+    if (opts?.showSpinner !== false) setPageLoading(true);
     setError(null);
     try {
       const [t, a, e, cf, units] = await Promise.all([
@@ -122,17 +126,17 @@ export default function CashFlow() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load cash flow');
     } finally {
-      setLoading(false);
+      setPageLoading(false);
     }
   }, [periods]);
 
   useEffect(() => {
-    refresh();
+    void refresh({ showSpinner: true });
   }, [refresh]);
 
   /** Persist pre-filled expected column to DB on first visit (so exports and reloads match the grid). */
   useEffect(() => {
-    if (loading || worksheetFilled.current || periods.length === 0) return;
+    if (pageLoading || worksheetFilled.current || periods.length === 0) return;
     const expectedLineCount = periods.length * ALL_CASHFLOW_LINES.length;
     const expectedUnitCount = periods.length * CASHFLOW_UNIT_ROWS.length;
     const hasWorkspaceLine = cashflowStored.some(
@@ -146,9 +150,9 @@ export default function CashFlow() {
     (async () => {
       const res = await applyLinkedCashflowForecast(periods, unitsStored);
       if (res.error) setError(res.error);
-      else await refresh();
+      else await refresh({ showSpinner: false });
     })().finally(() => setSavingWorksheet(false));
-  }, [loading, cashflowStored.length, unitsStored.length, periods, refresh]);
+  }, [pageLoading, cashflowStored.length, unitsStored.length, periods, refresh]);
 
   const handleSaveTarget = async () => {
     if (!editing) return;
@@ -164,7 +168,25 @@ export default function CashFlow() {
     else {
       setEditing(null);
       setEditValue('');
-      refresh();
+      setTargets((prev) => {
+        const next = { ...prev };
+        if (!next[editing.period]) next[editing.period] = {} as TargetMap[string];
+        next[editing.period] = {
+          ...next[editing.period],
+          [editing.metric]: {
+            ...(next[editing.period]?.[editing.metric] ?? {
+              id: '',
+              period: editing.period,
+              metric: editing.metric,
+              notes: '',
+              created_at: '',
+              updated_at: '',
+            }),
+            expected_value: value,
+          },
+        };
+        return next;
+      });
     }
   };
 
@@ -190,14 +212,16 @@ export default function CashFlow() {
         vendor: '',
         notes: '',
       });
-      refresh();
+      void refresh({ showSpinner: false });
     }
   };
 
   const handleDeleteExpense = async (id: string) => {
     const { error: err } = await deleteExpense(id);
     if (err) setError(err);
-    else refresh();
+    else {
+      setExpenses((prev) => prev.filter((e) => e.id !== id));
+    }
   };
 
   const unitGrid = useMemo(
@@ -223,16 +247,37 @@ export default function CashFlow() {
   ) => {
     const cents = Math.round(dollars * 100);
     const row = cashflowGrid[period]?.[def.key];
+    const notes =
+      field === 'actual' && def.paymentActualKey === 'sales'
+        ? withManualCashflowActual(row?.notes)
+        : row?.notes;
+    const expected_cents = field === 'expected' ? cents : (row?.expected_cents ?? 0);
+    const actual_cents = field === 'actual' ? cents : (row?.actual_cents ?? 0);
+
+    setCashflowStored((prev) =>
+      patchStoredLine(prev, {
+        id: row?.id,
+        period,
+        line_key: def.key,
+        section: def.section,
+        label: def.label,
+        expected_cents,
+        actual_cents,
+        notes: notes ?? '',
+      }),
+    );
+
     const { error: err } = await upsertCashflowLine({
       period,
       def,
-      expected_cents: field === 'expected' ? cents : (row?.expected_cents ?? 0),
-      actual_cents:
-        def.paymentActualKey === 'sales' ? (row?.actual_cents ?? 0) : field === 'actual' ? cents : (row?.actual_cents ?? 0),
-      notes: row?.notes,
+      expected_cents,
+      actual_cents,
+      notes,
     });
-    if (err) setError(err);
-    else refresh();
+    if (err) {
+      setError(err);
+      void refresh({ showSpinner: false });
+    }
   };
 
   const handleSaveUnit = async (
@@ -244,36 +289,46 @@ export default function CashFlow() {
     const def = CASHFLOW_UNIT_ROWS.find((d) => d.key === unitKey);
     if (!def) return;
     const row = unitGrid[period]?.[unitKey];
-    const { error: err } = await upsertCashflowUnit({
+    const expected_count = field === 'expected' ? count : (row?.expected_count ?? 0);
+    const actual_count = field === 'actual' ? count : (row?.actual_count ?? 0);
+    const monthIndex = periods.indexOf(period);
+
+    const nextUnits = patchStoredUnit(unitsStored, {
+      id: row?.id,
       period,
       unit_key: unitKey,
       label: def.label,
-      expected_count: field === 'expected' ? count : (row?.expected_count ?? 0),
-      actual_count: field === 'actual' ? count : (row?.actual_count ?? 0),
+      expected_count,
+      actual_count,
+      notes: row?.notes ?? '',
+    });
+    setUnitsStored(nextUnits);
+
+    if (field === 'expected') {
+      const nextUnitGrid = buildUnitGrid(periods, nextUnits);
+      setCashflowStored((prev) => patchDerivedLinesForPeriod(prev, period, monthIndex, nextUnitGrid));
+    }
+
+    const nextUnitGrid = buildUnitGrid(periods, nextUnits);
+    const unitErr = await upsertCashflowUnit({
+      period,
+      unit_key: unitKey,
+      label: def.label,
+      expected_count,
+      actual_count,
       notes: row?.notes,
     });
-    if (err) setError(err);
-    else {
-      if (field === 'expected') {
-        const monthIndex = periods.indexOf(period);
-        const nextPeriod = { ...unitGrid[period] };
-        const prev = nextPeriod[unitKey];
-        nextPeriod[unitKey] = {
-          ...prev,
-          period,
-          unit_key: unitKey,
-          label: def.label,
-          expected_count: count,
-          actual_count: prev?.actual_count ?? 0,
-          notes: prev?.notes ?? '',
-        };
-        const syncErr = await syncDerivedLinesForPeriod(period, monthIndex, {
-          ...unitGrid,
-          [period]: nextPeriod,
-        });
-        if (syncErr.error) setError(syncErr.error);
+    if (unitErr.error) {
+      setError(unitErr.error);
+      void refresh({ showSpinner: false });
+      return;
+    }
+    if (field === 'expected') {
+      const syncErr = await syncDerivedLinesForPeriod(period, monthIndex, nextUnitGrid);
+      if (syncErr.error) {
+        setError(syncErr.error);
+        void refresh({ showSpinner: false });
       }
-      await refresh();
     }
   };
 
@@ -282,7 +337,26 @@ export default function CashFlow() {
     const res = await applyLinkedCashflowForecast(periods, unitsStored);
     setSavingWorksheet(false);
     if (res.error) setError(res.error);
-    else refresh();
+    else await refresh({ showSpinner: false });
+  };
+
+  const handleExportExcel = async () => {
+    setExportingExcel(true);
+    setError(null);
+    try {
+      const y = periods[0]?.slice(0, 4) ?? 'forecast';
+      await downloadCashflowExcel(
+        periods,
+        cashflowGrid,
+        cashflowTotals,
+        unitGrid,
+        `ngoreality-cashflow-${y}.xlsx`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Excel export failed');
+    } finally {
+      setExportingExcel(false);
+    }
   };
 
   const handleExportCsv = () => {
@@ -335,7 +409,7 @@ export default function CashFlow() {
 
       <SectionHeader>Cash flow</SectionHeader>
       <p className="font-mono text-2xs text-ink-500 -mt-4 mb-4 max-w-3xl leading-relaxed">
-        Units first (batch 5→100 NGOs/day), then <span className="text-emerald-700">green</span> receipt lines and{' '}
+        Units first ({batchRampLabel()}), then <span className="text-emerald-700">green</span> receipt lines and{' '}
         <span className="text-red-700">red</span> costs. Workspace SaaS from month 2 ($25 admin + $15/user/mo).{' '}
         <Link to="/plan" className="underline hover:text-ink-950">Business plan</Link>.
         {savingWorksheet && <span className="block mt-2 text-teal">Saving worksheet…</span>}
@@ -388,18 +462,26 @@ export default function CashFlow() {
         <button
           type="button"
           onClick={handleResetWorksheet}
-          disabled={savingWorksheet || loading}
+          disabled={savingWorksheet || pageLoading}
           className="btn-brutal-outline text-2xs py-2 px-3 disabled:opacity-50"
         >
           {savingWorksheet ? 'Saving…' : 'Reset expected column to defaults'}
         </button>
         <button
           type="button"
-          onClick={handleExportCsv}
-          disabled={loading}
-          className="btn-brutal-outline text-2xs py-2 px-3 inline-flex items-center gap-1.5 disabled:opacity-50"
+          onClick={() => void handleExportExcel()}
+          disabled={pageLoading || exportingExcel}
+          className="btn-brutal-teal text-2xs py-2 px-3 inline-flex items-center gap-1.5 disabled:opacity-50 min-h-[44px]"
         >
-          <Download size={14} /> Export CSV
+          <Download size={14} /> {exportingExcel ? 'Building…' : 'Download Excel'}
+        </button>
+        <button
+          type="button"
+          onClick={handleExportCsv}
+          disabled={pageLoading}
+          className="btn-brutal-outline text-2xs py-2 px-3 inline-flex items-center gap-1.5 disabled:opacity-50 min-h-[44px]"
+        >
+          Export CSV
         </button>
       </div>
 
@@ -409,7 +491,7 @@ export default function CashFlow() {
           grid={cashflowGrid}
           unitGrid={unitGrid}
           totalsByPeriod={cashflowTotals}
-          loading={loading}
+          loading={pageLoading}
           onSaveLine={handleSaveCashflowLine}
           onSaveUnit={handleSaveUnit}
         />
@@ -419,7 +501,7 @@ export default function CashFlow() {
 
       <SectionHeader>Membership KPIs</SectionHeader>
       <div className="card-brutal overflow-hidden mb-12">
-        {loading ? (
+        {pageLoading ? (
           <p className="p-8 text-center text-sm text-ink-400">Loading…</p>
         ) : (
           <div className="overflow-x-auto">

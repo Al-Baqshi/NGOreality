@@ -61,8 +61,26 @@ export interface CashflowPeriodTotals {
   closingBalance: { expected: number; actual: number };
 }
 
+/** CRM rollup for the membership receipt line (not all payment types). */
+export function membershipActualCents(actual: BusinessPlanActual | undefined): number {
+  return actual?.badge_revenue_cents ?? 0;
+}
+
+/** @deprecated Use membershipActualCents for the sales / membership line. */
 export function salesActualCents(actual: BusinessPlanActual | undefined): number {
-  return actual?.total_revenue_cents ?? 0;
+  return membershipActualCents(actual);
+}
+
+/** Stored in line notes when staff overrides Actual (e.g. clear a stray value). */
+export const CASHFLOW_ACTUAL_OVERRIDE_MARKER = 'actual_source:manual';
+
+export function hasManualCashflowActual(notes?: string): boolean {
+  return Boolean(notes?.includes(CASHFLOW_ACTUAL_OVERRIDE_MARKER));
+}
+
+export function withManualCashflowActual(notes: string | undefined): string {
+  const base = (notes ?? '').replace(/\n?actual_source:manual\s*/g, '').trim();
+  return base ? `${base}\n${CASHFLOW_ACTUAL_OVERRIDE_MARKER}` : CASHFLOW_ACTUAL_OVERRIDE_MARKER;
 }
 
 /** PostgREST error when a migration was added locally but not applied to the linked Supabase project. */
@@ -122,7 +140,9 @@ export function buildCashflowGrid(
       const row = stored.find((s) => s.period === period && s.line_key === def.key);
       let actual_cents = row?.actual_cents ?? 0;
       if (def.paymentActualKey === 'sales') {
-        actual_cents = salesActualCents(actuals[period]);
+        actual_cents = hasManualCashflowActual(row?.notes)
+          ? (row?.actual_cents ?? 0)
+          : membershipActualCents(actuals[period]);
       }
 
       let expected_cents = row?.expected_cents ?? 0;

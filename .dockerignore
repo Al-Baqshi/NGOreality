@@ -6,4 +6,3 @@ dist
 backend/.env
 backend/bin
 *.md
-.bolt

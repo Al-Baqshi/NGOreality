@@ -74,6 +74,12 @@ export type OutreachEmailTemplate =
   | 'outreach_no_website'
   | 'outreach_website_help';
 
+export const OUTREACH_EMAIL_TEMPLATES: OutreachEmailTemplate[] = [
+  'outreach_cold_invite',
+  'outreach_no_website',
+  'outreach_website_help',
+];
+
 export type NotificationTemplate =
   | 'site_down'
   | 'badge_issued'

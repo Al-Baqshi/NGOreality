@@ -1,5 +1,5 @@
 import { FLEXI_WAGE_DEFAULT_MONTHS, FLEXI_WAGE_MONTHLY_CENTS } from './businessPlanRef';
-import { STAFFING_PLAN_SUMMARY, STAFFING_TIMELINE } from './businessPlanStaffing';
+import { FIRST_STAFF_HIRE_MONTH_INDEX, STAFFING_PLAN_SUMMARY, STAFFING_TIMELINE } from './businessPlanStaffing';
 import {
   LANDING_STANDARDS_PACKAGE_CENTS,
   LANDING_STANDARDS_PACKAGE_LABEL,
@@ -123,7 +123,7 @@ export const MSD_CHECKLIST_ANSWERS: ChecklistAnswer[] = [
     label: 'Business idea and growth plans',
     section: 'Executive summary / Growth',
     answer:
-      `NGOreality is a trust and implementation partner for nonprofits: badge, standards, ${MEMBER_MONITORING_SUMMARY.toLowerCase()}, plus landing packages and the ${ORGANISATION_WORKSPACE_NAME}. Year 1: memberships + $650 setups + payroll for delivery staff from months 1–2 (${STAFFING_PLAN_SUMMARY}). Year 2–3: premises and AU registry. Growth uses live data on which charities have no site or a down site.`,
+      `NGOreality is a trust and implementation partner for nonprofits: badge, standards, ${MEMBER_MONITORING_SUMMARY.toLowerCase()}, plus landing packages and the ${ORGANISATION_WORKSPACE_NAME}. ${STAFFING_PLAN_SUMMARY} ~1,000 registry leads imported monthly; badge conversions ramp 15→200/mo by year-end (~$172K trading). Year 2: premises and AU registry. Growth uses live data on which charities have no site or a down site.`,
   },
   {
     id: 'skills',
@@ -144,7 +144,7 @@ export const MSD_CHECKLIST_ANSWERS: ChecklistAnswer[] = [
     label: 'Equipment owned vs capitalisation grant',
     section: 'Assets / Capitalisation',
     answer:
-      `Year 1 from home in Auckland, then shared premises from ~month 10. Capitalisation grant up to $10,000 funds a Mac Studio M4 Max (64GB/1TB), logo/brand refresh, and business cards. ${STAFFING_PLAN_SUMMARY} Line-by-line payroll on CRM Cash flow — Staff wages row; Apply Auckland forecast.`,
+      `Year 1 entirely home-based in Auckland — office is a year-2 consideration. Capitalisation grant up to $10,000 funds a Mac Studio M4 Max (64GB/1TB), logo/brand refresh, and business cards. $5,000 owner capital injection. ${STAFFING_PLAN_SUMMARY} Line-by-line payroll on CRM Cash flow — Staff wages row.`,
   },
   {
     id: 'product',
@@ -178,14 +178,14 @@ export const MSD_CHECKLIST_ANSWERS: ChecklistAnswer[] = [
     label: 'Marketing and promotional activities',
     section: 'Marketing — promotional',
     answer:
-      'Segmented outreach (“your site is down / no site”), badge explainer content, LinkedIn, sector networks, case studies. Costs in Cash flow. Flexi-Wage supports founder ramp.',
+      '~1,000 leads/month imported from Charities Register. Segmented outreach (“your site is down / no site”). Badge conversions ramp 15→200/mo as pipeline matures. Badge explainer content, LinkedIn, sector networks, case studies. Flexi-Wage supports founder through month 6.',
   },
   {
     id: 'financials',
     label: 'Financials: forecast, cashflow, P&L, breakeven',
     section: 'Financial information',
     answer:
-      '12-month cashflow on CRM Cash flow page (Excel formulas, CSV export). Revenue: memberships, $650 packages, Flexi-Wage, grants, custom projects. Staff wages from month 1 (two hires by month 2; month 3 review; up to five with premises). Breakeven when recurring + projects cover payroll — see closing balance row.',
+      `12-month cashflow on CRM Cash flow page (Excel formulas, CSV export). Revenue: memberships (15→200 badges/mo), $650 packages (2→7/mo), workspace SaaS, Flexi-Wage (months 1–${FLEXI_WAGE_DEFAULT_MONTHS}), and capitalisation grant. Founder-operated — no staff payroll. Founder draws $1,000/week ($4,333/mo). Profitable from month 1 — closing balance ~$116K year-end. ~$172K trading year 1.`,
   },
   {
     id: 'tax_acc',
@@ -210,7 +210,7 @@ export const MSD_CHECKLIST_ANSWERS: ChecklistAnswer[] = [
     label: 'Threats, mitigation, and SWOT',
     section: 'Risk assessment',
     answer:
-      'Threats: long NGO sales cycles, alert fatigue. Mitigation: education-first $650 package, consultation, registry pipeline. SWOT in appendix.',
+      'Threats: long NGO sales cycles, founder dependence. Mitigation: AI-powered automation reduces manual work, $5K owner capital buffer, 1,000-lead/mo pipeline keeps funnel full, education-first $650 package. No staff costs = low breakeven. SWOT in appendix.',
   },
   {
     id: 'staff',

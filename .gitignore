@@ -26,3 +26,4 @@ backend/.env
 backend/bin/
 .vercel
 .npm-cache
+.bolt

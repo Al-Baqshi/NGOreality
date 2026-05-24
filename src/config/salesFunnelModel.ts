@@ -1,6 +1,5 @@
 /**
- * Volume-first forecast: daily NGO batch onboarding (5 → 100/day) drives units,
- * then membership, packages, and Organisation Workspace MRR ($25 admin + $15/seat).
+ * Volume-first forecast: NGO onboarding → badges (primary) + fixed $650 packages/mo + workspace MRR.
  */
 
 import {
@@ -10,26 +9,39 @@ import {
   WORKSPACE_SEAT_MONTHLY_CENTS,
 } from './customerProducts';
 import { MEMBERSHIP_ANNUAL_CENTS } from './pricing';
+import {
+  BATCH_ONBOARD_END_PER_DAY,
+  BATCH_ONBOARD_START_PER_DAY,
+  MONTHLY_BADGE_TARGETS,
+  MONTHLY_ONBOARD_TARGETS,
+  NGOs_ONBOARDED_MONTH_ONE,
+  packagesForMonth,
+} from './saasOperatingCosts';
 
 export const NZ_REGISTRY_LISTED = 29_000;
 export const NZ_COVERAGE_TARGET_PCT = 0.5;
 export const NZ_COVERAGE_TARGET_ORGS = Math.round(NZ_REGISTRY_LISTED * NZ_COVERAGE_TARGET_PCT);
 
-/** Batch onboarding: NGOs added to the platform per working day. */
-export const BATCH_ONBOARD_START_PER_DAY = 5;
-export const BATCH_ONBOARD_END_PER_DAY = 100;
+export { BATCH_ONBOARD_END_PER_DAY, BATCH_ONBOARD_START_PER_DAY, NGOs_ONBOARDED_MONTH_ONE };
 export const WORKING_DAYS_PER_MONTH = 22;
 
-/** Share of each batch cohort (can overlap in real life; forecast uses split for units). */
+/** Human-readable ramp for UI copy. */
+export function batchRampLabel(): string {
+  const first = MONTHLY_BADGE_TARGETS[0];
+  const last = MONTHLY_BADGE_TARGETS[MONTHLY_BADGE_TARGETS.length - 1];
+  return `${first} → ${last} badges/month`;
+}
+
+/** Share of each batch cohort that converts to paid products. */
 export const FUNNEL_RATES = {
-  /** Profile-ready → AI/hybrid pass → Reality Badge ($100/yr). */
-  badgeShareOfBatch: 0.28,
-  /** Need landing + standards build. */
-  packageShareOfBatch: 0.12,
+  /** Primary revenue: Reality Badge ($100/yr) after standards pass. */
+  badgeShareOfBatch: 0.40,
+  /** Used only when not using fixed package count (fallback). */
+  packageShareOfBatch: 0.10,
   /** Take Organisation Workspace SaaS (billed from month after onboard). */
-  workspaceAttachShare: 0.75,
+  workspaceAttachShare: 0.25,
   workspaceBillingStartsMonthIndex: 1,
-  workspaceMonthlyChurn: 0.03,
+  workspaceMonthlyChurn: 0.05,
 } as const;
 
 export const WORKSPACE_MONTHLY_ARPU_CENTS =
@@ -37,9 +49,9 @@ export const WORKSPACE_MONTHLY_ARPU_CENTS =
 
 /** Display-only unit rows in the cash flow table (not stored as cents). */
 export const CASHFLOW_UNIT_ROWS = [
-  { key: 'ngos_batch', label: 'NGOs onboarded (batch/day × 22 days)' },
-  { key: 'badges', label: 'Units — Reality Badge ($100/yr)' },
-  { key: 'packages', label: 'Units — $650 landing + standards' },
+  { key: 'ngos_batch', label: 'NGOs onboarded (leads in pipeline / mo)' },
+  { key: 'badges', label: 'Units — Reality Badge sold ($100/yr)' },
+  { key: 'packages', label: 'Units — $650 landing + standards (ramps 1→6/mo)' },
   { key: 'workspace_new', label: 'Units — Workspace new paying orgs (mo)' },
   { key: 'workspace_active', label: 'Units — Workspace active subscribers' },
 ] as const;
@@ -59,28 +71,29 @@ export interface MonthFunnelSnapshot {
   units: Record<(typeof CASHFLOW_UNIT_ROWS)[number]['key'], number>;
 }
 
-export function batchPerDayForMonth(monthIndex: number, monthCount: number): number {
-  if (monthCount <= 1) return BATCH_ONBOARD_END_PER_DAY;
-  const t = monthIndex / (monthCount - 1);
-  return BATCH_ONBOARD_START_PER_DAY + (BATCH_ONBOARD_END_PER_DAY - BATCH_ONBOARD_START_PER_DAY) * t;
+export function batchPerDayForMonth(monthIndex: number, _monthCount: number): number {
+  const target = MONTHLY_ONBOARD_TARGETS[Math.min(monthIndex, MONTHLY_ONBOARD_TARGETS.length - 1)];
+  return target / WORKING_DAYS_PER_MONTH;
 }
 
 /** Must run in order so workspace subscribers accumulate (recurring builds from month 2). */
 export function computeAllMonthFunnels(monthCount: number): MonthFunnelSnapshot[] {
   const results: MonthFunnelSnapshot[] = [];
   let cumulativeWorkspaceSubs = 0;
-  let prevOnboarded = 0;
+  let prevBadges = 0;
 
   for (let monthIndex = 0; monthIndex < monthCount; monthIndex++) {
-    const batchPerDay = batchPerDayForMonth(monthIndex, monthCount);
-    const ngosOnboardedBatch = Math.round(batchPerDay * WORKING_DAYS_PER_MONTH);
+    const ngosOnboardedBatch =
+      MONTHLY_ONBOARD_TARGETS[Math.min(monthIndex, MONTHLY_ONBOARD_TARGETS.length - 1)];
+    const batchPerDay = ngosOnboardedBatch / WORKING_DAYS_PER_MONTH;
 
-    const badgesThisMonth = Math.round(ngosOnboardedBatch * FUNNEL_RATES.badgeShareOfBatch);
-    const packagesThisMonth = Math.round(ngosOnboardedBatch * FUNNEL_RATES.packageShareOfBatch);
+    const packagesThisMonth = packagesForMonth(monthIndex);
+    const badgesThisMonth =
+      MONTHLY_BADGE_TARGETS[Math.min(monthIndex, MONTHLY_BADGE_TARGETS.length - 1)];
 
     const workspaceNewSubs =
       monthIndex >= FUNNEL_RATES.workspaceBillingStartsMonthIndex
-        ? Math.round(prevOnboarded * FUNNEL_RATES.workspaceAttachShare)
+        ? Math.round(prevBadges * FUNNEL_RATES.workspaceAttachShare)
         : 0;
 
     cumulativeWorkspaceSubs = Math.round(
@@ -113,7 +126,7 @@ export function computeAllMonthFunnels(monthCount: number): MonthFunnelSnapshot[
       },
     });
 
-    prevOnboarded = ngosOnboardedBatch;
+    prevBadges = badgesThisMonth;
   }
 
   return results;
@@ -151,29 +164,7 @@ export function workspaceSalesNote(f: MonthFunnelSnapshot): string {
   return `${f.workspaceActiveSubs} active orgs × $${(WORKSPACE_MONTHLY_ARPU_CENTS / 100).toFixed(2)}/mo MRR = $${(f.workspaceMrrCents / 100).toLocaleString()} ($25 admin + ~${WORKSPACE_AVG_EXTRA_SEATS} seats × $15)`;
 }
 
-export function monthlyInfraCostsCents(
-  monthIndex: number,
-  badgesThisMonth: number,
-  workspaceActiveSubs: number,
-): { total: number; note: string } {
-  const vercel = 3_500;
-  const database = monthIndex < 6 ? 6_500 : monthIndex < 9 ? 9_500 : 14_000;
-  const resend =
-    workspaceActiveSubs > 500
-      ? 12_000
-      : workspaceActiveSubs > 200
-        ? 8_000
-        : badgesThisMonth > 40
-          ? 5_500
-          : 2_500;
-  const domains = 300;
-  const aiApi = monthIndex < 4 ? 8_000 : monthIndex < 8 ? 10_000 : 5_000;
-  const total = vercel + database + resend + domains + aiApi;
-  return {
-    total,
-    note: `Vercel · DB · Resend (${workspaceActiveSubs} workspace orgs) · AI/API`,
-  };
-}
+export { monthlyInfraCostsCents, monthlyHostingCostsCents, monthlyAiDevCostsCents } from './saasOperatingCosts';
 
 /** Year-2 style recurring hint from month-12 subscriber base. */
 export function projectedWorkspaceArrCents(monthCount: number): number {

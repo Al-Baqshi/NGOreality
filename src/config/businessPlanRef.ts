@@ -12,6 +12,8 @@ export interface CashflowLineDef {
   section: CashflowSection;
   /** Label as in the MSD cashflow spreadsheet */
   label: string;
+  /** Shown under the label on Cash flow (what this row is for). */
+  guide?: string;
   /** Maps to CRM payment rollup when set */
   paymentActualKey?: 'sales';
   gst?: boolean;
@@ -40,13 +42,45 @@ export const CASHFLOW_RECEIPT_LINES: CashflowLineDef[] = [
 
 /** Payment lines — GST expenses (LESS CASH PAYMENTS) */
 export const CASHFLOW_EXPENSE_GST_LINES: CashflowLineDef[] = [
-  { key: 'cog_materials', section: 'expense_gst', label: 'COG — materials purchased', gst: true },
-  { key: 'it_internet', section: 'expense_gst', label: 'IT & internet (fibre + mobile)', gst: true },
+  {
+    key: 'cog_materials',
+    section: 'expense_gst',
+    label: 'COG — materials purchased',
+    guide: 'Physical goods only: print stock, badge cards, packaging — not software or hosting.',
+    gst: true,
+  },
+  {
+    key: 'it_internet',
+    section: 'expense_gst',
+    label: 'IT & internet (fibre + mobile)',
+    guide: 'Home/office fibre and mobile for running the business (~$100/mo in the default forecast).',
+    gst: true,
+  },
   { key: 'maintenance', section: 'expense_gst', label: 'General maintenance and repairs', gst: true },
   { key: 'health_safety', section: 'expense_gst', label: 'Health & safety', gst: true },
   { key: 'accountancy', section: 'expense_gst', label: 'Accountancy and bookkeeping', gst: true },
   { key: 'training', section: 'expense_gst', label: 'Training and development', gst: true },
-  { key: 'subscriptions', section: 'expense_gst', label: 'Professional subscriptions', gst: true },
+  {
+    key: 'hosting_saas',
+    section: 'expense_gst',
+    label: 'Hosting & cloud (Vercel, DB, Resend)',
+    guide: 'Platform hosting: Vercel app, Postgres (Supabase/Neon), Resend email, domain — scales with members (~$80–120/mo at low volume).',
+    gst: true,
+  },
+  {
+    key: 'saas_ai_dev',
+    section: 'expense_gst',
+    label: 'AI & dev tools (Claude Max, Cursor)',
+    guide: 'Founder/build stack: Claude Max (~$200/mo NZD), Cursor Pro, API headroom — not charity-facing COGS.',
+    gst: true,
+  },
+  {
+    key: 'subscriptions',
+    section: 'expense_gst',
+    label: 'Professional subscriptions (misc)',
+    guide: 'Other SaaS: GitHub, Xero/accounting add-ons, design tools — not hosting or Claude (those are separate rows).',
+    gst: true,
+  },
   { key: 'cogs_setup', section: 'expense_gst', label: 'Incoming COG set-up costs', gst: true },
   { key: 'motor_vehicle', section: 'expense_gst', label: 'Motor vehicle expenses', gst: true },
   { key: 'insurance', section: 'expense_gst', label: 'Insurance', gst: true },
@@ -83,13 +117,15 @@ export const ALL_CASHFLOW_LINES: CashflowLineDef[] = [
 export const FLEXI_WAGE_MONTHLY_CENTS = 240_000; // $2,400 NZD/month
 export const FLEXI_WAGE_DEFAULT_MONTHS = 6; // months 1–6 in the 12-month forecast
 
-/** Expected $ on these lines is computed from volume units (badges, packages, workspace_active). */
+/**
+ * Expected $ auto-calculated from volume units (receipts) or receipt totals (bank_fees).
+ * Professional subscriptions is editable — use Actual for real invoices; expected is your forecast.
+ */
 export const UNIT_DERIVED_LINE_KEYS = [
   'sales',
   'sales_other',
   'workspace_saas',
   'bank_fees',
-  'subscriptions',
 ] as const;
 
 export type UnitDerivedLineKey = (typeof UNIT_DERIVED_LINE_KEYS)[number];

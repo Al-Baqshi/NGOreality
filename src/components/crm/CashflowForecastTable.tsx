@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import {
   ALL_CASHFLOW_LINES,
   CASHFLOW_SECTION_LABELS,
@@ -8,9 +8,10 @@ import {
   type CashflowLineDef,
   type CashflowSection,
 } from '../../config/businessPlanRef';
-import { CASHFLOW_UNIT_ROWS, computeAllMonthFunnels } from '../../config/salesFunnelModel';
+import { cashflowLineGuideSummary } from '../../config/nzCashflowGuide';
+import { CASHFLOW_UNIT_ROWS, batchRampLabel } from '../../config/salesFunnelModel';
 import type { BusinessCashflowLine, CashflowPeriodTotals } from '../../lib/businessCashflow';
-import { sumLineAcrossPeriods } from '../../lib/businessCashflow';
+import { CASHFLOW_ACTUAL_OVERRIDE_MARKER, sumLineAcrossPeriods } from '../../lib/businessCashflow';
 import type { CashflowUnitGrid } from '../../lib/businessCashflowUnits';
 import { sumUnitAcrossPeriods } from '../../lib/businessCashflowUnits';
 import { formatMonthLabel } from '../../lib/businessPlan';
@@ -43,6 +44,11 @@ function moneyCellClass(section: CashflowSection, cents: number): string {
   if (!cents) return 'text-ink-300';
   if (section === 'receipt') return 'text-emerald-700 font-semibold';
   return 'text-red-700 font-semibold';
+}
+
+/** Unit-linked expected cells: section colour (green in / red out) + sky tint, not receipt teal. */
+function unitDerivedExpectedClass(section: CashflowSection, cents: number): string {
+  return `bg-sky-50/90 dark:bg-sky-950/25 ${moneyCellClass(section, cents)}`;
 }
 
 function sectionHeaderClass(section: CashflowSection): string {
@@ -131,8 +137,6 @@ export default function CashflowForecastTable({
     field: 'expected' | 'actual';
   } | null>(null);
   const [editValue, setEditValue] = useState('');
-
-  const funnels = useMemo(() => computeAllMonthFunnels(periods.length), [periods.length]);
 
   const renderUnitRow = (unitKey: string, sublabel?: string) => {
     const def = CASHFLOW_UNIT_ROWS.find((d) => d.key === unitKey);
@@ -225,8 +229,12 @@ export default function CashflowForecastTable({
 
   const renderLineRow = (def: CashflowLineDef) => {
     const unitDerivedExpected = (UNIT_DERIVED_LINE_KEYS as readonly string[]).includes(def.key);
-    const readOnlyActual = def.paymentActualKey === 'sales';
-    const rowNote = periods.map((p) => grid[p]?.[def.key]?.notes).find((n) => n && n.length > 0);
+    const crmMembershipActual = def.paymentActualKey === 'sales';
+    const rowNote = periods
+      .map((p) => grid[p]?.[def.key]?.notes)
+      .find((n) => n && n.replace(CASHFLOW_ACTUAL_OVERRIDE_MARKER, '').trim().length > 0)
+      ?.replace(new RegExp(`\\n?${CASHFLOW_ACTUAL_OVERRIDE_MARKER}\\s*`, 'g'), '')
+      .trim();
     const totalExp = sumLineAcrossPeriods(periods, grid, def.key, 'expected_cents');
     const totalAct = sumLineAcrossPeriods(periods, grid, def.key, 'actual_cents');
     const isFlexiDefault =
@@ -235,11 +243,15 @@ export default function CashflowForecastTable({
         const row = grid[p]?.[def.key];
         return (row?.expected_cents ?? 0) === FLEXI_WAGE_MONTHLY_CENTS;
       });
+    const lineGuide = cashflowLineGuideSummary(def.key, def.guide);
 
     return (
       <tr key={def.key} className="border-b border-ink-50">
-        <td className="p-2 pl-4 text-xs sticky left-0 bg-white max-w-[260px]">
+        <td className="p-2 pl-4 text-xs sticky left-0 bg-white max-w-[280px]">
           {def.label}
+          {lineGuide && (
+            <span className="block text-2xs text-ink-500 mt-0.5 leading-snug font-normal">{lineGuide}</span>
+          )}
           {isFlexiDefault && (
             <span className="block font-mono text-2xs text-teal">$2,400/mo (months 1–{FLEXI_WAGE_DEFAULT_MONTHS})</span>
           )}
@@ -247,14 +259,14 @@ export default function CashflowForecastTable({
             <span className="block font-mono text-2xs text-sky-700 mt-0.5">↳ from volume units above</span>
           )}
           {rowNote && (
-            <span className="block font-mono text-2xs text-ink-500 mt-0.5 leading-snug">{rowNote}</span>
+            <span className="block font-mono text-2xs text-ink-600 mt-0.5 leading-snug">{rowNote}</span>
           )}
         </td>
         {periods.map((period) => {
           const row = grid[period]?.[def.key];
           const cells: { field: 'expected' | 'actual'; cents: number; ro?: boolean }[] = [
             { field: 'expected', cents: row?.expected_cents ?? 0, ro: unitDerivedExpected },
-            { field: 'actual', cents: row?.actual_cents ?? 0, ro: readOnlyActual },
+            { field: 'actual', cents: row?.actual_cents ?? 0, ro: false },
           ];
           return cells.map((cell) => {
             const isEd =
@@ -266,7 +278,9 @@ export default function CashflowForecastTable({
               <td
                 key={`${period}-${def.key}-${cell.field}`}
                 className={`p-1 text-right font-mono text-2xs border-l border-ink-50 ${
-                  cell.ro ? 'text-teal bg-teal/5' : moneyCellClass(def.section, cell.cents)
+                  cell.ro
+                    ? unitDerivedExpectedClass(def.section, cell.cents)
+                    : moneyCellClass(def.section, cell.cents)
                 }`}
               >
                 {isEd ? (
@@ -302,11 +316,15 @@ export default function CashflowForecastTable({
                     }}
                     className={`w-full py-1 ${cell.ro ? 'cursor-default' : 'hover:bg-ink-50'}`}
                     title={
-                      cell.ro && unitDerivedExpected && cell.field === 'expected'
-                        ? 'Edit badges / packages / workspace units above'
-                        : cell.ro
-                          ? 'From CRM payments (formula)'
-                          : 'Click to edit'
+                      unitDerivedExpected && cell.field === 'expected'
+                        ? def.key === 'bank_fees'
+                          ? 'Estimated Stripe fees from receipts — edit receipt lines or volume above'
+                          : 'From volume units above — edit badges / packages / workspace subscribers'
+                        : crmMembershipActual && cell.field === 'actual'
+                          ? 'From CRM membership payments — click to edit or set 0 to clear'
+                          : def.section !== 'receipt'
+                            ? 'Expense — click to edit expected or actual'
+                            : 'Click to edit'
                     }
                   >
                     {cell.cents ? formatCents(cell.cents) : '—'}
@@ -433,12 +451,12 @@ export default function CashflowForecastTable({
           </tr>
           <tr className="bg-sky-50 text-sky-900 border-b-2 border-sky-300">
             <td colSpan={1 + periods.length * 2 + 2} className="p-2 pl-4 font-mono text-2xs">
-              Batch ramp 5 → 100 NGOs/day · sky = expected · white = actual (daily roll-up later)
+              Onboarding ramp: {batchRampLabel()} · sky = expected · white = actual
             </td>
           </tr>
           {renderUnitRow(
             'ngos_batch',
-            `Batch/day ${funnels[0]?.batchPerDay.toFixed(1)} → ${funnels[funnels.length - 1]?.batchPerDay.toFixed(0)}`,
+            `Ramp ${batchRampLabel()}`,
           )}
           {renderUnitRow('badges', '$100/yr membership each')}
           {renderUnitRow('packages', '$650 package each')}
@@ -478,7 +496,8 @@ export default function CashflowForecastTable({
       </table>
       <p className="p-3 font-mono text-2xs text-ink-500 border-t border-ink-100">
         Formulas: (A)=Σ receipts · (B)=Σ GST expenses · (C)=(B)+non-GST · (E)=(C)+other payments · Net=(A)−(E) ·
-        Volume: sky = expected units · actual editable per month. Cash: green in · red out. Edit any cell to save.
+        Volume: sky = expected units · actual editable per month. Cash: green in · red out. Edits update instantly;
+        saved to the database in the background (no full-page reload).
       </p>
     </div>
   );

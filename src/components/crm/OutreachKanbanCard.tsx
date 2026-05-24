@@ -32,7 +32,10 @@ function emailBadge(status?: OrgEmailStatus) {
         ? 'text-amber-700 border-amber-400'
         : 'text-red-600 border-red-300';
   return (
-    <span className={`inline-flex items-center gap-0.5 font-mono text-2xs border px-1 ${tone}`}>
+    <span
+      className={`inline-flex items-center gap-0.5 font-mono text-2xs border px-1 ${tone}`}
+      title={status.status === 'failed' && status.errorMessage ? status.errorMessage : undefined}
+    >
       <Mail size={10} aria-hidden />
       {label}
     </span>
@@ -117,6 +120,11 @@ export default function OutreachKanbanCard({
             )}
             {emailBadge(emailStatus)}
           </div>
+          {emailStatus?.status === 'failed' && emailStatus.errorMessage && (
+            <p className="font-mono text-2xs text-red-600 mt-1 line-clamp-2" title={emailStatus.errorMessage}>
+              {emailStatus.errorMessage}
+            </p>
+          )}
         </div>
       </div>
 
