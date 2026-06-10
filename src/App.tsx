@@ -30,6 +30,8 @@ import Blog from './pages/public/Blog';
 import BlogDetail from './pages/public/BlogDetail';
 import About from './pages/public/About';
 import Contact from './pages/public/Contact';
+import PrivacyPolicy from './pages/public/PrivacyPolicy';
+import TermsOfService from './pages/public/TermsOfService';
 import OrganizationProfile from './pages/public/OrganizationProfile';
 import NotFound from './pages/public/NotFound';
 import NgoLogin from './pages/ngo/NgoLogin';
@@ -121,6 +123,8 @@ export default function App() {
           <Route path="blog/:slug" element={<BlogDetail />} />
           <Route path="about" element={<About />} />
           <Route path="contact" element={<Contact />} />
+          <Route path="privacy" element={<PrivacyPolicy />} />
+          <Route path="terms" element={<TermsOfService />} />
         </Route>
 
         {/* Default redirect */}

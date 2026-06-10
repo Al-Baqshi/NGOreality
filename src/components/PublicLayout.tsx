@@ -150,8 +150,8 @@ export default function PublicLayout() {
             <div className="min-w-0">
               <h4 className="label-brutal text-ink-400 mb-3">Legal</h4>
               <div className="space-y-2">
-                <span className="block text-xs text-ink-400 py-0.5">Privacy Policy</span>
-                <span className="block text-xs text-ink-400 py-0.5">Terms of Service</span>
+                <NavLink to="/public/privacy" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Privacy Policy</NavLink>
+                <NavLink to="/public/terms" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Terms of Service</NavLink>
               </div>
             </div>
           </div>
