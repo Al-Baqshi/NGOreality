@@ -144,6 +144,7 @@ export default function PublicLayout() {
               <div className="space-y-2">
                 <NavLink to="/public/about" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">About</NavLink>
                 <NavLink to="/public/contact" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Contact</NavLink>
+                <NavLink to="/public/business-plan" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Business Plan</NavLink>
               </div>
             </div>
 
