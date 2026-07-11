@@ -4,32 +4,32 @@ const PDF_WIDTH_PX = 794;
 const PDF_EXPORT_CSS = `
 .pdf-export-root {
   background: #ffffff !important;
-  color: #0a0a0a !important;
+  color: #1a2b33 !important;
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
 }
-.pdf-export-root .text-ink-300 { color: #d6d6d6 !important; }
-.pdf-export-root .text-ink-400 { color: #737373 !important; }
-.pdf-export-root .text-ink-500 { color: #525252 !important; }
-.pdf-export-root .text-ink-600,
-.pdf-export-root .text-ink-700 { color: #262626 !important; }
+.pdf-export-root .text-ink-300 { color: #799eb0 !important; }
+.pdf-export-root .text-ink-400 { color: #547c8f !important; }
+.pdf-export-root .text-ink-500 { color: #395969 !important; }
+.pdf-export-root .text-ink-600 { color: #273d48 !important; }
+.pdf-export-root .text-ink-700 { color: #233741 !important; }
 .pdf-export-root .text-ink-950,
-.pdf-export-root strong { color: #0a0a0a !important; }
+.pdf-export-root strong { color: #1a2b33 !important; }
 .pdf-export-root .bg-ink-950 {
-  background-color: #0a0a0a !important;
+  background-color: #1a2b33 !important;
   color: #f5f5f5 !important;
 }
 .pdf-export-root .bg-ink-950 .text-white,
 .pdf-export-root .bg-ink-950 strong.text-white { color: #ffffff !important; }
-.pdf-export-root .bg-ink-50 { background-color: #f0f0f0 !important; }
-.pdf-export-root .bg-teal\\/5 { background-color: #e6f7f5 !important; }
+.pdf-export-root .bg-ink-50 { background-color: #eef1f1 !important; }
+.pdf-export-root .bg-teal\\/5 { background-color: #e6f2f0 !important; }
 .pdf-export-root .border-ink-950,
 .pdf-export-root .border-b-3,
-.pdf-export-root .border-3 { border-color: #0a0a0a !important; }
-.pdf-export-root .border-ink-200 { border-color: #d4d4d4 !important; }
-.pdf-export-root .border-teal { border-color: #0d9488 !important; }
-.pdf-export-root .text-teal { color: #0f766e !important; }
-.pdf-export-root .bg-teal { background-color: #0d9488 !important; }
+.pdf-export-root .border-3 { border-color: #1a2b33 !important; }
+.pdf-export-root .border-ink-200 { border-color: #acbec6 !important; }
+.pdf-export-root .border-teal { border-color: #1a7a6d !important; }
+.pdf-export-root .text-teal { color: #1a7a6d !important; }
+.pdf-export-root .bg-teal { background-color: #1a7a6d !important; }
 .pdf-export-root .card-brutal {
   box-shadow: none !important;
 }

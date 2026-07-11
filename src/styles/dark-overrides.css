@@ -4,35 +4,35 @@
 }
 
 .dark .text-ink-950 {
-  color: #f0f0f0;
+  color: #eef0f2;
 }
 
 .dark .text-ink-900 {
-  color: #e8e8e8;
+  color: #e5e8ea;
 }
 
 .dark .text-ink-800 {
-  color: #d4d4d4;
+  color: #ced6d9;
 }
 
 .dark .text-ink-700 {
-  color: #c4c4c4;
+  color: #b6c7ce;
 }
 
 .dark .text-ink-600 {
-  color: #a8a8a8;
+  color: #93acb7;
 }
 
 .dark .text-ink-500 {
-  color: #909090;
+  color: #6a96ab;
 }
 
 .dark .text-ink-400 {
-  color: #787878;
+  color: #527e92;
 }
 
 .dark .text-ink-300 {
-  color: #b0b0b0;
+  color: #9db4be;
 }
 
 .dark .bg-white {
@@ -40,50 +40,50 @@
 }
 
 .dark .bg-ink-50 {
-  background-color: #242424;
+  background-color: #19252c;
 }
 
 .dark .bg-ink-100 {
-  background-color: #2a2a2a;
+  background-color: #1d2d34;
 }
 
 .dark .border-ink-950 {
-  border-color: #d4d4d4;
+  border-color: #ced6d9;
 }
 
 .dark .border-ink-300 {
-  border-color: #555555;
+  border-color: #3b5968;
 }
 
 .dark .border-ink-200 {
-  border-color: #404040;
+  border-color: #2c444e;
 }
 
 .dark .border-ink-100 {
-  border-color: #333333;
+  border-color: #23363e;
 }
 
 .dark .border-t-3.border-ink-950,
 .dark .border-b-3.border-ink-950,
 .dark .border-r-3.border-ink-950,
 .dark .border-l-3.border-ink-950 {
-  border-color: #d4d4d4;
+  border-color: #ced6d9;
 }
 
 .dark .hover\:bg-ink-50:hover {
-  background-color: #2a2a2a;
+  background-color: #1d2d34;
 }
 
 .dark .hover\:text-ink-950:hover {
-  color: #f0f0f0;
+  color: #eef0f2;
 }
 
 .dark .placeholder\:text-ink-400::placeholder {
-  color: #787878;
+  color: #527e92;
 }
 
 .dark .divide-ink-100 > :not([hidden]) ~ :not([hidden]) {
-  border-color: #333333;
+  border-color: #23363e;
 }
 
 .dark .shadow-brutal {
@@ -100,11 +100,11 @@
 
 /* CRM sidebar stays dark; main chrome uses inverted borders on hover */
 .dark .hover\:bg-ink-950:hover {
-  background-color: #e8e8e8;
+  background-color: #e5e8ea;
 }
 
 .dark .hover\:text-white:hover {
-  color: #0a0a0a;
+  color: #1a2b33;
 }
 
 /* Brutal buttons bake ink colors via @apply — ensure readable labels in dark mode */

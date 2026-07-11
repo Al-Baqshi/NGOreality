@@ -102,7 +102,7 @@ export default function WorldMap({ countryCounts, onCountryClick, selectedCountr
   const getCountryColor = (code: string) => {
     const count = countryCounts[code] || 0;
     if (isCountryMuted(code)) return hovered === code ? '#d4d4d4' : '#ebebeb';
-    if (selectedCountry === code) return '#0d9488';
+    if (selectedCountry === code) return '#1a7a6d';
     if (count === 0) return hovered === code ? '#d4d4d4' : '#e5e5e5';
     const intensity = 0.3 + 0.7 * (count / maxCount);
     const r = Math.round(220 - intensity * 180);
@@ -112,9 +112,9 @@ export default function WorldMap({ countryCounts, onCountryClick, selectedCountr
   };
 
   const getCountryStroke = (code: string) => {
-    if (selectedCountry === code) return '#0a0a0a';
+    if (selectedCountry === code) return '#1a2b33';
     if (isCountryMuted(code)) return '#f5f5f5';
-    return hovered === code ? '#0a0a0a' : '#ffffff';
+    return hovered === code ? '#1a2b33' : '#ffffff';
   };
 
   const getCountryStrokeWidth = (code: string) => {
@@ -318,7 +318,7 @@ export default function WorldMap({ countryCounts, onCountryClick, selectedCountr
           <span>High concentration</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 bg-[#0d9488] border border-ink-200" />
+          <div className="w-3 h-3 bg-teal border border-ink-200" />
           <span>Selected</span>
         </div>
       </div>

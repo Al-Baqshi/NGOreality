@@ -11,25 +11,25 @@
     --surface-default: #fafafa;
     --surface-raised: #ffffff;
     --surface-overlay: #f5f5f5;
-    --accent-light: #f5e6e3;
+    --accent-light: #e9eff1;
     --teal-light: #e6f2f0;
     --card-bg: #ffffff;
     --input-bg: #ffffff;
-    --border-brutal: #0a0a0a;
-    --shadow-brutal: 4px 4px 0px 0px #0a0a0a;
-    --shadow-brutal-sm: 2px 2px 0px 0px #0a0a0a;
-    --shadow-brutal-lg: 6px 6px 0px 0px #0a0a0a;
+    --border-brutal: #1a2b33;
+    --shadow-brutal: 4px 4px 0px 0px #1a2b33;
+    --shadow-brutal-sm: 2px 2px 0px 0px #1a2b33;
+    --shadow-brutal-lg: 6px 6px 0px 0px #1a2b33;
   }
 
   .dark {
     --surface-default: #121212;
     --surface-raised: #1c1c1c;
     --surface-overlay: #161616;
-    --accent-light: #3d221e;
+    --accent-light: #192b33;
     --teal-light: #1a2e2b;
     --card-bg: #1c1c1c;
     --input-bg: #242424;
-    --border-brutal: #d4d4d4;
+    --border-brutal: #ced6d9;
     --shadow-brutal: 4px 4px 0px 0px #000000;
     --shadow-brutal-sm: 2px 2px 0px 0px #000000;
     --shadow-brutal-lg: 6px 6px 0px 0px #000000;
@@ -43,13 +43,13 @@
 
   html {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    color: #0a0a0a;
+    color: #2A3F47;
     background-color: var(--surface-default);
     @apply font-sans;
   }
 
   .dark html {
-    color: #e8e8e8;
+    color: #e5e8ea;
   }
 
   body {
@@ -58,7 +58,7 @@
   }
 
   ::selection {
-    background-color: #c23c2a;
+    background-color: #28464F;
     color: white;
   }
 }
@@ -283,22 +283,22 @@
   --width-88: 22rem;
   --width-128: 32rem;
   --border-width-3: 3px;
-  --shadow-brutal: 4px 4px 0px 0px #0a0a0a;
-  --shadow-brutal-sm: 2px 2px 0px 0px #0a0a0a;
-  --shadow-brutal-lg: 6px 6px 0px 0px #0a0a0a;
-  --color-ink-950: #0a0a0a;
-  --color-ink-900: #141414;
-  --color-ink-800: #1e1e1e;
-  --color-ink-700: #2a2a2a;
-  --color-ink-600: #3a3a3a;
-  --color-ink-500: #555555;
-  --color-ink-400: #777777;
-  --color-ink-300: #999999;
-  --color-ink-200: #bbbbbb;
-  --color-ink-100: #d4d4d4;
-  --color-ink-50: #f0f0f0;
-  --color-accent: #ec5620;
-  --color-accent-hover: #a83222;
+  --shadow-brutal: 4px 4px 0px 0px #1a2b33;
+  --shadow-brutal-sm: 2px 2px 0px 0px #1a2b33;
+  --shadow-brutal-lg: 6px 6px 0px 0px #1a2b33;
+  --color-ink-950: #1a2b33;
+  --color-ink-900: #1d2e36;
+  --color-ink-800: #20323b;
+  --color-ink-700: #233741;
+  --color-ink-600: #273d48;
+  --color-ink-500: #395969;
+  --color-ink-400: #547c8f;
+  --color-ink-300: #799eb0;
+  --color-ink-200: #acbec6;
+  --color-ink-100: #cbd5db;
+  --color-ink-50: #eef1f1;
+  --color-accent: #28464f;
+  --color-accent-hover: #1a2b33;
   --color-accent-light: var(--accent-light);
   --color-teal: #1a7a6d;
   --color-teal-hover: #146358;
@@ -350,16 +350,16 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.9 0 0);
   --input: oklch(0.9 0 0);
-  --ring: oklch(0.55 0.12 35);
+  --ring: oklch(0.425 0.070 219);
   --radius: 0.5rem;
-  --sidebar: #0a0a0a;
-  --sidebar-foreground: #f0f0f0;
-  --sidebar-primary: #ec5620;
+  --sidebar: #1a2b33;
+  --sidebar-foreground: #eef1f1;
+  --sidebar-primary: #28464f;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1e1e1e;
-  --sidebar-accent-foreground: #f0f0f0;
-  --sidebar-border: #2a2a2a;
-  --sidebar-ring: #ec5620;
+  --sidebar-accent: #20323b;
+  --sidebar-accent-foreground: #eef1f1;
+  --sidebar-border: #233741;
+  --sidebar-ring: #28464f;
 }
 
 .dark {
@@ -378,13 +378,13 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.65 0.15 35);
-  --sidebar: #0a0a0a;
-  --sidebar-foreground: #f0f0f0;
-  --sidebar-primary: #ec5620;
+  --ring: oklch(0.525 0.100 219);
+  --sidebar: #1a2b33;
+  --sidebar-foreground: #eef1f1;
+  --sidebar-primary: #28464f;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1e1e1e;
-  --sidebar-accent-foreground: #f0f0f0;
-  --sidebar-border: #2a2a2a;
-  --sidebar-ring: #ec5620;
+  --sidebar-accent: #20323b;
+  --sidebar-accent-foreground: #eef1f1;
+  --sidebar-border: #233741;
+  --sidebar-ring: #28464f;
 }

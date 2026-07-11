@@ -19,9 +19,7 @@ type BrandLogoProps = {
   onDark?: boolean;
 };
 
-function iconSrc(onDark: boolean, resolvedTheme: 'light' | 'dark') {
-  return onDark || resolvedTheme === 'dark' ? '/logo-icon-dark.svg' : '/logo-icon.svg';
-}
+const ICON_SRC = '/logo-icon.png';
 
 export default function BrandLogo({
   variant = 'full',
@@ -36,7 +34,7 @@ export default function BrandLogo({
 }: BrandLogoProps) {
   const { resolvedTheme } = useTheme();
   const isDark = onDark || resolvedTheme === 'dark';
-  const src = iconSrc(onDark, resolvedTheme);
+  const src = ICON_SRC;
 
   const nameClass = isDark
     ? 'text-white'
