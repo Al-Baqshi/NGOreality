@@ -17,11 +17,19 @@ import {
 } from './businessPlanRef';
 import { staffWagesCentsForMonth, staffWagesNoteForMonth } from './businessPlanStaffing';
 
-export const CAPITALISATION_GRANT_CENTS = 1_000_000;
-export const MAC_STUDIO_M4_MAX_CENTS = 849_900;
-export const SETUP_LOGO_BRAND_CENTS = 80_000;
-export const SETUP_PRINT_CARDS_CENTS = 20_000;
-export const OPENING_OWNER_CAPITAL_CENTS = 500_000;
+// Capitalisation grant line items — fills the $10,000 grant with quoted items + a working capital reserve.
+export const GRANT_HARDWARE_CENTS = 829_800; // $8,298.00 Mac Studio M3 Ultra 96GB/1TB + keyboard (quote 2B983105260003: net $7,215.65 + GST $1,082.35; GST-inclusive as not GST-registered)
+export const SETUP_LOGO_BRAND_CENTS = 10_000; // $100 logo / brand design
+export const SETUP_PRINT_CARDS_CENTS = 20_000; // $200 business cards
+export const GRANT_FIRST_YEAR_INSURANCE_CENTS = 54_672; // $546.72 first-year business insurance (quote 2B983105260003)
+export const GRANT_WORKING_CAPITAL_RESERVE_CENTS = 85_528; // $855.28 working capital reserve — fills grant to $10,000
+export const CAPITALISATION_GRANT_CENTS =
+  GRANT_HARDWARE_CENTS +
+  SETUP_LOGO_BRAND_CENTS +
+  SETUP_PRINT_CARDS_CENTS +
+  GRANT_FIRST_YEAR_INSURANCE_CENTS +
+  GRANT_WORKING_CAPITAL_RESERVE_CENTS; // $10,000.00 total
+export const OPENING_OWNER_CAPITAL_CENTS = 0; // No owner cash injection — nothing to evidence (was $5,000)
 export const MONTHLY_INTERNET_CENTS = 10_000;
 
 export const SETUP_MONTH_INDEX = 0;
@@ -62,7 +70,7 @@ function buildMonthFromFunnel(funnel: MonthFunnelSnapshot, monthIndex: number): 
     hosting_saas: hosting.totalCents,
     saas_ai_dev: aiDev.totalCents,
     subscriptions: nz(45),
-    insurance: nz(120),
+    insurance: nz(50.12), // monthly premium per quote 2B983105260003 ($546.72/yr if paid annually)
     accountancy: nz(200),
     marketing: nz(monthIndex < 6 ? 150 : 300),
     overheads: nz(95),
@@ -88,11 +96,18 @@ function buildMonthFromFunnel(funnel: MonthFunnelSnapshot, monthIndex: number): 
 
   if (monthIndex === SETUP_MONTH_INDEX) {
     lines.govt_grant = CAPITALISATION_GRANT_CENTS;
-    lines.other_receipts = OPENING_OWNER_CAPITAL_CENTS;
-    lines.cogs_setup = MAC_STUDIO_M4_MAX_CENTS;
+    lines.cogs_setup = GRANT_HARDWARE_CENTS;
     lines.marketing = (lines.marketing ?? 0) + SETUP_LOGO_BRAND_CENTS + SETUP_PRINT_CARDS_CENTS;
+    notes.govt_grant = `Capitalisation grant $${(CAPITALISATION_GRANT_CENTS / 100).toLocaleString()}: Mac Studio $${GRANT_HARDWARE_CENTS / 100} + logo $${SETUP_LOGO_BRAND_CENTS / 100} + cards $${SETUP_PRINT_CARDS_CENTS / 100} + yr-1 insurance $${(GRANT_FIRST_YEAR_INSURANCE_CENTS / 100).toFixed(2)} + working capital reserve $${(GRANT_WORKING_CAPITAL_RESERVE_CENTS / 100).toFixed(2)}`;
+    notes.cogs_setup = 'Mac Studio M3 Ultra 96GB/1TB + keyboard (quote 2B983105260003, GST-incl)';
+    if (OPENING_OWNER_CAPITAL_CENTS > 0) {
+      lines.other_receipts = OPENING_OWNER_CAPITAL_CENTS;
+      notes.other_receipts = 'Owner capital injection (evidence: bank statement)';
+    }
   }
 
+  // Founder draws $1,000/week ($4,333/mo) every month — ~$52K/yr. Grant + working capital reserve
+  // keep the bank positive through the ramp-up months without an owner cash injection.
   lines.drawings = nz(4_333);
   lines.acc_reserve = nz(90);
   lines.income_tax_reserve = monthIndex < 3 ? 0 : monthIndex < 8 ? nz(300) : nz(600);

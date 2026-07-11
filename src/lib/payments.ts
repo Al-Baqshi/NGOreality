@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { NGO_BANK_ACCOUNT } from '../config/billing';
 import {
   MEMBERSHIP_ANNUAL_CENTS,
   MONITORING_MONTHLY_CENTS,
@@ -152,8 +153,8 @@ export async function recordPayment(input: {
 
 /** Bank transfer instructions shown in CRM */
 export const BANK_TRANSFER_INSTRUCTIONS = {
-  accountName: 'NGOreality Ltd',
-  accountNumber: '(configure in CRM settings / env)',
+  accountName: NGO_BANK_ACCOUNT.accountName,
+  accountNumber: NGO_BANK_ACCOUNT.accountNumber || '(set VITE_BANK_ACCOUNT_NUMBER in env)',
   referenceHint: 'Use payment reference exactly as shown (NGR-…)',
 };
 

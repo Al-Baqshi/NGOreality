@@ -1,6 +1,19 @@
 # SHORTEXET — NGOreality session status
 
-_Last updated: 2026-05-21_
+_Last updated: 2026-05-27_
+
+## Latest — NGO verification billing & confirmation
+
+- **After badge/verification request submit:** full-screen thank-you dialog (timeline, standards list, bank top-up).
+- **Membership page:** Billing & top-up panel with **NGR-…** reference, bank details from env, 3 business-day bank processing note, Stripe/Airwallet “coming soon”.
+- **DB migration `026`:** on `badge_requests` insert → ensure payment reference, pending `membership_annual` payment row, staff + NGO portal notifications, **queued confirmation email** (`badge_request_received`). NGOs can **read** their payment ledger.
+- **Env:** `VITE_BANK_ACCOUNT_NAME`, `VITE_BANK_NAME`, `VITE_BANK_ACCOUNT_NUMBER`, optional `VITE_AIRWALLET_ENABLED`.
+
+**Apply:** `npx supabase db push` (or MCP) for migration `20260527120000_026_badge_request_billing_email.sql`. Flush emails from CRM **Email notifications** if Go API not running.
+
+Key files: `src/components/ngo/NgoBillingTopUpPanel.tsx`, `VerificationSubmittedDialog.tsx`, `src/pages/ngo/portal/NgoRequestsPage.tsx`, `NgoMembershipPage.tsx`.
+
+---
 
 ## Where we are
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { ensurePaymentReference } from '../lib/payments';
 import type {
   BadgeRequest,
   NgoSetupRequest,
@@ -108,8 +109,12 @@ export function useNgoPortal() {
   const submitBadgeRequest = async (
     requestType: BadgeRequest['request_type'],
     notes: string,
-  ): Promise<string | null> => {
-    if (!user || !organization) return 'Not signed in';
+  ): Promise<{ error: string | null; paymentReference: string | null }> => {
+    if (!user || !organization) {
+      return { error: 'Not signed in', paymentReference: null };
+    }
+
+    const paymentReference = await ensurePaymentReference(organization.id);
 
     const { error: insertError } = await supabase.from('badge_requests').insert({
       organization_id: organization.id,
@@ -118,7 +123,9 @@ export function useNgoPortal() {
       notes,
     });
 
-    if (insertError) return insertError.message;
+    if (insertError) {
+      return { error: insertError.message, paymentReference: null };
+    }
 
     if (requestType === 'renewal') {
       await supabase
@@ -129,7 +136,7 @@ export function useNgoPortal() {
     }
 
     await fetchPortal();
-    return null;
+    return { error: null, paymentReference };
   };
 
   const isLinked = Boolean(member);

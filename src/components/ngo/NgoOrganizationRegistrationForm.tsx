@@ -7,6 +7,8 @@ import { linkExistingOrganization, provisionNgoOrganization } from '../../lib/ng
 import { CATEGORIES } from '../../types';
 import OrganizationClaimSearch from '../OrganizationClaimSearch';
 import NgoDirectoryOrgPreview from './NgoDirectoryOrgPreview';
+import Turnstile, { isTurnstileEnabled } from '../Turnstile';
+import { verifyTurnstileToken } from '../../lib/turnstile';
 import type { ClaimSearchOrganization } from '../../hooks/useOrganizationClaimSearch';
 
 type SignupMode = 'existing' | 'new';
@@ -40,6 +42,7 @@ export default function NgoOrganizationRegistrationForm({
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loggedIn || !user) return;
@@ -90,7 +93,22 @@ export default function NgoOrganizationRegistrationForm({
       return;
     }
 
+    if (!loggedIn && isTurnstileEnabled() && !turnstileToken) {
+      setError('Please complete the security check.');
+      return;
+    }
+
     setSubmitting(true);
+
+    if (!loggedIn && isTurnstileEnabled() && turnstileToken) {
+      const verified = await verifyTurnstileToken(turnstileToken);
+      if (!verified) {
+        setError('Security check failed. Please try again.');
+        setTurnstileToken(null);
+        setSubmitting(false);
+        return;
+      }
+    }
 
     let userId = user?.id;
 
@@ -306,9 +324,17 @@ export default function NgoOrganizationRegistrationForm({
         </>
       )}
 
+      {!loggedIn && (
+        <Turnstile
+          onSuccess={setTurnstileToken}
+          onExpire={() => setTurnstileToken(null)}
+          onError={() => setTurnstileToken(null)}
+        />
+      )}
+
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || (!loggedIn && isTurnstileEnabled() && !turnstileToken)}
         className="btn-brutal-accent w-full min-h-[48px] disabled:opacity-60"
       >
         {submitting

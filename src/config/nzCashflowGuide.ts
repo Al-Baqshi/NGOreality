@@ -32,7 +32,7 @@ export const NZ_CASHFLOW_RECEIPT_GUIDE: CashflowLineGuide[] = [
     key: 'workspace_saas',
     title: 'Organisation Workspace SaaS',
     summary:
-      'Monthly subscription from charities using their organisation portal ($25 admin + $15/extra user in the model). Driven by “workspace active” units.',
+      'Monthly subscription from charities using their organisation portal ($25/org/mo admin seat in the model; extra seats are upside). Driven by “workspace active” units.',
     gstNote: `SaaS to NZ charities is generally ${NZ_GST_RATE_LABEL} GST unless your accountant advises otherwise.`,
   },
   {
@@ -128,7 +128,7 @@ export const NZ_CASHFLOW_PAYMENT_GUIDE: CashflowLineGuide[] = [
   {
     key: 'insurance',
     title: 'Insurance',
-    summary: 'Public liability / professional indemnity as you scale.',
+    summary: 'Public liability / professional indemnity. $50.12/mo per quote ($546.72/yr if paid annually); first year is grant-funded.',
   },
   {
     key: 'overheads',

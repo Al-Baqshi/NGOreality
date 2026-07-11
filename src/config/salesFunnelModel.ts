@@ -50,7 +50,7 @@ export const WORKSPACE_MONTHLY_ARPU_CENTS =
 /** Display-only unit rows in the cash flow table (not stored as cents). */
 export const CASHFLOW_UNIT_ROWS = [
   { key: 'ngos_batch', label: 'NGOs onboarded (leads in pipeline / mo)' },
-  { key: 'badges', label: 'Units — Reality Badge sold ($100/yr)' },
+  { key: 'badges', label: 'Units — Reality Badge sold ($70/yr)' },
   { key: 'packages', label: 'Units — $650 landing + standards (ramps 1→6/mo)' },
   { key: 'workspace_new', label: 'Units — Workspace new paying orgs (mo)' },
   { key: 'workspace_active', label: 'Units — Workspace active subscribers' },
@@ -161,7 +161,7 @@ export function packageSalesNote(f: MonthFunnelSnapshot): string {
 }
 
 export function workspaceSalesNote(f: MonthFunnelSnapshot): string {
-  return `${f.workspaceActiveSubs} active orgs × $${(WORKSPACE_MONTHLY_ARPU_CENTS / 100).toFixed(2)}/mo MRR = $${(f.workspaceMrrCents / 100).toLocaleString()} ($25 admin + ~${WORKSPACE_AVG_EXTRA_SEATS} seats × $15)`;
+  return `${f.workspaceActiveSubs} active orgs × $${(WORKSPACE_MONTHLY_ARPU_CENTS / 100).toFixed(2)}/mo MRR = $${(f.workspaceMrrCents / 100).toLocaleString()} ($25 admin seat only — extra seats are upside)`;
 }
 
 export { monthlyInfraCostsCents, monthlyHostingCostsCents, monthlyAiDevCostsCents } from './saasOperatingCosts';

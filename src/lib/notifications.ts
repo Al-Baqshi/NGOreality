@@ -5,6 +5,7 @@ export type NotificationTemplate =
   | 'site_down'
   | 'badge_issued'
   | 'membership_welcome'
+  | 'badge_request_received'
   | OutreachEmailTemplate;
 
 function portalSignupUrl(): string {
@@ -62,6 +63,29 @@ function buildMessage(
           `— NGOreality`,
         ].join('\n'),
       };
+    case 'badge_request_received': {
+      const ref = extra?.paymentReference ?? 'NGR-…';
+      return {
+        subject: `[NGOreality] Application received — ${organizationName}`,
+        body: [
+          `Kia ora,`,
+          ``,
+          `Thank you for submitting your NGOreality verification request for ${organizationName}.`,
+          ``,
+          `We will review your organisation against our public trust standards and contact you if anything needs to be updated on your site.`,
+          ``,
+          `Typical timeline: about 5–10 business days after payment and standards are in order. Your Reality Badge is issued when standards pass and membership is active.`,
+          ``,
+          `Bank transfer — use this payment reference exactly: ${ref}`,
+          `Amount: NZD $70.00 annual membership`,
+          `Allow up to 3 business days after we receive your transfer for it to be applied.`,
+          ``,
+          `Stripe and Airwallet will be available in the portal when enabled.`,
+          ``,
+          `— NGOreality`,
+        ].join('\n'),
+      };
+    }
     case 'outreach_cold_invite':
       return {
         subject: `[NGOreality] Claim your organisation profile — ${organizationName}`,

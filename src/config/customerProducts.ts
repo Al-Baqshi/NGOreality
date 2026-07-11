@@ -10,8 +10,8 @@ export const ORGANISATION_WORKSPACE_TAGLINE =
 /** Organisation Workspace SaaS (NGO-facing; not staff CRM). */
 export const WORKSPACE_ADMIN_MONTHLY_CENTS = 2_500; // $25/mo per org admin
 export const WORKSPACE_SEAT_MONTHLY_CENTS = 1_500; // $15/mo per additional user
-/** Forecast average: 1 admin + 1.5 extra seats per paying org. */
-export const WORKSPACE_AVG_EXTRA_SEATS = 1.5;
+/** Forecast baseline: admin seat only ($25/org/mo). Extra seats are upside, not modelled. */
+export const WORKSPACE_AVG_EXTRA_SEATS = 0;
 
 /** Trust landing + standards onboarding package (fixed price). */
 export const LANDING_STANDARDS_PACKAGE_CENTS = 65_000; // $650 NZD

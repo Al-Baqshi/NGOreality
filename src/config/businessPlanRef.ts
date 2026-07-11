@@ -24,14 +24,14 @@ export const CASHFLOW_RECEIPT_LINES: CashflowLineDef[] = [
   {
     key: 'sales',
     section: 'receipt',
-    label: 'Membership — Reality Badge ($100/yr)',
+    label: 'Membership — Reality Badge ($70/yr)',
     paymentActualKey: 'sales',
   },
   { key: 'sales_other', section: 'receipt', label: 'Landing + standards package ($650)' },
   {
     key: 'workspace_saas',
     section: 'receipt',
-    label: 'Organisation Workspace SaaS ($25 admin + $15/user/mo)',
+    label: 'Organisation Workspace SaaS ($25/org/mo)',
   },
   { key: 'flexi_wage', section: 'receipt', label: 'Flexi-Wage' },
   { key: 'govt_grant', section: 'receipt', label: 'Govt. grant (capitalisation)' },
@@ -64,7 +64,7 @@ export const CASHFLOW_EXPENSE_GST_LINES: CashflowLineDef[] = [
     key: 'hosting_saas',
     section: 'expense_gst',
     label: 'Hosting & cloud (Vercel, DB, Resend)',
-    guide: 'Platform hosting: Vercel app, Postgres (Supabase/Neon), Resend email, domain — scales with members (~$80–120/mo at low volume).',
+    guide: 'Platform hosting: Vercel (~$35) + Postgres tier ($65→$140 as data grows) + Resend email ($25→$55 as outreach/alerts scale) + domain ($3). ≈ $128/mo at launch rising to ≈ $233/mo at full year-1 volume — scales with members, not a flat fee.',
     gst: true,
   },
   {

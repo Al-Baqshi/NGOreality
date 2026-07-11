@@ -305,7 +305,7 @@ export default function RealityBadge() {
               join as a member.
             </p>
             <p className="font-mono text-sm text-teal mb-8">
-              $100 NZD / year — Reality Badge, monitoring, and email alerts if your site goes down. Hands-on support
+              $70 NZD / year — Reality Badge, monitoring, and email alerts if your site goes down. Hands-on support
               and custom builds are separate.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">

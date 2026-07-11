@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { CATEGORIES } from '../../types';
 import { Send, CheckCircle } from 'lucide-react';
 import SEO from '../../components/SEO';
+import Turnstile, { isTurnstileEnabled } from '../../components/Turnstile';
+import { verifyTurnstileToken } from '../../lib/turnstile';
 import { usePublicOrganizationBySlug } from '../../hooks/useSupabase';
 import { isRegistryListed } from '../../types';
 
@@ -23,6 +25,8 @@ export default function Contact() {
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!listedOrg) return;
@@ -40,6 +44,23 @@ export default function Contact() {
     e.preventDefault();
     setError('');
 
+    if (isTurnstileEnabled() && !turnstileToken) {
+      setError('Please complete the security check.');
+      return;
+    }
+
+    setSubmitting(true);
+
+    if (isTurnstileEnabled() && turnstileToken) {
+      const verified = await verifyTurnstileToken(turnstileToken);
+      if (!verified) {
+        setError('Security check failed. Please try again.');
+        setTurnstileToken(null);
+        setSubmitting(false);
+        return;
+      }
+    }
+
     const { error: insertError } = await supabase.from('inquiry_submissions').insert({
       ...form,
       organization_id: organizationId,
@@ -47,9 +68,11 @@ export default function Contact() {
 
     if (insertError) {
       setError('Something went wrong. Please try again.');
+      setSubmitting(false);
       return;
     }
 
+    setSubmitting(false);
     setSubmitted(true);
   };
 
@@ -178,8 +201,18 @@ export default function Contact() {
 
               {error && <p className="text-accent text-sm font-mono">{error}</p>}
 
-              <button type="submit" className="btn-brutal-accent w-full flex items-center justify-center gap-2 text-base min-h-[44px]">
-                <Send size={16} /> Submit Inquiry
+              <Turnstile
+                onSuccess={setTurnstileToken}
+                onExpire={() => setTurnstileToken(null)}
+                onError={() => setTurnstileToken(null)}
+              />
+
+              <button
+                type="submit"
+                disabled={submitting || (isTurnstileEnabled() && !turnstileToken)}
+                className="btn-brutal-accent w-full flex items-center justify-center gap-2 text-base min-h-[44px] disabled:opacity-60"
+              >
+                <Send size={16} /> {submitting ? 'Submitting...' : 'Submit Inquiry'}
               </button>
             </form>
           )}

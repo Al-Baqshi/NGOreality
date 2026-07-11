@@ -28,44 +28,22 @@ import {
   type BusinessCashflowUnit,
 } from '../../lib/businessCashflowUnits';
 import {
-  BUSINESS_PLAN_METRIC_LABELS,
-  BUSINESS_PLAN_METRIC_ORDER,
-  MONEY_METRICS,
   type BusinessExpense,
   type BusinessPlanActual,
-  type BusinessPlanMetric,
-  type BusinessPlanTarget,
 } from '../../types';
 import {
-  actualForMetric,
-  currentMonthKey,
   deleteExpense,
   fetchActuals,
   fetchRecentExpenses,
-  fetchTargets,
-  formatMetricDelta,
-  formatMetricValue,
-  formatMonthLabel,
   insertExpense,
   forecastMonthKeys,
-  upsertTarget,
 } from '../../lib/businessPlan';
 import { downloadCashflowExcel } from '../../lib/businessCashflowExcel';
 import { patchDerivedLinesForPeriod, patchStoredLine, patchStoredUnit } from '../../lib/cashflowLocalPatch';
 
 const MONTHS_WINDOW = 12;
 
-type TargetMap = Record<string, Record<BusinessPlanMetric, BusinessPlanTarget | undefined>>;
 type ActualMap = Record<string, BusinessPlanActual | undefined>;
-
-function indexTargets(rows: BusinessPlanTarget[]): TargetMap {
-  const out: TargetMap = {};
-  for (const t of rows) {
-    if (!out[t.period]) out[t.period] = {} as Record<BusinessPlanMetric, BusinessPlanTarget | undefined>;
-    out[t.period][t.metric] = t;
-  }
-  return out;
-}
 
 function indexActuals(rows: BusinessPlanActual[]): ActualMap {
   const out: ActualMap = {};
@@ -73,24 +51,13 @@ function indexActuals(rows: BusinessPlanActual[]): ActualMap {
   return out;
 }
 
-function isTargetMet(metric: BusinessPlanMetric, expected: number, actual: number): boolean {
-  if (expected <= 0) return false;
-  if (metric === 'expense_cents') return actual <= expected;
-  return actual >= expected;
-}
-
 export default function CashFlow() {
   const periods = useMemo(() => forecastMonthKeys(MONTHS_WINDOW), []);
-  const currentPeriod = useMemo(() => currentMonthKey(), []);
 
-  const [targets, setTargets] = useState<TargetMap>({});
   const [actuals, setActuals] = useState<ActualMap>({});
   const [expenses, setExpenses] = useState<BusinessExpense[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [editing, setEditing] = useState<{ metric: BusinessPlanMetric; period: string } | null>(null);
-  const [editValue, setEditValue] = useState('');
 
   const [newExpense, setNewExpense] = useState({
     incurred_on: new Date().toISOString().slice(0, 10),
@@ -111,14 +78,12 @@ export default function CashFlow() {
     if (opts?.showSpinner !== false) setPageLoading(true);
     setError(null);
     try {
-      const [t, a, e, cf, units] = await Promise.all([
-        fetchTargets(periods),
+      const [a, e, cf, units] = await Promise.all([
         fetchActuals(periods),
         fetchRecentExpenses(50),
         fetchCashflowLines(periods),
         fetchCashflowUnits(periods),
       ]);
-      setTargets(indexTargets(t));
       setActuals(indexActuals(a));
       setExpenses(e);
       setCashflowStored(cf);
@@ -153,42 +118,6 @@ export default function CashFlow() {
       else await refresh({ showSpinner: false });
     })().finally(() => setSavingWorksheet(false));
   }, [pageLoading, cashflowStored.length, unitsStored.length, periods, refresh]);
-
-  const handleSaveTarget = async () => {
-    if (!editing) return;
-    const numeric = parseFloat(editValue);
-    if (Number.isNaN(numeric)) return;
-    const value = MONEY_METRICS.has(editing.metric) ? Math.round(numeric * 100) : Math.round(numeric);
-    const { error: err } = await upsertTarget({
-      period: editing.period,
-      metric: editing.metric,
-      expected_value: value,
-    });
-    if (err) setError(err);
-    else {
-      setEditing(null);
-      setEditValue('');
-      setTargets((prev) => {
-        const next = { ...prev };
-        if (!next[editing.period]) next[editing.period] = {} as TargetMap[string];
-        next[editing.period] = {
-          ...next[editing.period],
-          [editing.metric]: {
-            ...(next[editing.period]?.[editing.metric] ?? {
-              id: '',
-              period: editing.period,
-              metric: editing.metric,
-              notes: '',
-              created_at: '',
-              updated_at: '',
-            }),
-            expected_value: value,
-          },
-        };
-        return next;
-      });
-    }
-  };
 
   const handleAddExpense = async (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -365,21 +294,6 @@ export default function CashFlow() {
     downloadCashflowCsv(csv, `ngoreality-cashflow-${y}.csv`);
   };
 
-  const currentScore = useMemo(() => {
-    const periodTargets = targets[currentPeriod];
-    const periodActual = actuals[currentPeriod];
-    if (!periodTargets) return { met: 0, total: 0 };
-    let met = 0;
-    let total = 0;
-    for (const metric of BUSINESS_PLAN_METRIC_ORDER) {
-      const t = periodTargets[metric];
-      if (!t || t.expected_value <= 0) continue;
-      total++;
-      if (isTargetMet(metric, t.expected_value, actualForMetric(metric, periodActual))) met++;
-    }
-    return { met, total };
-  }, [targets, actuals, currentPeriod]);
-
   const yearRollup = useMemo(() => {
     let netExp = 0;
     let netAct = 0;
@@ -401,17 +315,17 @@ export default function CashFlow() {
   return (
     <div className="max-w-[90rem] mx-auto min-w-0 w-full">
       <Link
-        to="/plan"
+        to="/dashboard"
         className="inline-flex items-center gap-2 font-mono text-2xs uppercase tracking-wider text-ink-500 hover:text-ink-950 mb-2"
       >
-        <ArrowLeft size={14} /> Business plan
+        <ArrowLeft size={14} /> Dashboard
       </Link>
 
       <SectionHeader>Cash flow</SectionHeader>
       <p className="font-mono text-2xs text-ink-500 -mt-4 mb-4 max-w-3xl leading-relaxed">
         Units first ({batchRampLabel()}), then <span className="text-emerald-700">green</span> receipt lines and{' '}
-        <span className="text-red-700">red</span> costs. Workspace SaaS from month 2 ($25 admin + $15/user/mo).{' '}
-        <Link to="/plan" className="underline hover:text-ink-950">Business plan</Link>.
+        <span className="text-red-700">red</span> costs. Workspace SaaS from month 2 ($25/org/mo). Figures are
+        GST-inclusive; the business is not GST-registered, so no GST is remitted to IRD.
         {savingWorksheet && <span className="block mt-2 text-teal">Saving worksheet…</span>}
       </p>
 
@@ -425,7 +339,7 @@ export default function CashFlow() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 sm:gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-8">
         <MetricCard
           label="12-mo receipts (expected)"
           value={formatNzCurrency(yearRollup.receiptsExp)}
@@ -450,11 +364,6 @@ export default function CashFlow() {
           value={formatNzCurrency(yearRollup.closingExp)}
           sub="End balance in bank"
           currency
-        />
-        <MetricCard
-          label={`${formatMonthLabel(currentPeriod)} KPIs`}
-          value={currentScore.total === 0 ? '—' : `${currentScore.met}/${currentScore.total} met`}
-          sub="Membership targets"
         />
       </div>
 
@@ -498,76 +407,6 @@ export default function CashFlow() {
       </div>
 
       <CashflowYearOutlook periods={periods} totalsByPeriod={cashflowTotals} />
-
-      <SectionHeader>Membership KPIs</SectionHeader>
-      <div className="card-brutal overflow-hidden mb-12">
-        {pageLoading ? (
-          <p className="p-8 text-center text-sm text-ink-400">Loading…</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b-3 border-ink-950 font-mono text-2xs uppercase tracking-wider text-left">
-                  <th className="p-3">Metric</th>
-                  {periods.map((p) => (
-                    <th key={p} className="p-3 text-right whitespace-nowrap">
-                      {formatMonthLabel(p)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100">
-                {BUSINESS_PLAN_METRIC_ORDER.map((metric) => (
-                  <tr key={metric}>
-                    <td className="p-3 font-medium">{BUSINESS_PLAN_METRIC_LABELS[metric]}</td>
-                    {periods.map((period) => {
-                      const target = targets[period]?.[metric];
-                      const actual = actualForMetric(metric, actuals[period]);
-                      const expected = target?.expected_value ?? 0;
-                      const isEditing = editing?.metric === metric && editing.period === period;
-                      const displayedExpected = MONEY_METRICS.has(metric)
-                        ? (expected / 100).toString()
-                        : expected.toString();
-                      return (
-                        <td key={period} className="p-3 text-right whitespace-nowrap">
-                          {isEditing ? (
-                            <input
-                              type="number"
-                              value={editValue}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveTarget();
-                                if (e.key === 'Escape') setEditing(null);
-                              }}
-                              onBlur={handleSaveTarget}
-                              autoFocus
-                              className="w-24 border-2 border-ink-950 px-2 py-1 text-right font-mono text-xs"
-                            />
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditing({ metric, period });
-                                setEditValue(displayedExpected);
-                              }}
-                              className="hover:bg-ink-50 -m-1 p-1 w-full"
-                            >
-                              <div className="font-mono text-2xs text-ink-500">
-                                {expected > 0 ? formatMetricValue(metric, expected) : '—'}
-                              </div>
-                              <div className="font-semibold">{formatMetricValue(metric, actual)}</div>
-                            </button>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
 
       <SectionHeader>Expenses</SectionHeader>
       <form onSubmit={handleAddExpense} className="card-brutal p-4 mb-6 grid gap-3 md:grid-cols-6">

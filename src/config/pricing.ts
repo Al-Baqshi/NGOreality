@@ -1,7 +1,7 @@
 /** NGOreality list prices (NZD) — NZ launch; adjust for global later */
 
 /** Annual membership: Reality Badge + 12 months monitoring + down alerts */
-export const MEMBERSHIP_ANNUAL_CENTS = 10_000; // $100/year
+export const MEMBERSHIP_ANNUAL_CENTS = 7_000; // $70/year
 
 export const PRICING_CURRENCY = 'NZD';
 

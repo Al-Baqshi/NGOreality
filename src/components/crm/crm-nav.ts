@@ -10,7 +10,7 @@ import {
   Inbox,
   Kanban,
   LayoutDashboard,
-  LineChart,
+  // LineChart, // TODO: re-enable with the Business plan nav item
   ListTodo,
   Mail,
   Shield,
@@ -43,7 +43,8 @@ export const CRM_NAV_GROUPS: CrmNavGroup[] = [
   {
     label: 'Finance',
     items: [
-      { to: '/plan', icon: LineChart, label: 'Business plan' },
+      // TODO: re-enable once external business plan is finalized
+      // { to: '/plan', icon: LineChart, label: 'Business plan' },
       { to: '/cash-flow', icon: Table2, label: 'Cash flow' },
     ],
   },

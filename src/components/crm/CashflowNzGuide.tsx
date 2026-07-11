@@ -59,6 +59,11 @@ export default function CashflowNzGuide() {
             <p className="mt-4 text-2xs text-ink-500 font-mono leading-relaxed border-t border-ink-100 pt-3">
               {GLOBAL_TAX_NOTE}
             </p>
+            <p className="mt-2 text-2xs text-ink-700 font-mono leading-relaxed">
+              NGOreality position: <span className="font-semibold">not GST-registered</span> — all figures
+              are GST-inclusive and no GST is remitted to IRD. Revisit if turnover approaches the $60k
+              registration threshold.
+            </p>
             <p className="mt-2 text-2xs text-ink-400 italic">Confirm GST registration and line treatment with your accountant.</p>
           </div>
         </div>

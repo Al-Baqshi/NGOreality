@@ -13,7 +13,8 @@ import OutreachBoard from './pages/crm/OutreachBoard';
 import InboundQueue from './pages/crm/InboundQueue';
 import CustomersList from './pages/crm/CustomersList';
 import PaymentsList from './pages/crm/PaymentsList';
-import BusinessPlan from './pages/crm/BusinessPlan';
+// TODO: re-enable once external business plan is finalized
+// import BusinessPlan from './pages/crm/BusinessPlan';
 import CashFlow from './pages/crm/CashFlow';
 import WorkQueue from './pages/crm/WorkQueue';
 import CrmBadges from './pages/crm/CrmBadges';
@@ -79,7 +80,8 @@ export default function App() {
             <Route path="/inbound" element={<InboundQueue />} />
             <Route path="/customers" element={<CustomersList />} />
             <Route path="/payments" element={<PaymentsList />} />
-            <Route path="/plan" element={<BusinessPlan />} />
+            {/* TODO: re-enable once external business plan is finalized */}
+            {/* <Route path="/plan" element={<BusinessPlan />} /> */}
             <Route path="/cash-flow" element={<CashFlow />} />
             <Route path="/work-queue" element={<WorkQueue />} />
             <Route path="/badges" element={<CrmBadges />} />

@@ -22,6 +22,7 @@ type Config struct {
 	ResendAPIKey          string
 	NotifyFromEmail       string
 	NotifyStaffEmail      string
+	TurnstileSecretKey    string
 }
 
 func Load() (Config, error) {
@@ -79,6 +80,7 @@ func Load() (Config, error) {
 		ResendAPIKey:          strings.TrimSpace(os.Getenv("RESEND_API_KEY")),
 		NotifyFromEmail:       envString("NOTIFY_FROM_EMAIL", "NGOreality <notifications@ngoreality.com>"),
 		NotifyStaffEmail:      strings.TrimSpace(os.Getenv("NOTIFY_STAFF_EMAIL")),
+		TurnstileSecretKey:    strings.TrimSpace(os.Getenv("TURNSTILE_SECRET_KEY")),
 	}, nil
 }
 
