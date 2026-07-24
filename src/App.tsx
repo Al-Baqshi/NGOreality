@@ -1,58 +1,78 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import CRMLayout from './components/Layout';
 import PublicLayout from './components/PublicLayout';
-import Dashboard from './pages/crm/Dashboard';
-import OrganizationsList from './pages/crm/OrganizationsList';
-import OrganizationDetail from './pages/crm/OrganizationDetail';
-import OrganizationNew from './pages/crm/OrganizationNew';
-import Verification from './pages/crm/Verification';
-import Contacts from './pages/crm/Contacts';
-import Inquiries from './pages/crm/Inquiries';
-import BlogManager from './pages/crm/BlogManager';
-import OutreachBoard from './pages/crm/OutreachBoard';
-import InboundQueue from './pages/crm/InboundQueue';
-import CustomersList from './pages/crm/CustomersList';
-import PaymentsList from './pages/crm/PaymentsList';
-// TODO: re-enable once external business plan is finalized
-// import BusinessPlan from './pages/crm/BusinessPlan';
-import CashFlow from './pages/crm/CashFlow';
-import WorkQueue from './pages/crm/WorkQueue';
-import CrmBadges from './pages/crm/CrmBadges';
-import Monitoring from './pages/crm/Monitoring';
-import CrmNotificationInbox from './pages/crm/CrmNotificationInbox';
-import EmailNotifications from './pages/crm/EmailNotifications';
-import Homepage from './pages/public/Homepage';
-import HowItWorks from './pages/public/HowItWorks';
-import Directory from './pages/public/Directory';
-import VerificationPublic from './pages/public/Verification';
-import RealityBadge from './pages/public/RealityBadge';
-import Verified from './pages/public/Verified';
-import Blog from './pages/public/Blog';
-import BlogDetail from './pages/public/BlogDetail';
-import About from './pages/public/About';
-import Contact from './pages/public/Contact';
-import BusinessPlanGate from './pages/public/BusinessPlanGate';
-import PrivacyPolicy from './pages/public/PrivacyPolicy';
-import TermsOfService from './pages/public/TermsOfService';
-import OrganizationProfile from './pages/public/OrganizationProfile';
-import NotFound from './pages/public/NotFound';
-import NgoLogin from './pages/ngo/NgoLogin';
-import NgoSignup from './pages/ngo/NgoSignup';
-import NgoLayout from './components/NgoLayout';
-import NgoPortalGate from './components/ngo/NgoPortalGate';
-import NgoOverviewPage from './pages/ngo/portal/NgoOverviewPage';
-import NgoProfilePage from './pages/ngo/portal/NgoProfilePage';
-import NgoSetupRequestPage from './pages/ngo/portal/NgoSetupRequestPage';
-import NgoMembershipPage from './pages/ngo/portal/NgoMembershipPage';
-import NgoStandardsPage from './pages/ngo/portal/NgoStandardsPage';
-import NgoBadgePage from './pages/ngo/portal/NgoBadgePage';
-import NgoMonitoringPage from './pages/ngo/portal/NgoMonitoringPage';
-import NgoRequestsPage from './pages/ngo/portal/NgoRequestsPage';
-import NgoNotificationsPage from './pages/ngo/portal/NgoNotificationsPage';
-import NgoProtectedRoute from './components/NgoProtectedRoute';
 import StaffProtectedRoute from './components/StaffProtectedRoute';
-import StaffLogin from './pages/staff/StaffLogin';
+import NgoProtectedRoute from './components/NgoProtectedRoute';
 import { isSupabaseConfigured } from './lib/supabase';
+
+/* Route-level code splitting: the public site (homepage, directory, org
+   profiles) no longer ships the CRM, NGO portal, or their heavy libraries
+   (recharts, jspdf, exceljs, html2canvas). Each page loads on demand. */
+
+// Public
+const Homepage = lazy(() => import('./pages/public/Homepage'));
+const HowItWorks = lazy(() => import('./pages/public/HowItWorks'));
+const Directory = lazy(() => import('./pages/public/Directory'));
+const VerificationPublic = lazy(() => import('./pages/public/Verification'));
+const RealityBadge = lazy(() => import('./pages/public/RealityBadge'));
+const Verified = lazy(() => import('./pages/public/Verified'));
+const Blog = lazy(() => import('./pages/public/Blog'));
+const BlogDetail = lazy(() => import('./pages/public/BlogDetail'));
+const About = lazy(() => import('./pages/public/About'));
+const Contact = lazy(() => import('./pages/public/Contact'));
+const BusinessPlanGate = lazy(() => import('./pages/public/BusinessPlanGate'));
+const PrivacyPolicy = lazy(() => import('./pages/public/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/public/TermsOfService'));
+const OrganizationProfile = lazy(() => import('./pages/public/OrganizationProfile'));
+const NotFound = lazy(() => import('./pages/public/NotFound'));
+
+// Staff CRM
+const CRMLayout = lazy(() => import('./components/Layout'));
+const StaffLogin = lazy(() => import('./pages/staff/StaffLogin'));
+const Dashboard = lazy(() => import('./pages/crm/Dashboard'));
+const OrganizationsList = lazy(() => import('./pages/crm/OrganizationsList'));
+const OrganizationDetail = lazy(() => import('./pages/crm/OrganizationDetail'));
+const OrganizationNew = lazy(() => import('./pages/crm/OrganizationNew'));
+const Verification = lazy(() => import('./pages/crm/Verification'));
+const Contacts = lazy(() => import('./pages/crm/Contacts'));
+const Inquiries = lazy(() => import('./pages/crm/Inquiries'));
+const BlogManager = lazy(() => import('./pages/crm/BlogManager'));
+const OutreachBoard = lazy(() => import('./pages/crm/OutreachBoard'));
+const InboundQueue = lazy(() => import('./pages/crm/InboundQueue'));
+const CustomersList = lazy(() => import('./pages/crm/CustomersList'));
+const PaymentsList = lazy(() => import('./pages/crm/PaymentsList'));
+const CashFlow = lazy(() => import('./pages/crm/CashFlow'));
+const WorkQueue = lazy(() => import('./pages/crm/WorkQueue'));
+const CrmBadges = lazy(() => import('./pages/crm/CrmBadges'));
+const Monitoring = lazy(() => import('./pages/crm/Monitoring'));
+const CrmNotificationInbox = lazy(() => import('./pages/crm/CrmNotificationInbox'));
+const EmailNotifications = lazy(() => import('./pages/crm/EmailNotifications'));
+
+// NGO Portal
+const NgoLogin = lazy(() => import('./pages/ngo/NgoLogin'));
+const NgoSignup = lazy(() => import('./pages/ngo/NgoSignup'));
+const NgoLayout = lazy(() => import('./components/NgoLayout'));
+const NgoPortalGate = lazy(() => import('./components/ngo/NgoPortalGate'));
+const NgoOverviewPage = lazy(() => import('./pages/ngo/portal/NgoOverviewPage'));
+const NgoProfilePage = lazy(() => import('./pages/ngo/portal/NgoProfilePage'));
+const NgoSetupRequestPage = lazy(() => import('./pages/ngo/portal/NgoSetupRequestPage'));
+const NgoMembershipPage = lazy(() => import('./pages/ngo/portal/NgoMembershipPage'));
+const NgoStandardsPage = lazy(() => import('./pages/ngo/portal/NgoStandardsPage'));
+const NgoBadgePage = lazy(() => import('./pages/ngo/portal/NgoBadgePage'));
+const NgoMonitoringPage = lazy(() => import('./pages/ngo/portal/NgoMonitoringPage'));
+const NgoRequestsPage = lazy(() => import('./pages/ngo/portal/NgoRequestsPage'));
+const NgoNotificationsPage = lazy(() => import('./pages/ngo/portal/NgoNotificationsPage'));
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center" role="status" aria-live="polite">
+      <div className="flex items-center gap-3 font-mono text-2xs uppercase tracking-[0.3em] text-ink-400">
+        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-teal" />
+        Loading…
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   return (
@@ -66,75 +86,77 @@ export default function App() {
           <code className="normal-case">.env.local</code> and add your project URL and anon key.
         </div>
       )}
-      <Routes>
-        {/* Staff CRM */}
-        <Route path="/staff/login" element={<StaffLogin />} />
-        <Route element={<StaffProtectedRoute />}>
-          <Route element={<CRMLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/organizations" element={<OrganizationsList />} />
-            <Route path="/organizations/new" element={<OrganizationNew />} />
-            <Route path="/organizations/:id" element={<OrganizationDetail />} />
-            <Route path="/verification" element={<Verification />} />
-            <Route path="/outreach" element={<OutreachBoard />} />
-            <Route path="/inbound" element={<InboundQueue />} />
-            <Route path="/customers" element={<CustomersList />} />
-            <Route path="/payments" element={<PaymentsList />} />
-            {/* TODO: re-enable once external business plan is finalized */}
-            {/* <Route path="/plan" element={<BusinessPlan />} /> */}
-            <Route path="/cash-flow" element={<CashFlow />} />
-            <Route path="/work-queue" element={<WorkQueue />} />
-            <Route path="/badges" element={<CrmBadges />} />
-            <Route path="/monitoring" element={<Monitoring />} />
-            <Route path="/notifications" element={<CrmNotificationInbox />} />
-            <Route path="/email-notifications" element={<EmailNotifications />} />
-            <Route path="/contacts" element={<Contacts />} />
-            <Route path="/inquiries" element={<Inquiries />} />
-            <Route path="/blog-manager" element={<BlogManager />} />
-          </Route>
-        </Route>
-
-        {/* NGO Portal */}
-        <Route path="/ngo/login" element={<NgoLogin />} />
-        <Route path="/ngo/signup" element={<NgoSignup />} />
-        <Route element={<NgoProtectedRoute />}>
-          <Route path="/ngo" element={<NgoLayout />}>
-            <Route element={<NgoPortalGate />}>
-              <Route index element={<NgoOverviewPage />} />
-              <Route path="profile" element={<NgoProfilePage />} />
-              <Route path="setup-request" element={<NgoSetupRequestPage />} />
-              <Route path="membership" element={<NgoMembershipPage />} />
-              <Route path="standards" element={<NgoStandardsPage />} />
-              <Route path="badge" element={<NgoBadgePage />} />
-              <Route path="monitoring" element={<NgoMonitoringPage />} />
-              <Route path="requests" element={<NgoRequestsPage />} />
-              <Route path="notifications" element={<NgoNotificationsPage />} />
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          {/* Staff CRM */}
+          <Route path="/staff/login" element={<StaffLogin />} />
+          <Route element={<StaffProtectedRoute />}>
+            <Route element={<CRMLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/organizations" element={<OrganizationsList />} />
+              <Route path="/organizations/new" element={<OrganizationNew />} />
+              <Route path="/organizations/:id" element={<OrganizationDetail />} />
+              <Route path="/verification" element={<Verification />} />
+              <Route path="/outreach" element={<OutreachBoard />} />
+              <Route path="/inbound" element={<InboundQueue />} />
+              <Route path="/customers" element={<CustomersList />} />
+              <Route path="/payments" element={<PaymentsList />} />
+              {/* TODO: re-enable once external business plan is finalized */}
+              {/* <Route path="/plan" element={<BusinessPlan />} /> */}
+              <Route path="/cash-flow" element={<CashFlow />} />
+              <Route path="/work-queue" element={<WorkQueue />} />
+              <Route path="/badges" element={<CrmBadges />} />
+              <Route path="/monitoring" element={<Monitoring />} />
+              <Route path="/notifications" element={<CrmNotificationInbox />} />
+              <Route path="/email-notifications" element={<EmailNotifications />} />
+              <Route path="/contacts" element={<Contacts />} />
+              <Route path="/inquiries" element={<Inquiries />} />
+              <Route path="/blog-manager" element={<BlogManager />} />
             </Route>
           </Route>
-        </Route>
 
-        {/* Public Routes */}
-        <Route path="/public" element={<PublicLayout />}>
-          <Route index element={<Homepage />} />
-          <Route path="how-it-works" element={<HowItWorks />} />
-          <Route path="directory" element={<Directory />} />
-          <Route path="org/:slug" element={<OrganizationProfile />} />
-          <Route path="verified" element={<Verified />} />
-          <Route path="reality-badge" element={<RealityBadge />} />
-          <Route path="verification" element={<VerificationPublic />} />
-          <Route path="blog" element={<Blog />} />
-          <Route path="blog/:slug" element={<BlogDetail />} />
-          <Route path="about" element={<About />} />
-          <Route path="contact" element={<Contact />} />
-          <Route path="business-plan" element={<BusinessPlanGate />} />
-          <Route path="privacy" element={<PrivacyPolicy />} />
-          <Route path="terms" element={<TermsOfService />} />
-        </Route>
+          {/* NGO Portal */}
+          <Route path="/ngo/login" element={<NgoLogin />} />
+          <Route path="/ngo/signup" element={<NgoSignup />} />
+          <Route element={<NgoProtectedRoute />}>
+            <Route path="/ngo" element={<NgoLayout />}>
+              <Route element={<NgoPortalGate />}>
+                <Route index element={<NgoOverviewPage />} />
+                <Route path="profile" element={<NgoProfilePage />} />
+                <Route path="setup-request" element={<NgoSetupRequestPage />} />
+                <Route path="membership" element={<NgoMembershipPage />} />
+                <Route path="standards" element={<NgoStandardsPage />} />
+                <Route path="badge" element={<NgoBadgePage />} />
+                <Route path="monitoring" element={<NgoMonitoringPage />} />
+                <Route path="requests" element={<NgoRequestsPage />} />
+                <Route path="notifications" element={<NgoNotificationsPage />} />
+              </Route>
+            </Route>
+          </Route>
 
-        {/* Default redirect */}
-        <Route path="/" element={<Navigate to="/public" replace />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+          {/* Public Routes */}
+          <Route path="/public" element={<PublicLayout />}>
+            <Route index element={<Homepage />} />
+            <Route path="how-it-works" element={<HowItWorks />} />
+            <Route path="directory" element={<Directory />} />
+            <Route path="org/:slug" element={<OrganizationProfile />} />
+            <Route path="verified" element={<Verified />} />
+            <Route path="reality-badge" element={<RealityBadge />} />
+            <Route path="verification" element={<VerificationPublic />} />
+            <Route path="blog" element={<Blog />} />
+            <Route path="blog/:slug" element={<BlogDetail />} />
+            <Route path="about" element={<About />} />
+            <Route path="contact" element={<Contact />} />
+            <Route path="business-plan" element={<BusinessPlanGate />} />
+            <Route path="privacy" element={<PrivacyPolicy />} />
+            <Route path="terms" element={<TermsOfService />} />
+          </Route>
+
+          {/* Default redirect */}
+          <Route path="/" element={<Navigate to="/public" replace />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

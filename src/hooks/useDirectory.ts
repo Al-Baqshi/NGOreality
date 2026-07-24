@@ -5,6 +5,11 @@ import type { Organization } from '../types';
 const DIRECTORY_STATUSES = ['listed', 'verified', 'active'] as const;
 const PAGE_SIZE = 48;
 
+/* Only the columns the directory cards render — avoids shipping every org
+   column (financials, contact details, timestamps) for each listed row. */
+const DIRECTORY_CARD_COLUMNS =
+  'id,slug,name,charity_registration_number,description,mission_statement,location,country,tags,status,verification_level';
+
 export type DirectoryPageFilters = {
   country?: string;
   search?: string;
@@ -83,7 +88,7 @@ export function useDirectoryPage(filters: DirectoryPageFilters, page: number) {
 
     let q = supabase
       .from('organizations')
-      .select('*', { count: 'exact' })
+      .select(DIRECTORY_CARD_COLUMNS, { count: 'exact' })
       .in('status', [...DIRECTORY_STATUSES])
       .order('name', { ascending: true });
 
@@ -101,7 +106,8 @@ export function useDirectoryPage(filters: DirectoryPageFilters, page: number) {
 
     const { data, error, count } = await q.range(from, to);
     if (!error && data) {
-      setOrganizations(data);
+      // Narrowed column set (DIRECTORY_CARD_COLUMNS) — the cards only read these fields.
+      setOrganizations(data as unknown as Organization[]);
       setTotalCount(count ?? 0);
     }
     setLoading(false);
