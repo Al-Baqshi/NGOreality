@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   useDirectoryCountryCounts,
   useDirectoryPage,
@@ -16,10 +16,13 @@ import { formatTagLabel } from '../../lib/tags';
 const DEFAULT_COUNTRY = 'NZ';
 
 export default function Directory() {
+  const [searchParams] = useSearchParams();
+  const initialQuery = searchParams.get('q')?.trim() ?? '';
+  const initialCountry = searchParams.get('country')?.trim().toUpperCase() || DEFAULT_COUNTRY;
   const { counts: countryCounts, nzTotal } = useDirectoryCountryCounts();
-  const [search, setSearch] = useState('');
-  const [searchDebounced, setSearchDebounced] = useState('');
-  const [selectedCountry, setSelectedCountry] = useState(DEFAULT_COUNTRY);
+  const [search, setSearch] = useState(initialQuery);
+  const [searchDebounced, setSearchDebounced] = useState(initialQuery);
+  const [selectedCountry, setSelectedCountry] = useState(initialCountry);
   const [selectedTag, setSelectedTag] = useState('');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [page, setPage] = useState(1);

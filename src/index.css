@@ -229,6 +229,57 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Bright gradient text — reads clearly on the dark hero (fixes dark-on-dark) */
+  .text-gradient-teal {
+    background-image: linear-gradient(100deg, #5eead4 0%, #2dd4bf 42%, #38bdf8 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Subtle blueprint grid for hero backdrops */
+  .bg-grid-hero {
+    background-image:
+      linear-gradient(to right, rgba(148, 197, 214, 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(148, 197, 214, 0.08) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .will-parallax {
+    will-change: transform;
+  }
+
+  .animate-float-slow {
+    animation: ngo-float 9s ease-in-out infinite;
+  }
+
+  .animate-float-slower {
+    animation: ngo-float 13s ease-in-out infinite;
+  }
+
+  .animate-pulse-ring {
+    animation: ngo-pulse-ring 2.4s ease-out infinite;
+  }
+}
+
+@keyframes ngo-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, -26px, 0) scale(1.06); }
+}
+
+@keyframes ngo-pulse-ring {
+  0% { transform: scale(0.7); opacity: 0.9; }
+  70% { transform: scale(2.4); opacity: 0; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-slow,
+  .animate-float-slower,
+  .animate-pulse-ring {
+    animation: none !important;
+  }
 }
 
 @media print {
@@ -303,6 +354,9 @@
   --color-teal: #1a7a6d;
   --color-teal-hover: #146358;
   --color-teal-light: var(--teal-light);
+  --color-glow-teal: #2dd4bf;
+  --color-glow-mint: #5eead4;
+  --color-glow-sky: #38bdf8;
   --color-surface: var(--surface-default);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
