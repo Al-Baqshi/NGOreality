@@ -33,6 +33,10 @@ export default {
           raised: 'var(--surface-raised)',
           overlay: 'var(--surface-overlay)',
         },
+        glow: {
+          gold: '#EBBB57',
+          light: '#f5d78a',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],

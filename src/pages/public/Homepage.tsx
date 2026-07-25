@@ -60,10 +60,10 @@ function LiveClock() {
   return (
     <div className="inline-flex items-center gap-3 border border-white/15 bg-white/5 px-4 py-2 backdrop-blur-sm">
       <span className="relative flex h-2.5 w-2.5 shrink-0">
-        <span className="animate-pulse-ring absolute inline-flex h-full w-full rounded-full bg-glow-teal" />
-        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-glow-teal" />
+        <span className="animate-pulse-ring absolute inline-flex h-full w-full rounded-full bg-glow-gold" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-glow-gold" />
       </span>
-      <Clock size={13} className="text-glow-teal shrink-0" aria-hidden />
+      <Clock size={13} className="text-glow-gold shrink-0" aria-hidden />
       <span className="font-mono text-2xs uppercase tracking-wider text-ink-200">{date}</span>
       <span className="font-mono text-sm font-semibold tabular-nums tracking-wider text-white" aria-live="off">
         {time}
@@ -172,20 +172,20 @@ export default function Homepage() {
         <section
           ref={heroRef}
           className="relative isolate overflow-hidden border-b-3 border-ink-950 text-white"
-          style={{ background: 'radial-gradient(120% 120% at 15% 0%, #24404b 0%, #172830 45%, #0f1c22 100%)' }}
+          style={{ background: 'radial-gradient(120% 120% at 15% 0%, #0a2647 0%, #041C3C 45%, #030e1e 100%)' }}
         >
           {/* Decorative parallax layers */}
           <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
             <div className="bg-grid-hero will-parallax absolute inset-0 opacity-60" style={gridStyle} />
             <div
               className="animate-float-slow will-parallax absolute -left-24 top-[-6rem] h-[26rem] w-[26rem] rounded-full opacity-40 blur-3xl"
-              style={{ ...blobA, background: 'radial-gradient(circle, #2dd4bf 0%, transparent 70%)' }}
+              style={{ ...blobA, background: 'radial-gradient(circle, #EBBB57 0%, transparent 70%)' }}
             />
             <div
               className="animate-float-slower will-parallax absolute right-[-8rem] top-24 h-[30rem] w-[30rem] rounded-full opacity-30 blur-3xl"
-              style={{ ...blobB, background: 'radial-gradient(circle, #38bdf8 0%, transparent 70%)' }}
+              style={{ ...blobB, background: 'radial-gradient(circle, #f5d78a 0%, transparent 70%)' }}
             />
-            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#0f1c22] to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#041C3C] to-transparent" />
           </div>
 
           <div className="mx-auto max-w-7xl px-6 py-20 md:py-28" style={contentStyle}>
@@ -193,8 +193,8 @@ export default function Homepage() {
               <div className="max-w-3xl lg:flex-1">
                 <div className="mb-6 flex flex-wrap items-center gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-px w-12 bg-glow-teal" />
-                    <span className="font-mono text-2xs uppercase tracking-[0.3em] text-glow-mint">
+                    <div className="h-px w-12 bg-glow-gold" />
+                    <span className="font-mono text-2xs uppercase tracking-[0.3em] text-glow-light">
                       Digital Trust Infrastructure
                     </span>
                   </div>
@@ -223,7 +223,7 @@ export default function Homepage() {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                   <Link
                     to="/public/contact"
-                    className="btn-brutal-accent flex items-center justify-center gap-2 text-base"
+                    className="btn-brutal-gold flex items-center justify-center gap-2 text-base"
                   >
                     Get Verified <ArrowRight size={18} />
                   </Link>
@@ -249,7 +249,7 @@ export default function Homepage() {
                 { value: 'Live', label: 'Verification' },
                 { value: '24/7', label: 'Public directory' },
               ].map((stat) => (
-                <div key={stat.label} className="bg-[#132229]/80 px-5 py-5 backdrop-blur-sm">
+                <div key={stat.label} className="bg-[#041C3C]/80 px-5 py-5 backdrop-blur-sm">
                   <div className="text-2xl font-black tracking-tight text-white md:text-3xl">{stat.value}</div>
                   <div className="mt-1 font-mono text-2xs uppercase tracking-wider text-ink-300">{stat.label}</div>
                 </div>
@@ -301,11 +301,11 @@ export default function Homepage() {
 
         {/* Solution */}
         <section className="relative overflow-hidden border-b-3 border-ink-950 bg-surface-overlay">
-          <div className="pointer-events-none absolute -left-20 bottom-0 -z-10 h-80 w-80 rounded-full bg-teal/5 blur-3xl" aria-hidden />
+          <div className="pointer-events-none absolute -left-20 bottom-0 -z-10 h-80 w-80 rounded-full bg-gold/5 blur-3xl" aria-hidden />
           <div className="mx-auto max-w-7xl px-6 py-16 md:py-24">
             <div className="mb-12 max-w-2xl">
               <div className="mb-4 flex items-center gap-3">
-                <div className="h-px w-12 bg-teal" />
+                <div className="h-px w-12 bg-gold" />
                 <span className="font-mono text-2xs uppercase tracking-[0.3em] text-ink-400">The Solution</span>
               </div>
               <h2 className="text-3xl font-black uppercase tracking-tight md:text-4xl">Three layers of trust</h2>
@@ -325,16 +325,16 @@ export default function Homepage() {
                   title: 'Verification',
                   description:
                     'Organizations that meet our standards receive a public verification badge — a clear, instant trust signal.',
-                  border: 'border-t-teal',
-                  chip: 'bg-teal text-white',
+                  border: 'border-t-gold',
+                  chip: 'bg-gold text-white',
                 },
                 {
                   icon: <Eye size={22} />,
                   title: 'Transparency',
                   description:
                     'Impact updates and public dashboards convert complex reporting into clear trust signals. Financial transparency tools coming soon.',
-                  border: 'border-t-accent',
-                  chip: 'bg-accent text-white',
+                  border: 'border-t-ink-950',
+                  chip: 'bg-ink-950 text-white',
                 },
               ].map((item, idx) => (
                 <div key={item.title} className={`card-brutal-hover border-t-4 p-6 ${item.border}`}>
@@ -358,7 +358,7 @@ export default function Homepage() {
             <div className="grid grid-cols-1 gap-12 md:grid-cols-2">
               <div>
                 <div className="mb-4 flex items-center gap-3">
-                  <div className="h-px w-12 bg-teal" />
+                  <div className="h-px w-12 bg-gold" />
                   <span className="font-mono text-2xs uppercase tracking-[0.3em] text-ink-400">For Nonprofits</span>
                 </div>
                 <h2 className="mb-6 text-3xl font-black uppercase tracking-tight">
@@ -373,7 +373,7 @@ export default function Homepage() {
                     'Ongoing support and maintenance',
                   ].map((item) => (
                     <li key={item} className="flex items-start gap-3">
-                      <CheckCircle size={16} className="mt-0.5 shrink-0 text-teal" />
+                      <CheckCircle size={16} className="mt-0.5 shrink-0 text-gold" />
                       <span className="text-sm text-ink-600">{item}</span>
                     </li>
                   ))}
@@ -381,7 +381,7 @@ export default function Homepage() {
               </div>
               <div>
                 <div className="mb-4 flex items-center gap-3">
-                  <div className="h-px w-12 bg-accent" />
+                  <div className="h-px w-12 bg-gold" />
                   <span className="font-mono text-2xs uppercase tracking-[0.3em] text-ink-400">For The Public</span>
                 </div>
                 <h2 className="mb-6 text-3xl font-black uppercase tracking-tight">Instant trust signal</h2>
@@ -394,7 +394,7 @@ export default function Homepage() {
                     'Standardized digital expectations',
                   ].map((item) => (
                     <li key={item} className="flex items-start gap-3">
-                      <CheckCircle size={16} className="mt-0.5 shrink-0 text-accent" />
+                      <CheckCircle size={16} className="mt-0.5 shrink-0 text-gold" />
                       <span className="text-sm text-ink-600">{item}</span>
                     </li>
                   ))}
@@ -407,7 +407,7 @@ export default function Homepage() {
         {/* CTA */}
         <section
           className="relative overflow-hidden text-white"
-          style={{ background: 'radial-gradient(120% 120% at 85% 100%, #24404b 0%, #172830 50%, #0f1c22 100%)' }}
+          style={{ background: 'radial-gradient(120% 120% at 85% 100%, #0a2647 0%, #041C3C 50%, #030e1e 100%)' }}
         >
           <div className="bg-grid-hero pointer-events-none absolute inset-0 opacity-40" aria-hidden />
           <div className="relative mx-auto max-w-7xl px-6 py-16 text-center md:py-24">
@@ -417,7 +417,7 @@ export default function Homepage() {
             <p className="mx-auto mb-8 max-w-lg text-ink-200">
               Join the organizations that are setting the standard for nonprofit transparency and digital credibility.
             </p>
-            <Link to="/public/contact" className="btn-brutal-accent inline-flex items-center gap-2 text-base">
+            <Link to="/public/contact" className="btn-brutal-gold inline-flex items-center gap-2 text-base">
               Get Verified <ArrowRight size={18} />
             </Link>
           </div>
