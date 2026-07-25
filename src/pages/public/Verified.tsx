@@ -147,13 +147,11 @@ export default function Verified() {
             {filtered.map((org) => (
               <div key={org.id} className="card-brutal-hover p-6">
                 <div className="flex items-start gap-3 mb-4">
-                  <div className={`flex h-12 w-12 items-center justify-center border-2 shrink-0 font-mono text-lg font-black
-                    ${FINANCIAL_VERIFICATION_ENABLED && org.verification_level === 'transparent_financial'
-                      ? 'border-accent bg-accent-light text-accent'
-                      : 'border-teal bg-teal-light text-teal'
-                    }`}>
-                    {org.name.charAt(0)}
-                  </div>
+                  <img
+                    src="/reality-badge.png"
+                    alt="NGOreality Reality Badge"
+                    className="w-12 h-12 object-contain shrink-0"
+                  />
                   <div>
                     <h3 className="text-base font-bold">{org.name}</h3>
                     <div className="flex items-center gap-2 mt-1">

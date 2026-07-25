@@ -40,6 +40,7 @@ export default function RealityBadge() {
         title="Reality Badge"
         description="The NGOreality Reality Badge is a public trust signal for nonprofits — digital independence, cybersecurity, and data privacy standards. Financial transparency tier coming soon."
         path="/public/reality-badge"
+        image="/reality-badge.png"
       />
       <BreadcrumbJsonLd items={[{ name: 'Home', path: '/public' }, { name: 'Reality Badge', path: '/public/reality-badge' }]} />
       <div>
@@ -259,11 +260,11 @@ export default function RealityBadge() {
               <div className="flex flex-col items-center gap-6">
                 {/* Verified Badge */}
                 <div className="card-brutal p-6 text-center w-full max-w-xs">
-                  <div className="flex items-center justify-center mb-3">
-                    <div className="flex h-16 w-16 items-center justify-center border-3 border-teal bg-teal-light">
-                      <Shield size={32} className="text-teal" />
-                    </div>
-                  </div>
+                  <img
+                    src="/reality-badge.png"
+                    alt="NGOreality Reality Badge"
+                    className="w-24 h-24 mx-auto mb-3 object-contain"
+                  />
                   <div className="font-mono text-xs uppercase tracking-[0.2em] text-teal font-bold mb-1">Verified Nonprofit</div>
                   <div className="font-mono text-2xs text-ink-400 tracking-wider">REAL-2026-001</div>
                   <div className="mt-3 pt-3 border-t-2 border-ink-100">
