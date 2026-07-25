@@ -84,9 +84,7 @@ export default function RealityBadge() {
               {/* Verified Tier */}
               <div className="card-brutal p-6 border-t-4 border-t-teal">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="flex h-12 w-12 items-center justify-center border-3 border-teal bg-teal-light">
-                    <Shield size={24} className="text-teal" />
-                  </div>
+                  <img src="/reality-badge.png" alt="NGOreality Reality Badge" className="w-12 h-12 object-contain shrink-0" />
                   <div>
                     <h3 className="text-xl font-black uppercase tracking-tight">Verified</h3>
                     <span className="badge-verified">Digital & Operational</span>
