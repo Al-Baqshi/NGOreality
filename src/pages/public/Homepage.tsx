@@ -219,7 +219,7 @@ export default function Homepage() {
                 </p>
               </div>
 
-              <div className="flex flex-col gap-4 sm:flex-row">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                 <Link
                   to="/public/contact"
                   className="btn-brutal-accent flex items-center justify-center gap-2 text-base"
@@ -232,6 +232,7 @@ export default function Homepage() {
                 >
                   View Directory
                 </Link>
+                <img src="/reality-badge.png" alt="NGOreality Reality Badge" className="h-14 w-14 object-contain shrink-0 ml-2" />
               </div>
             </div>
 
@@ -330,13 +331,16 @@ export default function Homepage() {
                   border: 'border-t-accent',
                   chip: 'bg-accent text-white',
                 },
-              ].map((item) => (
+              ].map((item, idx) => (
                 <div key={item.title} className={`card-brutal-hover border-t-4 p-6 ${item.border}`}>
                   <div className={`mb-4 inline-flex h-11 w-11 items-center justify-center ${item.chip}`}>
                     {item.icon}
                   </div>
                   <h3 className="mb-3 text-lg font-black uppercase tracking-tight">{item.title}</h3>
                   <p className="text-sm leading-relaxed text-ink-500">{item.description}</p>
+                  {idx === 1 && (
+                    <img src="/reality-badge.png" alt="NGOreality Reality Badge" className="mt-4 h-16 w-16 object-contain" />
+                  )}
                 </div>
               ))}
             </div>
