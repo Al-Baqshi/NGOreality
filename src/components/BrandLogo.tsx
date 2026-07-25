@@ -19,7 +19,7 @@ type BrandLogoProps = {
   onDark?: boolean;
 };
 
-const ICON_SRC = '/logo-icon.png';
+const ICON_SRC = '/reality-badge.png';
 
 export default function BrandLogo({
   variant = 'full',

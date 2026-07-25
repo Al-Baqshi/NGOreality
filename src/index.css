@@ -8,27 +8,27 @@
 
 @layer base {
   :root {
-    --surface-default: #fafafa;
+    --surface-default: #F9F9FA;
     --surface-raised: #ffffff;
-    --surface-overlay: #f5f5f5;
-    --accent-light: #e9eff1;
-    --teal-light: #e6f2f0;
+    --surface-overlay: #f3f3f5;
+    --accent-light: #e2e6ed;
+    --gold-light: #fdf3d6;
     --card-bg: #ffffff;
     --input-bg: #ffffff;
-    --border-brutal: #1a2b33;
-    --shadow-brutal: 4px 4px 0px 0px #1a2b33;
-    --shadow-brutal-sm: 2px 2px 0px 0px #1a2b33;
-    --shadow-brutal-lg: 6px 6px 0px 0px #1a2b33;
+    --border-brutal: #041C3C;
+    --shadow-brutal: 4px 4px 0px 0px #041C3C;
+    --shadow-brutal-sm: 2px 2px 0px 0px #041C3C;
+    --shadow-brutal-lg: 6px 6px 0px 0px #041C3C;
   }
 
   .dark {
-    --surface-default: #121212;
-    --surface-raised: #1c1c1c;
-    --surface-overlay: #161616;
-    --accent-light: #192b33;
-    --teal-light: #1a2e2b;
-    --card-bg: #1c1c1c;
-    --input-bg: #242424;
+    --surface-default: #0d0d12;
+    --surface-raised: #14141c;
+    --surface-overlay: #101018;
+    --accent-light: #0d1724;
+    --gold-light: #2a2415;
+    --card-bg: #14141c;
+    --input-bg: #1c1c24;
     --border-brutal: #ced6d9;
     --shadow-brutal: 4px 4px 0px 0px #000000;
     --shadow-brutal-sm: 2px 2px 0px 0px #000000;
@@ -83,6 +83,14 @@
 
   .btn-brutal-accent {
     @apply border-3 border-ink-950 bg-accent text-white font-semibold px-6 py-3 shadow-brutal
+           transition-all duration-150
+           hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm
+           active:translate-x-[4px] active:translate-y-[4px] active:shadow-none
+           dark:border-ink-200;
+  }
+
+  .btn-brutal-gold {
+    @apply border-3 border-ink-950 bg-gold text-white font-semibold px-6 py-3 shadow-brutal
            transition-all duration-150
            hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm
            active:translate-x-[4px] active:translate-y-[4px] active:shadow-none
@@ -232,7 +240,7 @@
 
   /* Bright gradient text — reads clearly on the dark hero (fixes dark-on-dark) */
   .text-gradient-teal {
-    background-image: linear-gradient(100deg, #5eead4 0%, #2dd4bf 42%, #38bdf8 100%);
+    background-image: linear-gradient(100deg, #EBBB57 0%, #f5cd7a 42%, #f5d78a 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -334,29 +342,31 @@
   --width-88: 22rem;
   --width-128: 32rem;
   --border-width-3: 3px;
-  --shadow-brutal: 4px 4px 0px 0px #1a2b33;
-  --shadow-brutal-sm: 2px 2px 0px 0px #1a2b33;
-  --shadow-brutal-lg: 6px 6px 0px 0px #1a2b33;
-  --color-ink-950: #1a2b33;
-  --color-ink-900: #1d2e36;
-  --color-ink-800: #20323b;
-  --color-ink-700: #233741;
-  --color-ink-600: #273d48;
-  --color-ink-500: #395969;
-  --color-ink-400: #547c8f;
-  --color-ink-300: #799eb0;
-  --color-ink-200: #acbec6;
-  --color-ink-100: #cbd5db;
-  --color-ink-50: #eef1f1;
-  --color-accent: #28464f;
-  --color-accent-hover: #1a2b33;
+  --shadow-brutal: 4px 4px 0px 0px #041C3C;
+  --shadow-brutal-sm: 2px 2px 0px 0px #041C3C;
+  --shadow-brutal-lg: 6px 6px 0px 0px #041C3C;
+  --color-ink-950: #041C3C;
+  --color-ink-900: #0a2647;
+  --color-ink-800: #0f2f52;
+  --color-ink-700: #14395d;
+  --color-ink-600: #1a4268;
+  --color-ink-500: #2a557d;
+  --color-ink-400: #4a7297;
+  --color-ink-300: #7a97b4;
+  --color-ink-200: #aebfcb;
+  --color-ink-100: #d3dce3;
+  --color-ink-50: #f0f2f4;
+  --color-accent: #041c3c;
+  --color-accent-hover: #030e1e;
   --color-accent-light: var(--accent-light);
-  --color-teal: #1a7a6d;
-  --color-teal-hover: #146358;
-  --color-teal-light: var(--teal-light);
-  --color-glow-teal: #2dd4bf;
-  --color-glow-mint: #5eead4;
-  --color-glow-sky: #38bdf8;
+  --color-gold: #EBBB57;
+  --color-gold-hover: #d4a83e;
+  --color-gold-light: var(--gold-light);
+  --color-glow-gold: #EBBB57;
+  /* backward compat — replaces teal */
+  --color-teal: #EBBB57;
+  --color-teal-hover: #d4a83e;
+  --color-teal-light: var(--gold-light);
   --color-surface: var(--surface-default);
   --color-background: var(--background);
   --color-foreground: var(--foreground);

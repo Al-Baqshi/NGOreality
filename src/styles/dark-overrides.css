@@ -8,31 +8,31 @@
 }
 
 .dark .text-ink-900 {
-  color: #e5e8ea;
+  color: #dce0e6;
 }
 
 .dark .text-ink-800 {
-  color: #ced6d9;
+  color: #bcc7d4;
 }
 
 .dark .text-ink-700 {
-  color: #b6c7ce;
+  color: #a0b2c4;
 }
 
 .dark .text-ink-600 {
-  color: #93acb7;
+  color: #7d9bb5;
 }
 
 .dark .text-ink-500 {
-  color: #6a96ab;
+  color: #5a7d9a;
 }
 
 .dark .text-ink-400 {
-  color: #527e92;
+  color: #4a6d88;
 }
 
 .dark .text-ink-300 {
-  color: #9db4be;
+  color: #8aa6be;
 }
 
 .dark .bg-white {
@@ -104,11 +104,12 @@
 }
 
 .dark .hover\:text-white:hover {
-  color: #1a2b33;
+  color: #041C3C;
 }
 
 /* Brutal buttons bake ink colors via @apply — ensure readable labels in dark mode */
 .dark .btn-brutal-outline,
+.dark .btn-brutal-gold,
 .dark .btn-brutal-teal,
 .dark .btn-brutal-accent {
   color: var(--foreground);
