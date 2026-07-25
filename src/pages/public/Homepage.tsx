@@ -189,50 +189,55 @@ export default function Homepage() {
           </div>
 
           <div className="mx-auto max-w-7xl px-6 py-20 md:py-28" style={contentStyle}>
-            <div className="max-w-3xl">
-              <div className="mb-6 flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-px w-12 bg-glow-teal" />
-                  <span className="font-mono text-2xs uppercase tracking-[0.3em] text-glow-mint">
-                    Digital Trust Infrastructure
-                  </span>
+            <div className="flex flex-col lg:flex-row lg:items-center lg:gap-16">
+              <div className="max-w-3xl lg:flex-1">
+                <div className="mb-6 flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-px w-12 bg-glow-teal" />
+                    <span className="font-mono text-2xs uppercase tracking-[0.3em] text-glow-mint">
+                      Digital Trust Infrastructure
+                    </span>
+                  </div>
+                  <LiveClock />
                 </div>
-                <LiveClock />
-              </div>
 
-              <h1 className="mb-6 text-5xl font-black uppercase leading-[0.9] tracking-tight md:text-7xl">
-                Building trust
-                <br />
-                <span className="text-gradient-teal">in nonprofits</span>
-              </h1>
+                <h1 className="mb-6 text-5xl font-black uppercase leading-[0.9] tracking-tight md:text-7xl">
+                  Building trust
+                  <br />
+                  <span className="text-gradient-teal">in nonprofits</span>
+                </h1>
 
-              <p className="mb-8 max-w-xl text-lg leading-relaxed text-ink-100">
-                NGOreality is the missing layer between intention and trust. We verify, certify, and build digital
-                infrastructure so nonprofits can be understood, trusted, and engaged with.
-              </p>
-
-              {/* Search bar */}
-              <div className="mb-6 max-w-2xl">
-                <DirectorySearch />
-                <p className="mt-2 font-mono text-2xs uppercase tracking-wider text-ink-300">
-                  Search 30,000+ registered charities &middot; filter by country &amp; cause
+                <p className="mb-8 max-w-xl text-lg leading-relaxed text-ink-100">
+                  NGOreality is the missing layer between intention and trust. We verify, certify, and build digital
+                  infrastructure so nonprofits can be understood, trusted, and engaged with.
                 </p>
+
+                {/* Search bar */}
+                <div className="mb-6 max-w-2xl">
+                  <DirectorySearch />
+                  <p className="mt-2 font-mono text-2xs uppercase tracking-wider text-ink-300">
+                    Search 30,000+ registered charities &middot; filter by country &amp; cause
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <Link
+                    to="/public/contact"
+                    className="btn-brutal-accent flex items-center justify-center gap-2 text-base"
+                  >
+                    Get Verified <ArrowRight size={18} />
+                  </Link>
+                  <Link
+                    to="/public/directory"
+                    className="btn-brutal-outline flex items-center justify-center gap-2 border-white bg-transparent text-base text-white hover:bg-white hover:text-ink-950"
+                  >
+                    View Directory
+                  </Link>
+                </div>
               </div>
 
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                <Link
-                  to="/public/contact"
-                  className="btn-brutal-accent flex items-center justify-center gap-2 text-base"
-                >
-                  Get Verified <ArrowRight size={18} />
-                </Link>
-                <Link
-                  to="/public/directory"
-                  className="btn-brutal-outline flex items-center justify-center gap-2 border-white bg-transparent text-base text-white hover:bg-white hover:text-ink-950"
-                >
-                  View Directory
-                </Link>
-                <img src="/reality-badge.png" alt="NGOreality Reality Badge" className="h-14 w-14 object-contain shrink-0 ml-2" />
+              <div className="mt-10 flex items-center justify-center lg:mt-0 lg:w-80 xl:w-96 shrink-0">
+                <img src="/reality-badge.png" alt="NGOreality Reality Badge" className="w-64 h-64 md:w-72 md:h-72 xl:w-80 xl:h-80 object-contain drop-shadow-2xl" />
               </div>
             </div>
 
