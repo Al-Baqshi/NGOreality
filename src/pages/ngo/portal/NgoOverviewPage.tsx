@@ -5,7 +5,7 @@ import {
   getProfileCompletionItems,
   profileCompletionPercent,
 } from '../../../lib/ngoProfileCompletion';
-import NgoPortalPageShell, { NgoPortalQuickLinks } from '../../../components/ngo/NgoPortalPageShell';
+import { NgoPortalQuickLinks } from '../../../components/ngo/NgoPortalPageShell';
 import SEO from '../../../components/SEO';
 
 export default function NgoOverviewPage() {

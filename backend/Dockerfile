@@ -11,7 +11,8 @@ RUN go mod download
 COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/worker ./cmd/worker \
- && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/api ./cmd/api
+ && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/api ./cmd/api \
+ && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/crm ./cmd/crm
 
 FROM alpine:3.20
 
@@ -20,6 +21,7 @@ RUN apk add --no-cache ca-certificates tzdata wget \
 
 COPY --from=build /bin/worker /worker
 COPY --from=build /bin/api /api
+COPY --from=build /bin/crm /crm
 
 USER app
 

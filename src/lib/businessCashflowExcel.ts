@@ -10,7 +10,6 @@ import {
 import { LANDING_STANDARDS_PACKAGE_CENTS } from '../config/customerProducts';
 import { MEMBERSHIP_ANNUAL_CENTS } from '../config/pricing';
 import { CASHFLOW_UNIT_ROWS, WORKSPACE_MONTHLY_ARPU_CENTS } from '../config/salesFunnelModel';
-import { isUnitDerivedLineKey } from './cashflowFromUnits';
 import { formatMonthLabel } from './businessPlan';
 import type { BusinessCashflowLine, CashflowPeriodTotals } from './businessCashflow';
 import type { CashflowUnitGrid } from './businessCashflowUnits';

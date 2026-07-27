@@ -49,7 +49,7 @@ function NgoPortalFrame() {
   const navigate = useNavigate();
   const { pathname, hash } = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
-  const { hasOrganization, needsRegistration, loading: portalLoading } = useNgoPortal();
+  const { needsRegistration, loading: portalLoading } = useNgoPortal();
 
   const onboarding = !portalLoading && needsRegistration;
   const navItems = useMemo(

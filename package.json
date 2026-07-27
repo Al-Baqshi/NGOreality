@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "import:nz-charities": "node scripts/import-nz-charities.mjs",
     "backfill:nz-tags": "node scripts/backfill-nz-tags.mjs",
-    "db:verify": "node scripts/verify-supabase-schema.mjs"
+    "db:verify": "node scripts/verify-supabase-schema.mjs",
+    "test:isolation": "node tests/isolation/crossTenant.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

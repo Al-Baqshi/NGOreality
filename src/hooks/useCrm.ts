@@ -320,7 +320,9 @@ export function useWorkQueue() {
     if (!tk.error && tk.data) setTasks(tk.data as typeof tasks);
     if (!br.error && br.data) setBadgeRequests(br.data as typeof badgeRequests);
     if (!setup.error && setup.data) setSetupRequests(setup.data as typeof setupRequests);
-    if (!inc.error && inc.data) setIncidents(inc.data as WebsiteIncidentRow[]);
+    // PostgREST types the embedded `organizations` relation as an array even
+    // for a to-one join, so the cast has to go via `unknown`.
+    if (!inc.error && inc.data) setIncidents(inc.data as unknown as WebsiteIncidentRow[]);
     setLoading(false);
   }, []);
 

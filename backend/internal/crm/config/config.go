@@ -1,0 +1,146 @@
+// Package config loads settings for the CRM service.
+//
+// The CRM runs against its OWN Postgres, separate from the Supabase database
+// that powers the marketing site, directory and monitoring. Beneficiary
+// records must never share a cluster with the public registry data.
+package config
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type Config struct {
+	// DatabaseURL is the CRM Postgres cluster (Railway), NOT Supabase.
+	DatabaseURL string
+
+	APIAddr string
+
+	// SupabaseJWTSecret verifies access tokens minted by Supabase Auth, so
+	// users who sign in on ngoreality.com can call this API directly.
+	SupabaseJWTSecret string
+	// SupabaseProjectRef builds the expected issuer claim.
+	SupabaseProjectRef string
+
+	// AdminAPIKey guards control-plane endpoints (tenant provisioning).
+	AdminAPIKey string
+
+	AllowedOrigins []string
+
+	MaxConns          int32
+	MinConns          int32
+	StatementTimeout  time.Duration
+	ProvisionTimeout  time.Duration
+	ShutdownTimeout   time.Duration
+	ReadHeaderTimeout time.Duration
+}
+
+func Load() (Config, error) {
+	dbURL := firstNonEmpty(
+		os.Getenv("CRM_DATABASE_URL"),
+		os.Getenv("DATABASE_URL"),
+	)
+	if dbURL == "" {
+		return Config{}, fmt.Errorf(
+			"CRM_DATABASE_URL is required: the CRM uses its own Postgres " +
+				"(Railway), separate from the Supabase project",
+		)
+	}
+
+	jwtSecret := strings.TrimSpace(os.Getenv("SUPABASE_JWT_SECRET"))
+	if jwtSecret == "" {
+		return Config{}, fmt.Errorf(
+			"SUPABASE_JWT_SECRET is required: Supabase Dashboard → Project " +
+				"Settings → API → JWT Settings → JWT Secret",
+		)
+	}
+
+	maxConns := int32(envInt("CRM_MAX_CONNS", 20))
+	if maxConns < 2 {
+		maxConns = 2
+	}
+	minConns := int32(envInt("CRM_MIN_CONNS", 2))
+	if minConns > maxConns {
+		minConns = maxConns
+	}
+
+	// Railway (and most PaaS) inject PORT and expect the process to bind it.
+	// An explicit CRM_API_ADDR still wins for local runs.
+	apiAddr := strings.TrimSpace(os.Getenv("CRM_API_ADDR"))
+	if apiAddr == "" {
+		if port := strings.TrimSpace(os.Getenv("PORT")); port != "" {
+			apiAddr = ":" + port
+		} else {
+			apiAddr = ":8081"
+		}
+	}
+
+	return Config{
+		DatabaseURL:        dbURL,
+		APIAddr:            apiAddr,
+		SupabaseJWTSecret:  jwtSecret,
+		SupabaseProjectRef: strings.TrimSpace(os.Getenv("SUPABASE_PROJECT_REF")),
+		AdminAPIKey:        strings.TrimSpace(os.Getenv("CRM_ADMIN_API_KEY")),
+		AllowedOrigins:     splitList(envString("CRM_ALLOWED_ORIGINS", "https://www.ngoreality.com,http://localhost:5173")),
+		MaxConns:           maxConns,
+		MinConns:           minConns,
+		StatementTimeout:   envDuration("CRM_STATEMENT_TIMEOUT", 15*time.Second),
+		ProvisionTimeout:   envDuration("CRM_PROVISION_TIMEOUT", 60*time.Second),
+		ShutdownTimeout:    envDuration("CRM_SHUTDOWN_TIMEOUT", 15*time.Second),
+		ReadHeaderTimeout:  envDuration("CRM_READ_HEADER_TIMEOUT", 10*time.Second),
+	}, nil
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if t := strings.TrimSpace(v); t != "" {
+			return t
+		}
+	}
+	return ""
+}
+
+func splitList(v string) []string {
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func envString(key, fallback string) string {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		return v
+	}
+	return fallback
+}
+
+func envInt(key string, fallback int) int {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return fallback
+	}
+	return n
+}
+
+func envDuration(key string, fallback time.Duration) time.Duration {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return fallback
+	}
+	return d
+}

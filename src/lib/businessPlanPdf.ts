@@ -77,7 +77,10 @@ function resolveComputedColors(root: HTMLElement): void {
     for (const prop of props) {
       const val = computed[prop];
       if (typeof val === 'string' && val) {
-        htmlEl.style[prop as any] = val;
+        // setProperty takes the kebab-case custom-property name, which avoids
+        // indexing CSSStyleDeclaration (whose camelCase keys are readonly).
+        const cssName = prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+        htmlEl.style.setProperty(cssName, val);
       }
     }
   });

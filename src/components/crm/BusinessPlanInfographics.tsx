@@ -18,7 +18,6 @@ import {
 } from '../../config/customerProducts';
 import { NZ_GST_RATE_LABEL } from '../../config/nzCashflowGuide';
 import {
-  FLEXI_WAGE_SUMMARY,
   REVENUE_STREAMS,
   STAFFING_TIMELINE,
   STAFFING_PLAN_SUMMARY,
