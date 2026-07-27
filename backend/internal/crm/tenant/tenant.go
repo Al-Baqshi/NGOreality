@@ -136,15 +136,18 @@ func (r *Registry) allocateSlug(ctx context.Context, base string) (string, error
 // Provisioning
 // ---------------------------------------------------------------------------
 
+// ProvisionInput is decoded straight from JSON, so every field needs an
+// explicit tag: the API decoder rejects unknown fields, and without tags the
+// documented snake_case names would all be refused.
 type ProvisionInput struct {
-	OrganizationID string
-	Name           string
-	Country        string
-	DataRegion     string
-	Plan           string
+	OrganizationID string `json:"organization_id"`
+	Name           string `json:"name"`
+	Country        string `json:"country"`
+	DataRegion     string `json:"data_region"`
+	Plan           string `json:"plan"`
 	// OwnerUserID is the Supabase auth user who gets the owner seat.
-	OwnerUserID string
-	OwnerEmail  string
+	OwnerUserID string `json:"owner_user_id"`
+	OwnerEmail  string `json:"owner_email"`
 }
 
 // Provision creates the tenant row, its schema, runs migrations and seats the

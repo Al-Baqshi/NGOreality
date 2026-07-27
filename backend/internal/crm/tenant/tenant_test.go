@@ -1,6 +1,10 @@
 package tenant
 
-import "testing"
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
 
 // ValidSchemaName is the last gate before an identifier reaches search_path.
 // Anything that slips through here becomes a cross-tenant or injection bug,
@@ -101,5 +105,44 @@ func TestSlugifyHostileNamesStayValid(t *testing.T) {
 		if !ValidSchemaName(schema) {
 			t.Errorf("Slugify(%q) → %q which fails validation (should be sanitised, not rejected later)", name, schema)
 		}
+	}
+}
+
+// ProvisionInput is decoded from JSON by a decoder that rejects unknown
+// fields, so a missing tag makes the documented field name a 400. This caught
+// exactly that in production smoke testing.
+func TestProvisionInputDecodesDocumentedFieldNames(t *testing.T) {
+	body := `{
+		"organization_id": "00000000-0000-4000-8000-000000000001",
+		"name": "Test Charity",
+		"country": "NZ",
+		"data_region": "ap-southeast-2",
+		"plan": "workspace",
+		"owner_user_id": "11111111-1111-1111-1111-111111111111",
+		"owner_email": "owner@example.org"
+	}`
+
+	dec := json.NewDecoder(strings.NewReader(body))
+	dec.DisallowUnknownFields() // same setting as the HTTP layer
+
+	var in ProvisionInput
+	if err := dec.Decode(&in); err != nil {
+		t.Fatalf("documented JSON field names must decode: %v", err)
+	}
+
+	if in.OrganizationID != "00000000-0000-4000-8000-000000000001" {
+		t.Errorf("organization_id = %q", in.OrganizationID)
+	}
+	if in.Name != "Test Charity" {
+		t.Errorf("name = %q", in.Name)
+	}
+	if in.OwnerUserID != "11111111-1111-1111-1111-111111111111" {
+		t.Errorf("owner_user_id = %q", in.OwnerUserID)
+	}
+	if in.OwnerEmail != "owner@example.org" {
+		t.Errorf("owner_email = %q", in.OwnerEmail)
+	}
+	if in.Country != "NZ" || in.DataRegion != "ap-southeast-2" || in.Plan != "workspace" {
+		t.Errorf("country/data_region/plan = %q/%q/%q", in.Country, in.DataRegion, in.Plan)
 	}
 }
