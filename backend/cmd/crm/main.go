@@ -23,6 +23,7 @@ import (
 	"ngoreality/backend/internal/crm/config"
 	"ngoreality/backend/internal/crm/httpapi"
 	"ngoreality/backend/internal/crm/migrate"
+	"ngoreality/backend/internal/crm/supabase"
 	"ngoreality/backend/internal/crm/tenant"
 )
 
@@ -107,12 +108,19 @@ func main() {
 		log.Info("token verification configured", "mode", "HS256")
 	}
 
+	sb := supabase.New(cfg.SupabaseProjectRef, cfg.SupabaseAnonKey)
+	if sb.Configured() {
+		log.Info("self-serve signup enabled")
+	} else {
+		log.Warn("self-serve signup disabled: set SUPABASE_ANON_KEY to enable one-click workspace creation")
+	}
+
 	target, _ := migrate.TenantVersion()
 	log.Info("crm starting", "addr", cfg.APIAddr, "tenant_schema_version", target)
 
 	srv := &http.Server{
 		Addr:              cfg.APIAddr,
-		Handler:           httpapi.New(cfg, registry, verifier, log).Handler(),
+		Handler:           httpapi.New(cfg, registry, verifier, sb, log).Handler(),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		IdleTimeout:       120 * time.Second,
 	}

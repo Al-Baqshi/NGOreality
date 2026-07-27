@@ -461,3 +461,70 @@ func (r *Registry) Acquire(ctx context.Context, t *Tenant) (*Conn, error) {
 
 	return &Conn{Tx: tx, release: func() {}}, nil
 }
+
+// ---------------------------------------------------------------------------
+// Offboarding
+// ---------------------------------------------------------------------------
+
+// Delete removes a tenant entirely: its schema, every row in it, and its
+// control-plane record.
+//
+// This is irreversible and destroys beneficiary records, so it is deliberately
+// awkward to call — the caller must pass the tenant's exact slug as
+// confirmation. It exists because an NGO leaving the platform has a legitimate
+// right to have its data destroyed (Privacy Act 2020, IPP9), and because
+// "we cannot actually delete it" is not an acceptable answer.
+func (r *Registry) Delete(ctx context.Context, tenantID, confirmSlug string) error {
+	t, err := r.ByID(ctx, tenantID)
+	if err != nil {
+		return err
+	}
+	if confirmSlug != t.Slug {
+		return fmt.Errorf("confirmation %q does not match the workspace slug %q", confirmSlug, t.Slug)
+	}
+	if !ValidSchemaName(t.SchemaName) {
+		return fmt.Errorf("refusing to drop invalid schema name %q", t.SchemaName)
+	}
+
+	r.logProvision(ctx, t.ID, "delete_requested", "schema="+t.SchemaName, true)
+
+	// DROP SCHEMA cannot be parameterised; the name has passed the regexp and
+	// is quoted here.
+	if _, err := r.pool.Exec(ctx, `DROP SCHEMA IF EXISTS `+pgx.Identifier{t.SchemaName}.Sanitize()+` CASCADE`); err != nil {
+		r.logProvision(ctx, t.ID, "delete", err.Error(), false)
+		return fmt.Errorf("drop schema: %w", err)
+	}
+
+	// Cascades to tenant_users. The provisioning log keeps its rows via
+	// ON DELETE SET NULL, so the deletion stays auditable after the fact.
+	if _, err := r.pool.Exec(ctx, `DELETE FROM platform.tenants WHERE id = $1`, t.ID); err != nil {
+		return fmt.Errorf("delete tenant row: %w", err)
+	}
+
+	r.log.Info("tenant deleted", "tenant", t.ID, "schema", t.SchemaName)
+	return nil
+}
+
+// List returns tenants for the admin console.
+func (r *Registry) List(ctx context.Context, limit int) ([]Tenant, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	rows, err := r.pool.Query(ctx,
+		`SELECT `+tenantCols+` FROM platform.tenants ORDER BY created_at DESC LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []Tenant{}
+	for rows.Next() {
+		var t Tenant
+		if err := rows.Scan(&t.ID, &t.OrganizationID, &t.Slug, &t.Name, &t.SchemaName,
+			&t.Status, &t.Plan, &t.SeatsPurchased, &t.DataRegion, &t.Country, &t.SchemaVersion); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}

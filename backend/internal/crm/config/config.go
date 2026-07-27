@@ -28,6 +28,11 @@ type Config struct {
 	// AdminAPIKey guards control-plane endpoints (tenant provisioning).
 	AdminAPIKey string
 
+	// SupabaseAnonKey is the project's public key. It is required by
+	// Supabase's gateway on every PostgREST call; it grants nothing on its
+	// own, since RLS decides access from the user's token.
+	SupabaseAnonKey string
+
 	AllowedOrigins []string
 
 	MaxConns          int32
@@ -90,6 +95,7 @@ func Load() (Config, error) {
 		SupabaseJWTSecret:  jwtSecret,
 		SupabaseProjectRef: projectRef,
 		AdminAPIKey:        strings.TrimSpace(os.Getenv("CRM_ADMIN_API_KEY")),
+		SupabaseAnonKey:    strings.TrimSpace(os.Getenv("SUPABASE_ANON_KEY")),
 		AllowedOrigins:     splitList(envString("CRM_ALLOWED_ORIGINS", "https://www.ngoreality.com,http://localhost:5173")),
 		MaxConns:           maxConns,
 		MinConns:           minConns,

@@ -21,6 +21,7 @@ import (
 	"ngoreality/backend/internal/crm/auth"
 	"ngoreality/backend/internal/crm/config"
 	"ngoreality/backend/internal/crm/store"
+	"ngoreality/backend/internal/crm/supabase"
 	"ngoreality/backend/internal/crm/tenant"
 )
 
@@ -30,11 +31,12 @@ type Server struct {
 	cfg      config.Config
 	registry *tenant.Registry
 	verifier *auth.Verifier
+	supabase *supabase.Client
 	log      *slog.Logger
 }
 
-func New(cfg config.Config, registry *tenant.Registry, verifier *auth.Verifier, log *slog.Logger) *Server {
-	return &Server{cfg: cfg, registry: registry, verifier: verifier, log: log}
+func New(cfg config.Config, registry *tenant.Registry, verifier *auth.Verifier, sb *supabase.Client, log *slog.Logger) *Server {
+	return &Server{cfg: cfg, registry: registry, verifier: verifier, supabase: sb, log: log}
 }
 
 // Handler builds the full route table.
@@ -48,6 +50,14 @@ func (s *Server) Handler() http.Handler {
 	root.HandleFunc("POST /v1/admin/tenants", s.adminOnly(s.provisionTenant))
 	root.HandleFunc("POST /v1/admin/tenants/migrate", s.adminOnly(s.migrateTenants))
 	root.HandleFunc("POST /v1/admin/tenants/{id}/users", s.adminOnly(s.adminUpsertUser))
+	root.HandleFunc("GET /v1/admin/tenants", s.adminOnly(s.listTenants))
+	root.HandleFunc("DELETE /v1/admin/tenants/{id}", s.adminOnly(s.deleteTenant))
+
+	// Self-serve signup sits outside the tenant middleware: the caller has no
+	// workspace yet, so resolving them to one would fail before they could
+	// create it. It authenticates the token itself.
+	root.HandleFunc("POST /v1/signup", s.signup)
+	root.HandleFunc("GET /v1/signup/eligibility", s.signupEligibility)
 
 	// Authenticated tenant API.
 	api := http.NewServeMux()
