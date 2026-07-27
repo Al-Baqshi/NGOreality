@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -29,8 +30,11 @@ func main() {
 
 	cfg, err := config.Load()
 	if err != nil {
-		log.Error("config", "err", err)
-		os.Exit(1)
+		// Put the reason in the message itself. Railway's log viewer renders
+		// the `msg` field of a JSON log line and hides the attributes, so
+		// logging a bare "config" leaves an operator with a restart loop and
+		// no way to tell why.
+		fatal(log, "startup failed: "+err.Error())
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -38,8 +42,7 @@ func main() {
 
 	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
 	if err != nil {
-		log.Error("invalid CRM_DATABASE_URL", "err", err)
-		os.Exit(1)
+		fatal(log, "invalid CRM_DATABASE_URL: "+err.Error())
 	}
 	poolCfg.MaxConns = cfg.MaxConns
 	poolCfg.MinConns = cfg.MinConns
@@ -49,8 +52,7 @@ func main() {
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
-		log.Error("database pool", "err", err)
-		os.Exit(1)
+		fatal(log, "could not create the database pool: "+err.Error())
 	}
 	defer pool.Close()
 
@@ -58,8 +60,7 @@ func main() {
 	err = pool.Ping(pingCtx)
 	pingCancel()
 	if err != nil {
-		log.Error("database unreachable", "err", err)
-		os.Exit(1)
+		fatal(log, "database unreachable: "+err.Error())
 	}
 
 	// Control-plane migrations run on every boot; they are idempotent.
@@ -67,8 +68,7 @@ func main() {
 	err = migrate.Platform(migCtx, pool, log)
 	migCancel()
 	if err != nil {
-		log.Error("platform migrations", "err", err)
-		os.Exit(1)
+		fatal(log, "platform migrations failed: "+err.Error())
 	}
 
 	registry := tenant.NewRegistry(pool, log)
@@ -81,8 +81,7 @@ func main() {
 		migrated, failed, err := registry.MigrateAll(tmCtx)
 		tmCancel()
 		if err != nil {
-			log.Error("tenant migrations", "err", err)
-			os.Exit(1)
+			fatal(log, "tenant migrations failed: "+err.Error())
 		}
 		if failed > 0 {
 			log.Error("some tenant migrations failed", "migrated", migrated, "failed", failed)
@@ -116,4 +115,15 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer shutdownCancel()
 	_ = srv.Shutdown(shutdownCtx)
+}
+
+// fatal reports why the process is exiting in a form that survives log
+// aggregation, then exits non-zero. Startup errors are the ones an operator
+// sees as a restart loop, so the reason must be in the message itself.
+func fatal(log *slog.Logger, msg string) {
+	log.Error(msg)
+	// Also write plainly to stderr: if the JSON handler or the log viewer
+	// swallows the line, this still reaches `railway logs`.
+	fmt.Fprintln(os.Stderr, "FATAL: "+msg)
+	os.Exit(1)
 }
