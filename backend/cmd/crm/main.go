@@ -19,6 +19,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"ngoreality/backend/internal/crm/auth"
 	"ngoreality/backend/internal/crm/config"
 	"ngoreality/backend/internal/crm/httpapi"
 	"ngoreality/backend/internal/crm/migrate"
@@ -90,12 +91,28 @@ func main() {
 		}
 	}
 
+	// Verify the token-signing keys are reachable before accepting traffic, so
+	// a wrong project ref fails at boot rather than on a user's first login.
+	verifier := auth.NewVerifier(cfg.SupabaseJWTSecret, cfg.SupabaseProjectRef)
+	if verifier.SupportsAsymmetric() {
+		if err := verifier.WarmKeys(); err != nil {
+			if cfg.SupabaseJWTSecret == "" {
+				fatal(log, "could not load Supabase signing keys and no HS256 fallback is set: "+err.Error())
+			}
+			log.Warn("could not preload Supabase JWKS; falling back to HS256", "err", err)
+		} else {
+			log.Info("supabase signing keys loaded", "mode", "ES256/JWKS")
+		}
+	} else {
+		log.Info("token verification configured", "mode", "HS256")
+	}
+
 	target, _ := migrate.TenantVersion()
 	log.Info("crm starting", "addr", cfg.APIAddr, "tenant_schema_version", target)
 
 	srv := &http.Server{
 		Addr:              cfg.APIAddr,
-		Handler:           httpapi.New(cfg, registry, log).Handler(),
+		Handler:           httpapi.New(cfg, registry, verifier, log).Handler(),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		IdleTimeout:       120 * time.Second,
 	}

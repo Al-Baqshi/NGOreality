@@ -29,19 +29,17 @@ const maxBody = 1 << 20 // 1 MiB
 type Server struct {
 	cfg      config.Config
 	registry *tenant.Registry
+	verifier *auth.Verifier
 	log      *slog.Logger
 }
 
-func New(cfg config.Config, registry *tenant.Registry, log *slog.Logger) *Server {
-	return &Server{cfg: cfg, registry: registry, log: log}
+func New(cfg config.Config, registry *tenant.Registry, verifier *auth.Verifier, log *slog.Logger) *Server {
+	return &Server{cfg: cfg, registry: registry, verifier: verifier, log: log}
 }
 
 // Handler builds the full route table.
 func (s *Server) Handler() http.Handler {
-	mw := &auth.Middleware{
-		Verifier: auth.NewVerifier(s.cfg.SupabaseJWTSecret, s.cfg.SupabaseProjectRef),
-		Registry: s.registry,
-	}
+	mw := &auth.Middleware{Verifier: s.verifier, Registry: s.registry}
 
 	// Unauthenticated: health + control plane (admin API key).
 	root := http.NewServeMux()

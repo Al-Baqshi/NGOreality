@@ -38,21 +38,41 @@ type Claims struct {
 	NotBefore int64  `json:"nbf"`
 }
 
-// Verifier checks tokens against the project JWT secret.
+// Verifier checks Supabase access tokens.
+//
+// Supabase issues ES256 tokens signed by a key whose public half is published
+// at a JWKS endpoint; that path needs no shared secret. Older projects sign
+// HS256 with the project JWT secret, which is still accepted when configured.
 type Verifier struct {
 	secret         []byte
+	jwks           *JWKSCache
 	expectedIssuer string
 	// Leeway absorbs small clock differences between Supabase and this host.
 	Leeway time.Duration
 }
 
+// NewVerifier builds a verifier. `secret` may be empty when the project uses
+// asymmetric keys; `projectRef` is then required so the JWKS URL can be built.
 func NewVerifier(secret, projectRef string) *Verifier {
 	v := &Verifier{secret: []byte(secret), Leeway: 60 * time.Second}
 	if projectRef != "" {
 		v.expectedIssuer = fmt.Sprintf("https://%s.supabase.co/auth/v1", projectRef)
+		v.jwks = NewJWKSCache(projectRef)
 	}
 	return v
 }
+
+// WarmKeys pre-fetches the JWKS so a bad project ref surfaces at boot rather
+// than on the first login. Returns nil when only HS256 is configured.
+func (v *Verifier) WarmKeys() error {
+	if v.jwks == nil {
+		return nil
+	}
+	return v.jwks.Warm()
+}
+
+// SupportsAsymmetric reports whether JWKS verification is available.
+func (v *Verifier) SupportsAsymmetric() bool { return v.jwks != nil }
 
 // Verify parses and validates a compact JWS, returning its claims.
 func (v *Verifier) Verify(token string) (*Claims, error) {
@@ -64,6 +84,7 @@ func (v *Verifier) Verify(token string) (*Claims, error) {
 	var header struct {
 		Alg string `json:"alg"`
 		Typ string `json:"typ"`
+		Kid string `json:"kid"`
 	}
 	headerJSON, err := decodeSegment(parts[0])
 	if err != nil {
@@ -72,20 +93,37 @@ func (v *Verifier) Verify(token string) (*Claims, error) {
 	if err := json.Unmarshal(headerJSON, &header); err != nil {
 		return nil, ErrMalformed
 	}
-	// Pin the algorithm. Accepting whatever the header claims is how "alg:none"
-	// and RS256->HS256 confusion attacks work.
-	if header.Alg != "HS256" {
-		return nil, fmt.Errorf("%w: unsupported alg %q", ErrBadSignature, header.Alg)
-	}
-
 	signingInput := parts[0] + "." + parts[1]
-	expectedMAC := signHS256(v.secret, signingInput)
-	actualMAC, err := decodeSegment(parts[2])
+	signature, err := decodeSegment(parts[2])
 	if err != nil {
 		return nil, ErrMalformed
 	}
-	if !hmac.Equal(expectedMAC, actualMAC) {
-		return nil, ErrBadSignature
+
+	// Pin the algorithm to what this verifier is actually configured for.
+	// Accepting whatever the header claims is how "alg:none" and
+	// asymmetric->symmetric confusion attacks work: an attacker who knows the
+	// public key could otherwise sign an HS256 token with it.
+	switch header.Alg {
+	case "ES256":
+		if v.jwks == nil {
+			return nil, fmt.Errorf("%w: ES256 token but no project ref configured", ErrBadSignature)
+		}
+		pub, err := v.jwks.key(header.Kid)
+		if err != nil {
+			return nil, err
+		}
+		if !verifyES256(pub, signingInput, signature) {
+			return nil, ErrBadSignature
+		}
+	case "HS256":
+		if len(v.secret) == 0 {
+			return nil, fmt.Errorf("%w: HS256 token but no JWT secret configured", ErrBadSignature)
+		}
+		if !hmac.Equal(signHS256(v.secret, signingInput), signature) {
+			return nil, ErrBadSignature
+		}
+	default:
+		return nil, fmt.Errorf("%w: unsupported alg %q", ErrBadSignature, header.Alg)
 	}
 
 	payload, err := decodeSegment(parts[1])

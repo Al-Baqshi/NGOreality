@@ -50,11 +50,17 @@ func Load() (Config, error) {
 		)
 	}
 
+	// Token verification needs EITHER the project ref (asymmetric ES256 keys,
+	// fetched from the public JWKS endpoint — no secret involved) OR the legacy
+	// symmetric JWT secret. Requiring at least one keeps the service failing
+	// closed: it must never start unable to verify tokens.
 	jwtSecret := strings.TrimSpace(os.Getenv("SUPABASE_JWT_SECRET"))
-	if jwtSecret == "" {
+	projectRef := strings.TrimSpace(os.Getenv("SUPABASE_PROJECT_REF"))
+	if jwtSecret == "" && projectRef == "" {
 		return Config{}, fmt.Errorf(
-			"SUPABASE_JWT_SECRET is required: Supabase Dashboard → Project " +
-				"Settings → API → JWT Settings → JWT Secret",
+			"token verification is not configured: set SUPABASE_PROJECT_REF " +
+				"(preferred — verifies against the project's public JWKS keys) " +
+				"or SUPABASE_JWT_SECRET for legacy HS256 projects",
 		)
 	}
 
@@ -82,7 +88,7 @@ func Load() (Config, error) {
 		DatabaseURL:        dbURL,
 		APIAddr:            apiAddr,
 		SupabaseJWTSecret:  jwtSecret,
-		SupabaseProjectRef: strings.TrimSpace(os.Getenv("SUPABASE_PROJECT_REF")),
+		SupabaseProjectRef: projectRef,
 		AdminAPIKey:        strings.TrimSpace(os.Getenv("CRM_ADMIN_API_KEY")),
 		AllowedOrigins:     splitList(envString("CRM_ALLOWED_ORIGINS", "https://www.ngoreality.com,http://localhost:5173")),
 		MaxConns:           maxConns,
