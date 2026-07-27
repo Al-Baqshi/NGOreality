@@ -251,6 +251,34 @@ export interface WorkspaceSettings {
   updated_at: string;
 }
 
+/**
+ * Per-tenant service catalogue, so each NGO names its own programmes rather
+ * than using a fixed list. Lives in the Go CRM.
+ */
+export interface ServiceType {
+  id: string;
+  key: string;
+  label: string;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+/**
+ * Settings as returned by the Go CRM (`GET /v1/settings`).
+ *
+ * Distinct from `WorkspaceSettings` above, which is the Supabase-side shape:
+ * the CRM keeps tenant identity and residency in its control plane, so its
+ * settings row holds only what the NGO itself configures.
+ */
+export interface CrmSettings {
+  client_retention_months: number;
+  collection_notice: string;
+  case_reference_prefix: string;
+  branding: Record<string, unknown>;
+  updated_at: string;
+}
+
 export type AuditAction =
   | 'create'
   | 'read'

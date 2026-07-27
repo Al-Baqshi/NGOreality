@@ -117,6 +117,17 @@ With several workspaces, add `X-Tenant-ID: <tenant uuid>`.
 | POST/PATCH | `/v1/sessions`, `/v1/sessions/{id}` | write |
 | DELETE | `/v1/sessions/{id}` | admin |
 | GET | `/v1/stats?from=&to=` | any seat |
+| GET | `/v1/field-defs?entity=` | any seat (sensitive definitions hidden) |
+| POST/PATCH/DELETE | `/v1/field-defs`, `/v1/field-defs/{id}` | admin (DELETE archives) |
+| GET | `/v1/service-types` | any seat |
+| PUT | `/v1/service-types` | admin |
+| GET/PATCH | `/v1/settings` | any seat / admin |
+| GET | `/v1/documents?client_id=&case_id=` | any seat |
+| POST | `/v1/documents` | write (restricted needs sensitive) |
+| DELETE | `/v1/documents/{id}` | admin |
+| GET | `/v1/export/clients.csv` | admin |
+| GET | `/v1/export/sessions.csv?from=&to=` | admin |
+| POST | `/v1/import/clients` (raw CSV body) | admin |
 
 Control plane — `X-Admin-Key`, not a user token:
 
@@ -216,14 +227,37 @@ Then call the API with a real Supabase access token from the browser
 
 ---
 
+## Import and export
+
+`POST /v1/import/clients` takes a raw CSV body (max 16 MB, 10,000 rows).
+
+- **Header matching is forgiving** — "First name", "firstname", "Given name"
+  all map to `given_name`; "Surname", "Last name" to `family_name`, and so on.
+- **Unrecognised columns are preserved** into the row's `custom` jsonb rather
+  than dropped, so a spreadsheet migration loses nothing.
+- **Dates are day-first** (`28/07/2026` → 28 July). This is a New Zealand
+  product; `TestParseFlexibleDatePrefersDayFirst` pins the behaviour.
+- **A bad row does not sink the import.** Each row runs inside a savepoint, so
+  a duplicate reference code skips that row and keeps the rest. The response
+  lists every skipped row with a reason.
+- **The whole import is one transaction** — it commits or rolls back together,
+  so there is never a half-imported caseload.
+- Excel's UTF-8 BOM is stripped, which would otherwise corrupt the first
+  column name and silently lose that column.
+
+Exports are admin-only and always write an `action='export'` audit row
+recording the row count and whether sensitive columns were included.
+
+---
+
 ## Not yet built
 
-- Documents, `field_defs` and `service_types` have tables but no HTTP endpoints
-- CSV/Excel import and export
-- PDF funder reports
+- PDF funder reports (CSV export exists)
 - Retention enforcement (`settings.client_retention_months` is recorded, not applied)
 - Seat-count enforcement against `tenants.seats_purchased`
-- Frontend workspace UI
+- Frontend workspace UI (the API client `src/lib/crmApi.ts` is complete)
+- Supabase Storage upload flow behind `/v1/documents` (the table records paths;
+  it does not yet issue signed upload URLs)
 
 See `docs/PRIVACY_AND_RESIDENCY.md` for the Privacy Act obligations that still
 gate onboarding a real tenant.

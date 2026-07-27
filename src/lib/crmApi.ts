@@ -8,13 +8,18 @@
 
 import { supabase } from './supabase';
 import type {
+  OrganizationRole,
+  ServiceType,
   WorkspaceCase,
   WorkspaceCaseNote,
   WorkspaceClient,
   WorkspaceConsent,
+  WorkspaceDocument,
+  WorkspaceFieldDef,
+  WorkspaceFieldEntity,
   WorkspaceSession,
+  CrmSettings,
   WorkspaceStats,
-  OrganizationRole,
 } from '../types/workspace';
 
 const BASE_URL = (import.meta.env.VITE_CRM_API_URL ?? '').replace(/\/$/, '');
@@ -278,3 +283,141 @@ export const deleteSession = (id: string) =>
 
 export const getStats = (from?: string, to?: string) =>
   request<WorkspaceStats>('/v1/stats', { query: { from, to } });
+
+// ---------------------------------------------------------------------------
+// Customisation
+// ---------------------------------------------------------------------------
+
+export const listFieldDefs = (entity?: WorkspaceFieldEntity, includeArchived = false) =>
+  request<{ items: WorkspaceFieldDef[] }>('/v1/field-defs', {
+    query: { entity, include_archived: includeArchived ? 'true' : undefined },
+  });
+
+export const createFieldDef = (input: Partial<WorkspaceFieldDef>) =>
+  request<WorkspaceFieldDef>('/v1/field-defs', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+
+export const updateFieldDef = (id: string, input: Partial<WorkspaceFieldDef>) =>
+  request<WorkspaceFieldDef>(`/v1/field-defs/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+
+/**
+ * Archives rather than deletes — values already stored under this key stay in
+ * each record's `custom` object, so removing the definition outright would
+ * strand data the NGO still relies on.
+ */
+export const archiveFieldDef = (id: string) =>
+  request<{ status: string }>(`/v1/field-defs/${id}`, { method: 'DELETE' });
+
+export const listServiceTypes = (includeInactive = false) =>
+  request<{ items: ServiceType[] }>('/v1/service-types', {
+    query: { include_inactive: includeInactive ? 'true' : undefined },
+  });
+
+export const upsertServiceType = (input: Partial<ServiceType>) =>
+  request<ServiceType>('/v1/service-types', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+export const getSettings = () => request<CrmSettings>('/v1/settings');
+
+export const updateSettings = (input: Partial<CrmSettings>) =>
+  request<CrmSettings>('/v1/settings', {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+
+// ---------------------------------------------------------------------------
+// Documents
+// ---------------------------------------------------------------------------
+
+export const listDocuments = (params: { client_id?: string; case_id?: string } = {}) =>
+  request<{ items: WorkspaceDocument[] }>('/v1/documents', { query: { ...params } });
+
+export const createDocument = (input: Partial<WorkspaceDocument>) =>
+  request<WorkspaceDocument>('/v1/documents', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+
+export const deleteDocument = (id: string) =>
+  request<void>(`/v1/documents/${id}`, { method: 'DELETE' });
+
+// ---------------------------------------------------------------------------
+// Import / export (admin only)
+// ---------------------------------------------------------------------------
+
+export interface ImportResult {
+  imported: number;
+  skipped: number;
+  errors: { row: number; message: string }[];
+}
+
+/** Posts a raw CSV. Everything commits together — no half-imported caseload. */
+export async function importClients(csv: File | string): Promise<ImportResult> {
+  const body = typeof csv === 'string' ? csv : await csv.text();
+  return request<ImportResult>('/v1/import/clients', {
+    method: 'POST',
+    body,
+    headers: { 'Content-Type': 'text/csv' },
+  });
+}
+
+/**
+ * Downloads a CSV export. Returns a Blob rather than triggering navigation,
+ * because the request needs an Authorization header.
+ */
+async function downloadCsv(path: string, query: Record<string, string | undefined>): Promise<Blob> {
+  if (!CRM_API_CONFIGURED) {
+    throw new CrmApiError('CRM API is not configured (set VITE_CRM_API_URL)', 0);
+  }
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new CrmApiError('Not signed in', 401);
+
+  const url = new URL(BASE_URL + path);
+  for (const [key, value] of Object.entries(query)) {
+    if (value) url.searchParams.set(key, value);
+  }
+
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  if (activeTenantId) headers['X-Tenant-ID'] = activeTenantId;
+
+  const response = await fetch(url.toString(), { headers });
+  if (!response.ok) {
+    let message = `Export failed (${response.status})`;
+    try {
+      message = (JSON.parse(await response.text()) as { error?: string }).error ?? message;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new CrmApiError(message, response.status);
+  }
+  return response.blob();
+}
+
+export const exportClientsCsv = () => downloadCsv('/v1/export/clients.csv', {});
+
+export const exportSessionsCsv = (from?: string, to?: string) =>
+  downloadCsv('/v1/export/sessions.csv', { from, to });
+
+/** Saves a Blob to the user's machine. */
+export function saveBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}

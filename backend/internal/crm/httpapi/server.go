@@ -83,6 +83,28 @@ func (s *Server) Handler() http.Handler {
 
 	api.HandleFunc("GET /v1/stats", s.stats)
 
+	// Customisation — each NGO shapes the CRM to its own programmes.
+	api.HandleFunc("GET /v1/field-defs", s.listFieldDefs)
+	api.HandleFunc("POST /v1/field-defs", auth.RequireAdmin(s.createFieldDef))
+	api.HandleFunc("PATCH /v1/field-defs/{id}", auth.RequireAdmin(s.updateFieldDef))
+	api.HandleFunc("DELETE /v1/field-defs/{id}", auth.RequireAdmin(s.archiveFieldDef))
+
+	api.HandleFunc("GET /v1/service-types", s.listServiceTypes)
+	api.HandleFunc("PUT /v1/service-types", auth.RequireAdmin(s.upsertServiceType))
+
+	api.HandleFunc("GET /v1/settings", s.getSettings)
+	api.HandleFunc("PATCH /v1/settings", auth.RequireAdmin(s.updateSettings))
+
+	api.HandleFunc("GET /v1/documents", s.listDocuments)
+	api.HandleFunc("POST /v1/documents", auth.RequireWrite(s.createDocument))
+	api.HandleFunc("DELETE /v1/documents/{id}", auth.RequireAdmin(s.deleteDocument))
+
+	// Import / export. Admin-only: bulk movement of beneficiary records is the
+	// highest-consequence operation in the product.
+	api.HandleFunc("GET /v1/export/clients.csv", s.exportClients)
+	api.HandleFunc("GET /v1/export/sessions.csv", s.exportSessions)
+	api.HandleFunc("POST /v1/import/clients", s.importClients)
+
 	root.Handle("/v1/", mw.Wrap(api))
 
 	return s.cors(root)
