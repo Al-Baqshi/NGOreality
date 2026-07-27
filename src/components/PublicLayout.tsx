@@ -7,9 +7,12 @@ import ThemeToggle from './ThemeToggle';
 const navItems = [
   { to: '/public', label: 'Home', end: true },
   { to: '/public/how-it-works', label: 'How It Works' },
-  { to: '/public/verified', label: 'Verified' },
+  // "Verified" and "Directory" read as near-duplicates to a visitor. The
+  // /public/verified route stays and is linked from the footer, so nothing is
+  // de-indexed — it just frees a header slot for a product that earns revenue.
   { to: '/public/directory', label: 'Directory' },
   { to: '/public/reality-badge', label: 'Reality Badge' },
+  { to: '/public/workspace', label: 'Workspace' },
   { to: '/public/blog', label: 'Blog' },
   { to: '/public/about', label: 'About' },
   { to: '/public/contact', label: 'Contact' },
@@ -116,13 +119,18 @@ export default function PublicLayout() {
               </p>
             </div>
 
+            {/*
+              Column headings say WHO each group is for. "Platform" gave no
+              such signal, which is how an internal staff login ended up
+              sitting beside customer links and being read as a customer
+              feature.
+            */}
             <div className="min-w-0">
-              <h4 className="label-brutal text-ink-400 mb-3">Platform</h4>
+              <h4 className="label-brutal text-ink-400 mb-3">For charities</h4>
               <div className="space-y-2">
+                <NavLink to="/public/reality-badge" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Reality Badge</NavLink>
+                <NavLink to="/public/workspace" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Organisation Workspace</NavLink>
                 <NavLink to="/public/how-it-works" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">How It Works</NavLink>
-                <NavLink to="/public/directory" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Verified Directory</NavLink>
-                <NavLink to="/public/verification" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Verification</NavLink>
-                <NavLink to="/public/blog" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Blog</NavLink>
                 <Link
                   to="/ngo/login"
                   className="inline-flex items-center gap-1.5 text-xs text-ink-400 hover:text-white transition-colors py-0.5 min-h-[44px] sm:min-h-0"
@@ -130,27 +138,26 @@ export default function PublicLayout() {
                   <LogIn size={12} aria-hidden />
                   NGO sign in
                 </Link>
-                <Link
-                  to="/staff/login"
-                  className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5"
-                >
-                  Staff CRM
-                </Link>
+                <NavLink to="/ngo/signup" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">NGO sign up</NavLink>
               </div>
             </div>
 
             <div className="min-w-0">
-              <h4 className="label-brutal text-ink-400 mb-3">Organization</h4>
+              <h4 className="label-brutal text-ink-400 mb-3">Trust &amp; verification</h4>
+              <div className="space-y-2">
+                <NavLink to="/public/directory" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Verified Directory</NavLink>
+                <NavLink to="/public/verified" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Verified organisations</NavLink>
+                <NavLink to="/public/verification" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Verification</NavLink>
+              </div>
+            </div>
+
+            <div className="min-w-0">
+              <h4 className="label-brutal text-ink-400 mb-3">Company</h4>
               <div className="space-y-2">
                 <NavLink to="/public/about" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">About</NavLink>
                 <NavLink to="/public/contact" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Contact</NavLink>
+                <NavLink to="/public/blog" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Blog</NavLink>
                 <NavLink to="/public/business-plan" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Business Plan</NavLink>
-              </div>
-            </div>
-
-            <div className="min-w-0">
-              <h4 className="label-brutal text-ink-400 mb-3">Legal</h4>
-              <div className="space-y-2">
                 <NavLink to="/public/privacy" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Privacy Policy</NavLink>
                 <NavLink to="/public/terms" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Terms of Service</NavLink>
               </div>
@@ -161,6 +168,19 @@ export default function PublicLayout() {
             <p className="font-mono text-2xs text-ink-500 uppercase tracking-wider">
               &copy; {new Date().getFullYear()} NGOreality. All rights reserved.
             </p>
+            {/*
+              NGOreality's OWN admin console. It lives here, in the utility
+              bar, rather than in a product column — and the brand name does
+              the possessive work. "Staff CRM" was ambiguous the moment a real
+              customer-facing CRM existed, and labels like "Super admin" read
+              as a permission tier inside the customer's own workspace.
+            */}
+            <Link
+              to="/staff/login"
+              className="font-mono text-2xs text-ink-600 uppercase tracking-wider hover:text-ink-400 transition-colors"
+            >
+              NGOreality staff sign in
+            </Link>
             <p className="font-mono text-2xs text-ink-500 uppercase tracking-wider">
               Independent Verification Body
             </p>
