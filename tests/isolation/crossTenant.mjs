@@ -410,6 +410,33 @@ async function run() {
     await stranger.client.from('workspace_clients').select('*'),
   );
 
+  // Regression: migration 027 allowed self-claim whenever an organisation had
+  // zero members RIGHT NOW. Because organization_members.user_id cascades from
+  // auth.users, an org whose last portal user deleted their account went back
+  // to looking unclaimed while its workspace and every client record survived —
+  // letting anyone claim it and reach that data. Migration 028 records
+  // organizations.claimed_at, which is never cleared.
+  await admin.from('organization_members').delete().eq('organization_id', betaOrg);
+
+  assertBlocked(
+    'stranger cannot re-claim an org whose members were all deleted',
+    await stranger.client
+      .from('organization_members')
+      .insert({ user_id: stranger.id, organization_id: betaOrg, role: 'owner' })
+      .select(),
+  );
+
+  const { data: betaOrgRow } = await admin
+    .from('organizations')
+    .select('claimed_at')
+    .eq('id', betaOrg)
+    .single();
+  check(
+    'claimed_at survives deletion of every membership row',
+    Boolean(betaOrgRow?.claimed_at),
+    `claimed_at = ${betaOrgRow?.claimed_at}`,
+  );
+
   // -- 6. Aggregates do not leak --------------------------------------------
 
   console.log('\n6. workspace_stats() aggregate isolation');

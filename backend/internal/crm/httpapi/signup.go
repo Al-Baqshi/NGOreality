@@ -106,17 +106,31 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if errors.Is(err, tenant.ErrExists) {
-		// Already set up. Make sure this user has a seat — they may be a second
-		// admin arriving after the first one created it — then report success,
-		// so a double-click or a retry is harmless.
-		if seatErr := s.registry.UpsertUser(ctx, t.ID, claims.Subject, claims.Email, seatRoleFor(role)); seatErr != nil {
-			s.log.Error("could not seat user on existing workspace", "err", seatErr, "tenant", t.ID)
-			writeErr(w, http.StatusInternalServerError, "workspace exists but your access could not be granted")
+		// SECURITY: never grant or raise a seat here.
+		//
+		// This branch used to call UpsertUser, which was a privilege-escalation
+		// path into an existing workspace's beneficiary records:
+		//
+		//   1. A user demoted to volunteer in the CRM, but still owner/admin in
+		//      Supabase, could call this and be promoted straight back.
+		//   2. Worse, organization_members.user_id is ON DELETE CASCADE against
+		//      auth.users, so an organisation goes back to having zero members
+		//      when its last portal user deletes their account — while its
+		//      tenant and every client record survive. The Supabase self-claim
+		//      policy then let ANY authenticated user claim that organisation
+		//      and land here to be seated as owner of a live workspace.
+		//
+		// Access to an existing workspace is granted by its owner. The only
+		// thing this branch may do is report the caller's existing seat, which
+		// is what makes a double-click or a retry harmless.
+		if existing, mErr := s.registry.MembershipFor(ctx, claims.Subject, t.ID); mErr == nil {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"tenant": t, "already_existed": true, "role": existing.Role,
+			})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{
-			"tenant": t, "already_existed": true, "role": seatRoleFor(role),
-		})
+		writeErr(w, http.StatusConflict,
+			"this organisation already has a workspace; ask one of its administrators to invite you")
 		return
 	}
 	if err != nil {
@@ -130,15 +144,14 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// seatRoleFor maps a platform role onto a workspace role. A platform admin
-// becomes a workspace admin, not an owner: ownership is granted once, to
-// whoever created the workspace.
-func seatRoleFor(platformRole string) string {
-	if platformRole == "owner" {
-		return "owner"
-	}
-	return "admin"
-}
+// NOTE: a seatRoleFor() helper used to live here, mapping a Supabase org role
+// onto a workspace role. It defaulted to "admin" for anything that was not
+// "owner", which was only safe because the caller happened to reject every
+// other role first. Migration 027 widened organization_members.role to include
+// caseworker/volunteer/viewer, so that default was one relaxed check away from
+// making every viewer a workspace admin. It is deleted rather than fixed: the
+// only seat this endpoint may create is the owner seat for a brand-new
+// workspace, which is set explicitly in Provision.
 
 // eligibility lets the portal decide whether to show a "Create workspace"
 // button without attempting provisioning first.
