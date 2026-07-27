@@ -15,9 +15,11 @@ them out of the Supabase cluster means:
 - The 29k-charity registry can stay broadly readable without touching CRM data.
 - The CRM can be moved to an NZ region later without migrating the marketing site.
 
-The only thing shared between the two systems is the **Supabase JWT secret**,
-used to verify tokens. An NGO signs in once on ngoreality.com and the same
-token works against the CRM API.
+Nothing secret is shared between the two systems. Supabase signs access tokens
+with an asymmetric **ES256** key and publishes the public half at
+`/auth/v1/.well-known/jwks.json`; the CRM verifies against that. An NGO signs
+in once on ngoreality.com and the same token works against the CRM API — with
+no symmetric signing key distributed to the deployment.
 
 ---
 
@@ -173,14 +175,28 @@ health check `/health`, watch pattern `backend/**`.
 |---|---|---|
 | `CRM_DATABASE_URL` | ✅ | Reference to `${{ Postgres.DATABASE_URL }}` |
 | `CRM_ADMIN_API_KEY` | ✅ | Generated; guards the control plane |
-| `SUPABASE_PROJECT_REF` | ✅ | `cpbilbskfbzqlynjhdvm` — pins the issuer claim |
+| `SUPABASE_PROJECT_REF` | ✅ | `cpbilbskfbzqlynjhdvm` — builds the JWKS URL and pins the issuer |
 | `CRM_ALLOWED_ORIGINS` | ✅ | CORS allowlist |
-| `SUPABASE_JWT_SECRET` | ❌ **required** | Supabase → Project Settings → API → JWT Settings |
+| `SUPABASE_JWT_SECRET` | not needed | Only for legacy HS256 projects |
 | `PORT` | auto | Railway injects it; the service binds it |
 
-**The service will refuse to start without `SUPABASE_JWT_SECRET`** — failing
-closed is intentional, since starting without token verification would expose
-every workspace.
+**Token verification requires `SUPABASE_PROJECT_REF` or `SUPABASE_JWT_SECRET`**,
+and the service refuses to start with neither — failing closed is intentional,
+since running without token verification would expose every workspace.
+
+### How tokens are verified
+
+`SUPABASE_PROJECT_REF` is enough. The service fetches the project's public
+signing keys at boot (so a wrong ref fails at startup, not at a user's first
+login), caches them with a TTL, and refetches on key rotation. A refresh
+throttle stops tokens carrying unknown key IDs from driving one upstream fetch
+per request, and a stale cached key is preferred over failing every request
+while the JWKS endpoint is briefly unreachable.
+
+Algorithm confusion is closed in both directions: an ES256 token is rejected
+when no JWKS is configured, and an HS256 token is rejected when no symmetric
+secret is configured. Without the second check, an attacker holding the public
+key could sign an HS256 token using it as the HMAC secret.
 
 ### Migrations
 
