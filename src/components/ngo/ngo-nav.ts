@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
-import { Activity, Award, Bell, Calendar, LayoutDashboard, RefreshCw, Shield, Sparkles, User, UserPlus } from 'lucide-react';
+import { WORKSPACE_ENABLED } from '../../config/features';
+import { Activity, Award, Bell, Calendar, LayoutDashboard, RefreshCw, Shield, Sparkles, User, UserPlus, Users } from 'lucide-react';
 
 export type NgoNavItem = {
   id: string;
@@ -16,8 +17,21 @@ export const NGO_PORTAL_NAV_ONBOARDING: NgoNavItem[] = [
   { id: 'registration', label: 'Complete registration', icon: UserPlus, path: '/ngo/signup' },
 ];
 
+const WORKSPACE_NAV: NgoNavItem[] = WORKSPACE_ENABLED
+  ? [
+      {
+        id: 'workspace',
+        label: 'Client workspace',
+        icon: Users,
+        path: `${NGO_PORTAL_BASE}/workspace`,
+        description: 'Clients, cases & service records',
+      },
+    ]
+  : [];
+
 export const NGO_PORTAL_NAV: NgoNavItem[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard, path: NGO_PORTAL_BASE },
+  ...WORKSPACE_NAV,
   { id: 'profile', label: 'Profile', icon: User, path: `${NGO_PORTAL_BASE}/profile`, description: 'Mission, logo & completion' },
   { id: 'setup-request', label: 'Setup request', icon: Sparkles, path: `${NGO_PORTAL_BASE}/setup-request`, description: 'Landing page & brand' },
   { id: 'membership', label: 'Membership', icon: Calendar, path: `${NGO_PORTAL_BASE}/membership`, description: 'Annual plan & renewal' },

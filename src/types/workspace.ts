@@ -92,6 +92,16 @@ export interface WorkspaceClient {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+
+  /**
+   * Restricted attributes, returned by `GET /v1/clients/{id}` only for roles
+   * permitted to see them.
+   *
+   * Absent — not null, not blanked — for volunteer and viewer, because the
+   * server never selects those columns for them. Treat `undefined` as "you
+   * cannot see this", never as "there is none recorded".
+   */
+  sensitive?: WorkspaceClientSensitive;
 }
 
 /** Separate table with a tighter policy — may be absent for a given client. */

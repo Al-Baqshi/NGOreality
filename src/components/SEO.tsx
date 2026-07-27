@@ -13,13 +13,32 @@ interface SEOProps {
   type?: 'website' | 'article';
   image?: string;
   publishedTime?: string;
+  /**
+   * Keeps a page out of search results. Set on anything behind a login —
+   * particularly the workspace, where URLs relate to beneficiary records and
+   * must never appear in an index or a referrer-derived crawl.
+   */
+  noindex?: boolean;
 }
 
-export default function SEO({ title, description, path, type = 'website', image, publishedTime }: SEOProps) {
+export default function SEO({ title, description, path, type = 'website', image, publishedTime, noindex = false }: SEOProps) {
   const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} — Digital Trust Infrastructure for Nonprofits`;
   const desc = description || DEFAULT_DESCRIPTION;
   const url = absoluteUrl(path || '/');
   const ogImage = image || absoluteUrl('/og-default.png');
+
+  if (noindex) {
+    // Private pages get no canonical, no Open Graph and no description —
+    // there is nothing here that should be shared, previewed or crawled.
+    return (
+      <Helmet>
+        <title>{fullTitle}</title>
+        <meta name="robots" content="noindex, nofollow, noarchive" />
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="referrer" content="no-referrer" />
+      </Helmet>
+    );
+  }
 
   return (
     <Helmet>

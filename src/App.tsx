@@ -9,6 +9,7 @@ import { isSupabaseConfigured } from './lib/supabase';
    profiles) no longer ships the CRM, NGO portal, or their heavy libraries
    (recharts, jspdf, exceljs, html2canvas). Each page loads on demand. */
 
+import { WORKSPACE_ENABLED } from './config/features';
 // Public
 const Homepage = lazy(() => import('./pages/public/Homepage'));
 const HowItWorks = lazy(() => import('./pages/public/HowItWorks'));
@@ -62,6 +63,17 @@ const NgoBadgePage = lazy(() => import('./pages/ngo/portal/NgoBadgePage'));
 const NgoMonitoringPage = lazy(() => import('./pages/ngo/portal/NgoMonitoringPage'));
 const NgoRequestsPage = lazy(() => import('./pages/ngo/portal/NgoRequestsPage'));
 const NgoNotificationsPage = lazy(() => import('./pages/ngo/portal/NgoNotificationsPage'));
+
+// Organisation Workspace — the case management CRM. Backed by the Go service
+// on its own database, not Supabase (see docs/CRM_SAAS.md).
+const NgoWorkspacePage = lazy(() => import('./pages/ngo/workspace/NgoWorkspacePage'));
+const NgoWorkspaceClientsPage = lazy(() => import('./pages/ngo/workspace/NgoWorkspaceClientsPage'));
+const NgoWorkspaceClientDetailPage = lazy(
+  () => import('./pages/ngo/workspace/NgoWorkspaceClientDetailPage'),
+);
+const NgoWorkspaceCaseDetailPage = lazy(
+  () => import('./pages/ngo/workspace/NgoWorkspaceCaseDetailPage'),
+);
 
 function RouteFallback() {
   return (
@@ -130,6 +142,14 @@ export default function App() {
                 <Route path="monitoring" element={<NgoMonitoringPage />} />
                 <Route path="requests" element={<NgoRequestsPage />} />
                 <Route path="notifications" element={<NgoNotificationsPage />} />
+                {WORKSPACE_ENABLED && (
+                  <>
+                    <Route path="workspace" element={<NgoWorkspacePage />} />
+                    <Route path="workspace/clients" element={<NgoWorkspaceClientsPage />} />
+                    <Route path="workspace/clients/:id" element={<NgoWorkspaceClientDetailPage />} />
+                    <Route path="workspace/cases/:id" element={<NgoWorkspaceCaseDetailPage />} />
+                  </>
+                )}
               </Route>
             </Route>
           </Route>

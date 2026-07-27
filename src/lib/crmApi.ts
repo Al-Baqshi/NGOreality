@@ -130,6 +130,44 @@ async function request<T>(
 }
 
 // ---------------------------------------------------------------------------
+// Signup
+// ---------------------------------------------------------------------------
+
+export interface SignupResult {
+  tenant: CrmIdentity['tenant'];
+  already_existed: boolean;
+  role: OrganizationRole;
+}
+
+/**
+ * Creates the workspace for an organisation the signed-in user owns or
+ * administers. The server re-checks that against Supabase using this user's
+ * own token, so passing another organisation's id gets a 403.
+ *
+ * Safe to call twice — an existing workspace returns `already_existed: true`
+ * and grants the caller a seat rather than erroring.
+ */
+export const createWorkspace = (organizationId: string, name?: string) =>
+  request<SignupResult>('/v1/signup', {
+    method: 'POST',
+    body: JSON.stringify({ organization_id: organizationId, name: name ?? '' }),
+  });
+
+export interface SignupEligibility {
+  exists: boolean;
+  can_create: boolean;
+  has_access: boolean;
+  tenant?: CrmIdentity['tenant'];
+  role?: OrganizationRole;
+}
+
+/** Lets the portal show the right thing without attempting provisioning. */
+export const checkSignupEligibility = (organizationId: string) =>
+  request<SignupEligibility>('/v1/signup/eligibility', {
+    query: { organization_id: organizationId },
+  });
+
+// ---------------------------------------------------------------------------
 // Identity
 // ---------------------------------------------------------------------------
 
