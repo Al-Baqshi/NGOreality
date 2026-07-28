@@ -68,7 +68,7 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Does this user actually run this NGO?
-	role, err := s.supabase.OrganizationRole(ctx, raw, in.OrganizationID)
+	role, err := s.supabase.OrganizationRole(ctx, raw, claims.Subject, in.OrganizationID)
 	if err != nil {
 		s.log.Error("membership check failed", "err", err, "org", in.OrganizationID)
 		writeErr(w, http.StatusBadGateway, "could not verify your organisation membership")
@@ -197,7 +197,7 @@ func (s *Server) signupEligibility(w http.ResponseWriter, r *http.Request) {
 
 	canCreate := false
 	if s.supabase.Configured() {
-		if role, rErr := s.supabase.OrganizationRole(ctx, raw, orgID); rErr == nil {
+		if role, rErr := s.supabase.OrganizationRole(ctx, raw, claims.Subject, orgID); rErr == nil {
 			canCreate = role == "owner" || role == "admin"
 		}
 	}

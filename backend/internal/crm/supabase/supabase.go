@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -37,22 +38,42 @@ func (c *Client) Configured() bool {
 
 type orgMember struct {
 	OrganizationID string `json:"organization_id"`
+	UserID         string `json:"user_id"`
 	Role           string `json:"role"`
 }
 
-// OrganizationRole returns the caller's role in an organisation, or an empty
+// OrganizationRole returns THIS USER'S role in an organisation, or an empty
 // string when they have none.
 //
-// Because the request carries the user's own token, a user who is not a member
-// simply gets zero rows back — there is no way to probe another NGO's data.
-func (c *Client) OrganizationRole(ctx context.Context, userToken, organizationID string) (string, error) {
+// SECURITY: the query filters on user_id explicitly. An earlier version relied
+// on RLS alone, reasoning that "the request carries the user's own token, so a
+// non-member gets zero rows back". That reasoning was wrong and the result was
+// a workspace-takeover bug:
+//
+//	Migration 021 added a policy on organization_members whose USING clause is
+//	  user_id = auth.uid() OR is_staff_user()
+//	  OR organization_id IN (SELECT id FROM organizations
+//	                         WHERE status IN ('listed','verified','active'))
+//
+//	— so ANY authenticated user can read the membership rows of ANY of the
+//	~29,000 listed charities. The unfiltered query therefore returned the REAL
+//	owner's row to a stranger, this function reported "owner", and the signup
+//	handler provisioned that charity's workspace to the attacker, locking the
+//	genuine charity out of its own organisation.
+//
+// Never infer "these rows are mine" from the presence of a token. Filter on
+// the verified subject, and treat RLS as the second line, not the first.
+func (c *Client) OrganizationRole(ctx context.Context, userToken, userID, organizationID string) (string, error) {
 	if !c.Configured() {
 		return "", fmt.Errorf("supabase membership checks are not configured")
 	}
+	if strings.TrimSpace(userID) == "" {
+		return "", fmt.Errorf("membership lookup: userID is required")
+	}
 
 	endpoint := fmt.Sprintf(
-		"%s/rest/v1/organization_members?select=organization_id,role&organization_id=eq.%s&limit=1",
-		c.baseURL, url.QueryEscape(organizationID),
+		"%s/rest/v1/organization_members?select=organization_id,user_id,role&organization_id=eq.%s&user_id=eq.%s&limit=1",
+		c.baseURL, url.QueryEscape(organizationID), url.QueryEscape(userID),
 	)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
@@ -83,6 +104,15 @@ func (c *Client) OrganizationRole(ctx context.Context, userToken, organizationID
 	if len(rows) == 0 {
 		return "", nil
 	}
+
+	// Belt and braces: confirm the row that came back is actually this user's.
+	// If a future policy or query change ever widens the result again, this
+	// fails closed instead of handing over someone else's role.
+	if rows[0].UserID != userID || rows[0].OrganizationID != organizationID {
+		return "", fmt.Errorf(
+			"membership lookup returned a row for a different user or organisation; refusing")
+	}
+
 	return rows[0].Role, nil
 }
 
