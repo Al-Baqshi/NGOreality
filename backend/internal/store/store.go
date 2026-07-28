@@ -315,11 +315,11 @@ func logActivity(ctx context.Context, tx pgx.Tx, orgID, action, description stri
 }
 
 type MonitorStats struct {
-	MonitorsTotal   int
-	MonitorsUp      int
-	MonitorsDown    int
-	OpenIncidents   int
-	ChecksLast24h   int
+	MonitorsTotal int
+	MonitorsUp    int
+	MonitorsDown  int
+	OpenIncidents int
+	ChecksLast24h int
 }
 
 func (s *Store) MonitorStats(ctx context.Context) (MonitorStats, error) {

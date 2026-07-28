@@ -8,16 +8,16 @@ import (
 )
 
 type NotificationEvent struct {
-	ID              string
-	OrganizationID  string
-	IncidentID      *string
-	Template        string
-	RecipientEmail  string
-	Subject         string
-	BodyText        string
-	Status          string
-	ErrorMessage    string
-	CreatedAt       time.Time
+	ID               string
+	OrganizationID   string
+	IncidentID       *string
+	Template         string
+	RecipientEmail   string
+	Subject          string
+	BodyText         string
+	Status           string
+	ErrorMessage     string
+	CreatedAt        time.Time
 	OrganizationName string
 }
 

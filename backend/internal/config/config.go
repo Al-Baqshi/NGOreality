@@ -78,9 +78,11 @@ func Load() (Config, error) {
 		CheckFailureThreshold: failureThreshold,
 		MonitorStatuses:       trimmed,
 		ResendAPIKey:          strings.TrimSpace(os.Getenv("RESEND_API_KEY")),
-		NotifyFromEmail:       envString("NOTIFY_FROM_EMAIL", "NGOreality <notifications@ngoreality.com>"),
-		NotifyStaffEmail:      strings.TrimSpace(os.Getenv("NOTIFY_STAFF_EMAIL")),
-		TurnstileSecretKey:    strings.TrimSpace(os.Getenv("TURNSTILE_SECRET_KEY")),
+		// The verified Resend domain is contact.ngoreality.com, NOT the apex.
+		// Sending from an unverified domain is rejected outright by Resend.
+		NotifyFromEmail:    envString("NOTIFY_FROM_EMAIL", "NGOreality <notifications@contact.ngoreality.com>"),
+		NotifyStaffEmail:   strings.TrimSpace(os.Getenv("NOTIFY_STAFF_EMAIL")),
+		TurnstileSecretKey: strings.TrimSpace(os.Getenv("TURNSTILE_SECRET_KEY")),
 	}, nil
 }
 
