@@ -43,6 +43,7 @@ const OutreachBoard = lazy(() => import('./pages/crm/OutreachBoard'));
 const InboundQueue = lazy(() => import('./pages/crm/InboundQueue'));
 const CustomersList = lazy(() => import('./pages/crm/CustomersList'));
 const PaymentsList = lazy(() => import('./pages/crm/PaymentsList'));
+const Reconciliation = lazy(() => import('./pages/crm/Reconciliation'));
 const CashFlow = lazy(() => import('./pages/crm/CashFlow'));
 const WorkQueue = lazy(() => import('./pages/crm/WorkQueue'));
 const CrmBadges = lazy(() => import('./pages/crm/CrmBadges'));
@@ -114,6 +115,7 @@ export default function App() {
               <Route path="/inbound" element={<InboundQueue />} />
               <Route path="/customers" element={<CustomersList />} />
               <Route path="/payments" element={<PaymentsList />} />
+              <Route path="/reconciliation" element={<Reconciliation />} />
               {/* TODO: re-enable once external business plan is finalized */}
               {/* <Route path="/plan" element={<BusinessPlan />} /> */}
               <Route path="/cash-flow" element={<CashFlow />} />

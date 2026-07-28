@@ -6,6 +6,7 @@ import {
   Building2,
   CreditCard,
   FileText,
+  Landmark,
   Globe,
   Inbox,
   Kanban,
@@ -38,6 +39,7 @@ export const CRM_NAV_GROUPS: CrmNavGroup[] = [
       { to: '/inbound', icon: Inbox, label: 'Inbound' },
       { to: '/customers', icon: UserCheck, label: 'Customers' },
       { to: '/payments', icon: CreditCard, label: 'Payments' },
+      { to: '/reconciliation', icon: Landmark, label: 'Reconciliation' },
     ],
   },
   {
