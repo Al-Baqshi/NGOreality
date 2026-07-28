@@ -26,16 +26,54 @@ var (
 	ErrBadIssuer    = errors.New("unexpected token issuer")
 )
 
+// Audience handles the `aud` claim, which RFC 7519 allows to be EITHER a single
+// string OR an array of strings.
+//
+// Decoding it as a plain string is a latent total outage: the day the issuer
+// emits ["authenticated"] instead of "authenticated", json.Unmarshal fails,
+// every token is rejected as malformed, and every signed-in user loses the
+// workspace at once — with nothing in the logs but "invalid token".
+type Audience []string
+
+func (a *Audience) UnmarshalJSON(b []byte) error {
+	var single string
+	if err := json.Unmarshal(b, &single); err == nil {
+		*a = Audience{single}
+		return nil
+	}
+	var many []string
+	if err := json.Unmarshal(b, &many); err != nil {
+		return fmt.Errorf("aud must be a string or an array of strings")
+	}
+	*a = Audience(many)
+	return nil
+}
+
+// Contains reports whether the audience includes want. An absent audience is
+// permitted (Supabase omits it in some flows); an audience that is present but
+// does not match is not.
+func (a Audience) Contains(want string) bool {
+	if len(a) == 0 {
+		return true
+	}
+	for _, v := range a {
+		if v == want {
+			return true
+		}
+	}
+	return false
+}
+
 // Claims is the subset of the Supabase access token we rely on.
 type Claims struct {
-	Subject   string `json:"sub"`
-	Email     string `json:"email"`
-	Role      string `json:"role"`
-	Audience  string `json:"aud"`
-	Issuer    string `json:"iss"`
-	ExpiresAt int64  `json:"exp"`
-	IssuedAt  int64  `json:"iat"`
-	NotBefore int64  `json:"nbf"`
+	Subject   string   `json:"sub"`
+	Email     string   `json:"email"`
+	Role      string   `json:"role"`
+	Audience  Audience `json:"aud"`
+	Issuer    string   `json:"iss"`
+	ExpiresAt int64    `json:"exp"`
+	IssuedAt  int64    `json:"iat"`
+	NotBefore int64    `json:"nbf"`
 }
 
 // Verifier checks Supabase access tokens.
@@ -142,7 +180,7 @@ func (v *Verifier) Verify(token string) (*Claims, error) {
 	if claims.NotBefore > 0 && now.Before(time.Unix(claims.NotBefore, 0).Add(-v.Leeway)) {
 		return nil, ErrNotYetValid
 	}
-	if claims.Audience != "" && claims.Audience != "authenticated" {
+	if !claims.Audience.Contains("authenticated") {
 		return nil, ErrBadAudience
 	}
 	if v.expectedIssuer != "" && claims.Issuer != "" && claims.Issuer != v.expectedIssuer {

@@ -180,3 +180,57 @@ func TestRolePermissions(t *testing.T) {
 		}
 	}
 }
+
+// RFC 7519 allows `aud` to be a string OR an array. Decoding it as a plain
+// string is a latent total outage: the day the issuer emits ["authenticated"],
+// every token becomes "malformed" and every signed-in user loses the workspace
+// at once.
+func TestVerifyAcceptsAudienceAsArray(t *testing.T) {
+	v := NewVerifier(testSecret, "")
+	c := validClaims()
+	c["aud"] = []string{"authenticated"}
+
+	if _, err := v.Verify(mint(t, testSecret, map[string]any{"alg": "HS256"}, c)); err != nil {
+		t.Fatalf("array-form aud must verify, got %v", err)
+	}
+}
+
+func TestVerifyAcceptsAudienceArrayContainingAuthenticated(t *testing.T) {
+	v := NewVerifier(testSecret, "")
+	c := validClaims()
+	c["aud"] = []string{"some-other-service", "authenticated"}
+
+	if _, err := v.Verify(mint(t, testSecret, map[string]any{"alg": "HS256"}, c)); err != nil {
+		t.Fatalf("aud array containing 'authenticated' must verify, got %v", err)
+	}
+}
+
+func TestVerifyRejectsAudienceArrayWithoutAuthenticated(t *testing.T) {
+	v := NewVerifier(testSecret, "")
+	c := validClaims()
+	c["aud"] = []string{"some-other-service"}
+
+	if _, err := v.Verify(mint(t, testSecret, map[string]any{"alg": "HS256"}, c)); err != ErrBadAudience {
+		t.Fatalf("expected ErrBadAudience, got %v", err)
+	}
+}
+
+func TestVerifyAcceptsMissingAudience(t *testing.T) {
+	v := NewVerifier(testSecret, "")
+	c := validClaims()
+	delete(c, "aud")
+
+	if _, err := v.Verify(mint(t, testSecret, map[string]any{"alg": "HS256"}, c)); err != nil {
+		t.Fatalf("absent aud must verify (Supabase omits it in some flows), got %v", err)
+	}
+}
+
+func TestVerifyRejectsNonsenseAudienceType(t *testing.T) {
+	v := NewVerifier(testSecret, "")
+	c := validClaims()
+	c["aud"] = 12345
+
+	if _, err := v.Verify(mint(t, testSecret, map[string]any{"alg": "HS256"}, c)); err == nil {
+		t.Fatal("a numeric aud was accepted")
+	}
+}
