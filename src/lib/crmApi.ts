@@ -22,7 +22,19 @@ import type {
   WorkspaceStats,
 } from '../types/workspace';
 
-const BASE_URL = (import.meta.env.VITE_CRM_API_URL ?? '').replace(/\/$/, '');
+/**
+ * The CRM service lives on our own domain, not a vendor hostname.
+ *
+ * api.ngoreality.com is a CNAME we control, so moving off Railway later is a
+ * DNS change rather than a rebuild — and any callback URL registered with a
+ * payment provider stays valid. The env override remains for staging and local
+ * work; production needs no variable set at all.
+ */
+const DEFAULT_CRM_API_URL = 'https://api.ngoreality.com';
+
+const BASE_URL = (
+  (import.meta.env.VITE_CRM_API_URL as string | undefined)?.trim() || DEFAULT_CRM_API_URL
+).replace(/\/$/, '');
 
 export const CRM_API_CONFIGURED = BASE_URL !== '';
 
