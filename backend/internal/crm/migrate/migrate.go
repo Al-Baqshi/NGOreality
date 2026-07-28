@@ -76,11 +76,24 @@ func load(dir string) ([]Migration, error) {
 
 	sort.Slice(out, func(i, j int) bool { return out[i].Version < out[j].Version })
 
+	// Two files sharing a version is the likely mistake (two branches both
+	// adding "0002_"), and the consecutive check below reports it as a
+	// confusing off-by-one. Name the actual culprits instead — this cost a
+	// production deploy once.
+	for i := 1; i < len(out); i++ {
+		if out[i].Version == out[i-1].Version {
+			return nil, fmt.Errorf(
+				"migrations in %s: duplicate version %04d used by both %q and %q; renumber one of them",
+				dir, out[i].Version, out[i-1].Name, out[i].Name,
+			)
+		}
+	}
+
 	for i := range out {
 		if out[i].Version != i+1 {
 			return nil, fmt.Errorf(
-				"migrations in %s must be numbered consecutively from 1; got %d at position %d",
-				dir, out[i].Version, i+1,
+				"migrations in %s must be numbered consecutively from 1; expected %04d but %q is %04d",
+				dir, i+1, out[i].Name, out[i].Version,
 			)
 		}
 	}
