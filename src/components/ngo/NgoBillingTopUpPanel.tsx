@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, Copy, Check, CreditCard, Landmark, Wallet } from 'lucide-react';
 import { ensurePaymentReference } from '../../lib/payments';
-import { bankTransferDetailsConfigured, bankTransferLines, MEMBERSHIP_TOP_UP_AMOUNT_LABEL } from '../../lib/ngoBilling';
+import {
+  bankTransferDetailsConfigured,
+  bankTransferLines,
+  MEMBERSHIP_GST_NOTE,
+  MEMBERSHIP_PAYABLE_LABEL,
+  MEMBERSHIP_PRICE_LABEL,
+} from '../../lib/ngoBilling';
 import {
   AIRWALLET_AVAILABLE,
   BANK_TRANSFER_PROCESSING_BUSINESS_DAYS,
@@ -50,10 +56,16 @@ export default function NgoBillingTopUpPanel({
         <div>
           <h3 className="text-sm font-black uppercase tracking-tight">Top up / pay membership</h3>
           {showMembershipAmount && (
-            <p className="text-xs text-ink-600 mt-1 leading-relaxed">
-              Annual membership is {MEMBERSHIP_TOP_UP_AMOUNT_LABEL} (NZD), including trust review, Reality Badge (when
-              standards pass), and website monitoring.
-            </p>
+            <>
+              <p className="text-xs text-ink-600 mt-1 leading-relaxed">
+                Annual membership is {MEMBERSHIP_PRICE_LABEL} (NZD) — transfer{' '}
+                {MEMBERSHIP_PAYABLE_LABEL}. Includes trust review, Reality Badge (when standards
+                pass), and website monitoring.
+              </p>
+              {/* A treasurer reconciling a bank line against an invoice needs to
+                  know why there is no GST on it. Saying so here avoids the email. */}
+              <p className="text-2xs text-ink-500 mt-1 leading-relaxed">{MEMBERSHIP_GST_NOTE}</p>
+            </>
           )}
         </div>
       </div>

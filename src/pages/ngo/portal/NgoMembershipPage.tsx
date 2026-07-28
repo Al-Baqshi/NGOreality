@@ -10,7 +10,7 @@ import {
   getMembershipDisplayStatus,
   MEMBERSHIP_STATUS_LABELS,
 } from '../../../lib/membership';
-import { MEMBERSHIP_ANNUAL_CENTS, PRICING_CURRENCY } from '../../../config/pricing';
+import { GST_PRICE_SUFFIX, MEMBERSHIP_ANNUAL_CENTS, PRICING_CURRENCY } from '../../../config/pricing';
 import { PAYMENT_STATUS_LABELS, type OrganizationPayment } from '../../../types';
 import NgoPortalPageShell from '../../../components/ngo/NgoPortalPageShell';
 import NgoBillingTopUpPanel from '../../../components/ngo/NgoBillingTopUpPanel';
@@ -41,10 +41,12 @@ export default function NgoMembershipPage() {
 
   const latestMembership = getLatestMembership(memberships);
   const membershipStatus = getMembershipDisplayStatus(latestMembership);
-  const membershipPrice = new Intl.NumberFormat('en-NZ', {
+  // Always rendered with its GST status attached — a bare number here is how a
+  // customer ends up believing the price was tax-inclusive when it was not.
+  const membershipPrice = `${new Intl.NumberFormat('en-NZ', {
     style: 'currency',
     currency: PRICING_CURRENCY,
-  }).format(MEMBERSHIP_ANNUAL_CENTS / 100);
+  }).format(MEMBERSHIP_ANNUAL_CENTS / 100)} ${GST_PRICE_SUFFIX}`;
 
   const pendingPayment = payments.find(
     (p) =>
