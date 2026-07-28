@@ -59,6 +59,12 @@ func (s *Server) Handler() http.Handler {
 	root.HandleFunc("POST /v1/signup", s.signup)
 	root.HandleFunc("GET /v1/signup/eligibility", s.signupEligibility)
 
+	// Invitation redemption is outside the tenant middleware for the same
+	// reason: the invitee has no seat yet. Go 1.22 pattern precedence puts
+	// these more specific patterns ahead of the "/v1/" catch-all below.
+	root.HandleFunc("GET /v1/invites/{token}", s.previewInvite)
+	root.HandleFunc("POST /v1/invites/{token}/accept", s.acceptInvite)
+
 	// Authenticated tenant API.
 	api := http.NewServeMux()
 	api.HandleFunc("GET /v1/me", s.me)
@@ -106,6 +112,14 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /v1/documents", s.listDocuments)
 	api.HandleFunc("POST /v1/documents", auth.RequireWrite(s.createDocument))
 	api.HandleFunc("DELETE /v1/documents/{id}", auth.RequireAdmin(s.deleteDocument))
+
+	// Team seats. The tenant always comes from the principal, never the
+	// request — no endpoint here accepts a tenant identifier.
+	api.HandleFunc("GET /v1/team", s.listTeam)
+	api.HandleFunc("POST /v1/team/invites", auth.RequireAdmin(s.createInvite))
+	api.HandleFunc("DELETE /v1/team/invites/{id}", auth.RequireAdmin(s.revokeInvite))
+	api.HandleFunc("PATCH /v1/team/members/{user_id}", auth.RequireAdmin(s.updateSeat))
+	api.HandleFunc("DELETE /v1/team/members/{user_id}", auth.RequireAdmin(s.removeSeat))
 
 	// Import / export. Admin-only: bulk movement of beneficiary records is the
 	// highest-consequence operation in the product.
