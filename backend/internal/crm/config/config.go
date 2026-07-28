@@ -28,6 +28,11 @@ type Config struct {
 	// AdminAPIKey guards control-plane endpoints (tenant provisioning).
 	AdminAPIKey string
 
+	// PaymarkEnv selects which Paymark JWKS and API host to trust.
+	// Defaults to sandbox: trusting production keys by accident is worse than
+	// refusing a real payment loudly.
+	PaymarkEnv string
+
 	// SupabaseAnonKey is the project's public key. It is required by
 	// Supabase's gateway on every PostgREST call; it grants nothing on its
 	// own, since RLS decides access from the user's token.
@@ -96,6 +101,7 @@ func Load() (Config, error) {
 		SupabaseProjectRef: projectRef,
 		AdminAPIKey:        strings.TrimSpace(os.Getenv("CRM_ADMIN_API_KEY")),
 		SupabaseAnonKey:    strings.TrimSpace(os.Getenv("SUPABASE_ANON_KEY")),
+		PaymarkEnv:         envString("PAYMARK_ENV", "sandbox"),
 		AllowedOrigins:     splitList(envString("CRM_ALLOWED_ORIGINS", "https://www.ngoreality.com,http://localhost:5173")),
 		MaxConns:           maxConns,
 		MinConns:           minConns,

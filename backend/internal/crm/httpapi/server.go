@@ -20,6 +20,7 @@ import (
 
 	"ngoreality/backend/internal/crm/auth"
 	"ngoreality/backend/internal/crm/config"
+	"ngoreality/backend/internal/crm/payments"
 	"ngoreality/backend/internal/crm/store"
 	"ngoreality/backend/internal/crm/supabase"
 	"ngoreality/backend/internal/crm/tenant"
@@ -32,11 +33,19 @@ type Server struct {
 	registry *tenant.Registry
 	verifier *auth.Verifier
 	supabase *supabase.Client
+	paymark  *payments.Verifier
 	log      *slog.Logger
 }
 
 func New(cfg config.Config, registry *tenant.Registry, verifier *auth.Verifier, sb *supabase.Client, log *slog.Logger) *Server {
-	return &Server{cfg: cfg, registry: registry, verifier: verifier, supabase: sb, log: log}
+	return &Server{
+		cfg:      cfg,
+		registry: registry,
+		verifier: verifier,
+		supabase: sb,
+		paymark:  payments.NewVerifier(payments.Environment(cfg.PaymarkEnv)),
+		log:      log,
+	}
 }
 
 // Handler builds the full route table.
@@ -56,6 +65,13 @@ func (s *Server) Handler() http.Handler {
 	// Self-serve signup sits outside the tenant middleware: the caller has no
 	// workspace yet, so resolving them to one would fail before they could
 	// create it. It authenticates the token itself.
+	// Payment notifications. Authenticated ONLY by the provider's JWT signature
+	// — Paymark holds no Supabase token and no admin key.
+	root.HandleFunc("POST /v1/payments/paymark/callback", s.paymarkCallback)
+	root.HandleFunc("GET /v1/payments/paymark/health", s.paymarkHealth)
+	root.HandleFunc("GET /v1/admin/payment-events", s.adminOnly(s.listPaymentEvents))
+	root.HandleFunc("POST /v1/admin/payment-events/{id}/reconcile", s.adminOnly(s.markPaymentEventReconciled))
+
 	root.HandleFunc("POST /v1/signup", s.signup)
 	root.HandleFunc("GET /v1/signup/eligibility", s.signupEligibility)
 
