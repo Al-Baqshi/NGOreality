@@ -64,8 +64,9 @@ export default function WorkspaceSignupCard({
           <ul className="mt-4 space-y-1.5 text-sm text-muted-foreground">
             <li>
               <strong className="text-foreground">Private to your organisation.</strong> Your
-              records live in their own database schema. No other charity — and no one at
-              NGOreality — can read them.
+              records live in their own database schema, unreachable by any other charity. Our
+              own support access is break-glass only and writes an entry into your audit log
+              every time it is used.
             </li>
             <li>
               <strong className="text-foreground">Roles for your team.</strong> Volunteers can

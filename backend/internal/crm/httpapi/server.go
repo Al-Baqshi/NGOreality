@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -219,11 +220,35 @@ func (s *Server) migrateTenants(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, status, map[string]int{"migrated": migrated, "failed": failed})
 }
 
+// adminUpsertUser is the break-glass seat grant: account recovery when a
+// charity has locked itself out, and nothing else.
+//
+// It used to accept ANY role — including owner — with no validation, guarded
+// only by the shared admin key, and it wrote nothing the customer could see.
+// That made it a silent backdoor into beneficiary health records, and it made
+// the Data Processing Addendum's claim that staff "carry no permissions inside
+// any customer workspace" untrue.
+//
+// The endpoint stays, because account recovery is a real need. What changes is
+// that it can no longer be used invisibly:
+//
+//   - a written reason is required, and is recorded;
+//   - granting 'owner' needs an explicit break-glass flag, so it cannot happen
+//     by fat-finger;
+//   - every use is written to the TENANT'S OWN audit log, which their
+//     administrators can read, as well as to the platform provisioning log.
+//
+// The protection is therefore not "we promise not to" — it is "we cannot do it
+// without leaving a record in your workspace that you can see".
 func (s *Server) adminUpsertUser(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		UserID string `json:"user_id"`
 		Email  string `json:"email"`
 		Role   string `json:"role"`
+		// Reason is mandatory and ends up in the customer's audit log.
+		Reason string `json:"reason"`
+		// AllowOwner must be explicitly true to grant ownership.
+		AllowOwner bool `json:"allow_owner"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -232,11 +257,68 @@ func (s *Server) adminUpsertUser(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "user_id and role are required")
 		return
 	}
-	if err := s.registry.UpsertUser(r.Context(), r.PathValue("id"), in.UserID, in.Email, in.Role); err != nil {
+	if strings.TrimSpace(in.Reason) == "" {
+		writeErr(w, http.StatusBadRequest,
+			"reason is required: it is recorded in the customer's own audit log")
+		return
+	}
+	if in.Role == "owner" && !in.AllowOwner {
+		writeErr(w, http.StatusBadRequest,
+			"granting owner requires allow_owner:true — ownership is transferred, not assigned")
+		return
+	}
+	if in.Role != "owner" && !tenant.IsAssignableRole(in.Role) {
+		writeErr(w, http.StatusBadRequest, "unknown role")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	tenantID := r.PathValue("id")
+	t, err := s.registry.ByID(ctx, tenantID)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "workspace not found")
+		return
+	}
+
+	// Record the intent BEFORE acting, so an attempt that fails part-way is
+	// still visible rather than silently absent.
+	s.registry.LogProvisioning(ctx, tenantID, "admin_seat_grant",
+		fmt.Sprintf("role=%s user=%s reason=%s", in.Role, in.UserID, in.Reason), true)
+
+	if err := s.registry.UpsertUser(ctx, tenantID, in.UserID, in.Email, in.Role); err != nil {
 		writeErr(w, http.StatusInternalServerError, "could not assign seat")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+
+	// Write into the CUSTOMER'S audit log. This is the part that matters: a
+	// support action they cannot see is indistinguishable from a backdoor.
+	if conn, aErr := s.registry.Acquire(ctx, t); aErr == nil {
+		auditErr := store.Audit(ctx, conn.Tx, in.UserID, "seat", "", "create", map[string]any{
+			"granted_by": "ngoreality_support",
+			"role":       in.Role,
+			"reason":     in.Reason,
+			"note":       "Seat granted by NGOreality support using the break-glass admin path.",
+		})
+		if auditErr != nil {
+			_ = conn.Close(ctx)
+			s.log.Error("admin seat grant not audited in tenant log", "err", auditErr, "tenant", tenantID)
+		} else if cErr := conn.Commit(ctx); cErr != nil {
+			s.log.Error("admin seat grant audit commit failed", "err", cErr, "tenant", tenantID)
+		}
+	} else {
+		s.log.Error("could not open tenant to audit admin seat grant", "err", aErr, "tenant", tenantID)
+	}
+
+	s.log.Warn("break-glass seat granted",
+		"tenant", tenantID, "user", in.UserID, "role", in.Role, "reason", in.Reason)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":  "ok",
+		"audited": true,
+		"note":    "Recorded in the customer's audit log.",
+	})
 }
 
 // ---------------------------------------------------------------------------

@@ -50,9 +50,11 @@ const sections = [
   {
     title: 'Who at NGOreality can see your records',
     body: [
-      'By default, nobody. Our staff accounts carry no permissions inside any customer workspace. This is enforced by the system, not by policy: administrative rights on the NGOreality platform grant nothing inside your workspace.',
-      'We may access your records only in these circumstances: where you ask us to, in order to help with a specific problem; where it is strictly necessary to diagnose a fault or contain a security incident; or where we are compelled by law.',
-      'Where the law compels disclosure, we will tell you before we disclose anything, unless we are legally prohibited from telling you.',
+      'In normal operation, nobody. A staff account on the NGOreality platform carries no permissions inside your workspace, and our ordinary administrative rights grant nothing there.',
+      'There is one exception and we would rather describe it than let you discover it. We keep a break-glass support path that can grant a person access to a workspace \u2014 it exists so that a charity which has locked itself out can get back in. It is the only way our people can reach your records.',
+      'It cannot be used quietly. Using it requires a written reason; granting ownership requires a separate explicit confirmation; and every use writes an entry into YOUR OWN audit log, visible to your administrators, recording who was granted access, what role, when, and why. It is also recorded on our side.',
+      'So the protection we are offering you is not \u201cwe promise not to look\u201d. It is \u201cwe cannot look without leaving a record in your workspace that you can read\u201d. Check your audit log; if you see an entry you did not expect, ask us and we will account for it.',
+      'Beyond that, we access your records only where you ask us to for support, where it is strictly necessary to diagnose a fault or contain a security incident, or where we are compelled by law. Where the law compels disclosure we will tell you first, unless legally prohibited from doing so.',
     ],
   },
   {

@@ -236,6 +236,13 @@ func (r *Registry) Provision(ctx context.Context, in ProvisionInput) (*Tenant, e
 	return &t, nil
 }
 
+// LogProvisioning records a control-plane action against a tenant. Exported so
+// the HTTP layer can record break-glass support actions, which must never be
+// invisible to the customer they affect.
+func (r *Registry) LogProvisioning(ctx context.Context, tenantID, action, detail string, ok bool) {
+	r.logProvision(ctx, tenantID, action, detail, ok)
+}
+
 func (r *Registry) logProvision(ctx context.Context, tenantID, action, detail string, ok bool) {
 	_, err := r.pool.Exec(ctx,
 		`INSERT INTO platform.provisioning_log (tenant_id, action, detail, succeeded)

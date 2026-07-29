@@ -214,10 +214,15 @@ export default function Workspace() {
               <div className="card-brutal p-6">
                 <div className="label-brutal mb-4">Not us</div>
                 <p className="text-sm text-ink-700 leading-relaxed">
-                  There is no staff view of your workspace. No support login, no
-                  impersonation, and no NGOreality account holds a seat in your
-                  organisation. Your records sit in a different database from the public
-                  site and directory.
+                  There is no staff view of your workspace and no impersonation. An
+                  NGOreality account carries no permissions inside your organisation. Your
+                  records sit in a different database from the public site and directory.
+                </p>
+                <p className="text-sm text-ink-700 mt-4 leading-relaxed">
+                  There is one break-glass path, so a charity locked out of its own
+                  workspace can be let back in. Using it requires a written reason and
+                  writes an entry into your audit log — who, what role, when and why.
+                  We cannot use it without you being able to see that we did.
                 </p>
                 <p className="text-sm text-ink-500 mt-4 leading-relaxed">
                   We are not claiming we hold no key. The small number of people who
