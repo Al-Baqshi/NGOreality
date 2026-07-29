@@ -25,6 +25,7 @@ const Contact = lazy(() => import('./pages/public/Contact'));
 const BusinessPlanGate = lazy(() => import('./pages/public/BusinessPlanGate'));
 const PrivacyPolicy = lazy(() => import('./pages/public/PrivacyPolicy'));
 const TermsOfService = lazy(() => import('./pages/public/TermsOfService'));
+const DataProcessingAddendum = lazy(() => import('./pages/public/DataProcessingAddendum'));
 const OrganizationProfile = lazy(() => import('./pages/public/OrganizationProfile'));
 const NotFound = lazy(() => import('./pages/public/NotFound'));
 
@@ -174,6 +175,7 @@ export default function App() {
             <Route path="business-plan" element={<BusinessPlanGate />} />
             <Route path="privacy" element={<PrivacyPolicy />} />
             <Route path="terms" element={<TermsOfService />} />
+            <Route path="data-processing" element={<DataProcessingAddendum />} />
           </Route>
 
           {/* Default redirect */}

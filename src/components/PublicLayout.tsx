@@ -160,6 +160,7 @@ export default function PublicLayout() {
                 <NavLink to="/public/business-plan" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Business Plan</NavLink>
                 <NavLink to="/public/privacy" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Privacy Policy</NavLink>
                 <NavLink to="/public/terms" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Terms of Service</NavLink>
+                <NavLink to="/public/data-processing" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Data Processing</NavLink>
               </div>
             </div>
           </div>
