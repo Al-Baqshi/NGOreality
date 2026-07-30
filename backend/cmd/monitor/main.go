@@ -57,11 +57,17 @@ type config struct {
 const failureThreshold = 2
 
 // baselineUpRate is what the original Go worker measured across 39,728 checks.
-// A run far below it means this checker is broken, not that the sector went
-// offline, so we refuse to write and say so.
+// Kept as documentation and logged for comparison, but deliberately NOT used as
+// a gate: a batch can sit far below it for the honest reason that the queue has
+// filled with charities whose domains have lapsed. Judging a batch by its
+// up-rate alone once blocked six hours of perfectly accurate checks.
 const baselineUpRate = 0.862
-const minPlausibleUpRate = 0.35
 const minSampleForSanity = 10
+
+// maxSelfInflictedRate is the share of a batch that may fail for reasons that
+// implicate us — timeouts, unreachable connections — before the batch is
+// discarded. Dead domains do not count towards it.
+const maxSelfInflictedRate = 0.5
 
 func loadConfig() (config, error) {
 	ref := strings.TrimSpace(os.Getenv("SUPABASE_PROJECT_REF"))
@@ -108,6 +114,40 @@ type outcome struct {
 	statusCode *int
 	latencyMs  int
 	errMsg     string
+	// selfInflicted marks a failure that says more about US than about the
+	// site: a timeout we imposed, or a connection we could not open. A DNS
+	// NXDOMAIN is the opposite — a definitive answer that the domain is dead.
+	selfInflicted bool
+}
+
+// looksSelfInflicted distinguishes "we could not complete the request" from
+// "the domain does not exist".
+//
+// This distinction is the whole guard. An earlier version compared the batch
+// up-rate to the population baseline and refused anything far below it. That
+// correctly caught a broken checker once, then spent hours refusing a perfectly
+// accurate batch — because the queue had filled with genuinely dead domains and
+// a biased sample looks identical to a broken checker if you only count.
+func looksSelfInflicted(msg string) bool {
+	m := strings.ToLower(msg)
+	switch {
+	case strings.Contains(m, "no such host"),
+		strings.Contains(m, "nxdomain"),
+		strings.Contains(m, "server misbehaving"):
+		// DNS answered: the domain is dead. That is real data about a real
+		// charity, and refusing to record it is how monitoring stalls.
+		return false
+	case strings.Contains(m, "timeout"),
+		strings.Contains(m, "deadline exceeded"),
+		strings.Contains(m, "context canceled"),
+		strings.Contains(m, "connection reset"),
+		strings.Contains(m, "connection refused"),
+		strings.Contains(m, "no route to host"),
+		strings.Contains(m, "network is unreachable"),
+		strings.Contains(m, "tls handshake"):
+		return true
+	}
+	return false
 }
 
 type client struct {
@@ -163,10 +203,12 @@ func (c *client) check(ctx context.Context, m monitor) outcome {
 
 	resp, err := c.http.Do(req)
 	if err != nil {
+		msg := truncate(err.Error(), 300)
 		return outcome{
 			mon: m, up: false,
-			latencyMs: int(time.Since(started).Milliseconds()),
-			errMsg:    truncate(err.Error(), 300),
+			latencyMs:     int(time.Since(started).Milliseconds()),
+			errMsg:        msg,
+			selfInflicted: looksSelfInflicted(msg),
 		}
 	}
 	defer resp.Body.Close()
@@ -223,43 +265,35 @@ func (c *client) runCycle(ctx context.Context) {
 	}
 	upRate := float64(upCount) / float64(len(outcomes))
 
-	// A monitor that has never been checked has no baseline to be measured
-	// against, and the ~120 never-checked URLs in this database are precisely
-	// the malformed residue the previous worker could not handle — an email
-	// address in a URL field, mixed-case hostnames that do not resolve. They
-	// are genuinely down, and if the guard below applied to them it would
-	// refuse every batch forever and monitoring would never start.
-	firstEverCheck := true
+	// Refuse only when the failures look like OUR failure.
+	//
+	// The Edge Function attempt reported 4.5% up because the runtime serialised
+	// outbound connections and every request hit our own timeout. That is the
+	// signature worth refusing: a batch dominated by timeouts and unreachable
+	// connections. A batch full of "no such host" is not a malfunction — it is
+	// an accurate finding about charities whose domains have lapsed, and it is
+	// exactly what the registry statistics are meant to capture.
+	selfInflicted := 0
 	for _, o := range outcomes {
-		if o.mon.LastStatus != "" && o.mon.LastStatus != "unknown" {
-			firstEverCheck = false
-			break
+		if o.selfInflicted {
+			selfInflicted++
 		}
 	}
+	selfRate := float64(selfInflicted) / float64(len(outcomes))
 
-	// Refuse to write a batch that looks like our own failure rather than a
-	// real outage. Poisoning 14,700 monitors with false downtime would corrupt
-	// the registry statistics the whole outreach strategy rests on, and could
-	// email members that their working site is down.
-	//
-	// Calibration note: measured against the 86.2% baseline, this checker
-	// returns 90% up on the mainstream population. A run far below that means
-	// the checker broke, not the sector.
-	if !firstEverCheck && len(outcomes) >= minSampleForSanity && upRate < minPlausibleUpRate {
-		// Print real examples. "up_rate 0.04" says something is wrong; it does
-		// not say whether this host cannot resolve DNS, cannot complete TLS, or
-		// is simply slow — and those have completely different fixes.
+	if len(outcomes) >= minSampleForSanity && selfRate > maxSelfInflictedRate {
 		samples := make([]string, 0, 3)
 		for _, o := range outcomes {
-			if !o.up && len(samples) < 3 {
+			if o.selfInflicted && len(samples) < 3 {
 				samples = append(samples, fmt.Sprintf("%s => %s", o.mon.URL, o.errMsg))
 			}
 		}
-		c.log.Error("implausible up-rate, refusing to record",
+		c.log.Error("too many failures look self-inflicted, refusing to record",
+			"self_inflicted_rate", fmt.Sprintf("%.3f", selfRate),
 			"up_rate", fmt.Sprintf("%.3f", upRate),
-			"baseline", baselineUpRate, "checked", len(outcomes),
+			"checked", len(outcomes),
 			"sample_errors", strings.Join(samples, " | "),
-			"note", "suspect the checker or its network, not the internet")
+			"note", "timeouts and unreachable hosts mean the checker or its network, not the sites")
 		return
 	}
 
