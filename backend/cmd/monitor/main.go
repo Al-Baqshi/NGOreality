@@ -372,6 +372,14 @@ func main() {
 		"batch", cfg.batchSize, "concurrency", cfg.concurrency,
 		"interval", cfg.interval.String(), "timeout", cfg.timeout.String())
 
+	// Self-test against sites known to answer 200 from an ordinary machine.
+	//
+	// Without this, "up_rate 0.04" is ambiguous forever: it could mean the
+	// queue is full of dead charities, or it could mean this container cannot
+	// reach the New Zealand internet. Those need opposite responses, and
+	// guessing has already cost hours. Three requests at boot settles it.
+	selfTest(context.Background(), c, log)
+
 	c.runCycle(ctx)
 	if cfg.runOnce {
 		log.Info("MONITOR_RUN_ONCE=true, exiting")
@@ -419,4 +427,33 @@ func envDuration(key string, fallback time.Duration) time.Duration {
 		}
 	}
 	return fallback
+}
+
+// selfTest checks a few known-good hosts so the logs distinguish "the sites are
+// dead" from "this container cannot resolve or reach them".
+func selfTest(ctx context.Context, c *client, log *slog.Logger) {
+	known := []string{
+		"https://cminz.org/",
+		"https://www.rda.org.nz",
+		"https://www.google.com",
+	}
+	ok := 0
+	for _, u := range known {
+		o := c.check(ctx, monitor{URL: u, LastStatus: "unknown"})
+		if o.up {
+			ok++
+			log.Info("self-test reachable", "url", u, "latency_ms", o.latencyMs)
+		} else {
+			log.Error("self-test UNREACHABLE", "url", u, "err", o.errMsg)
+		}
+	}
+	switch ok {
+	case len(known):
+		log.Info("self-test passed: outbound HTTP works from this container")
+	case 0:
+		log.Error("self-test FAILED for every host: this container cannot reach the " +
+			"public internet. A low up-rate says nothing about the charities.")
+	default:
+		log.Warn("self-test partially failed", "reachable", ok, "of", len(known))
+	}
 }
