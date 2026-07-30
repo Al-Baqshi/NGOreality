@@ -246,10 +246,20 @@ func (c *client) runCycle(ctx context.Context) {
 	// returns 90% up on the mainstream population. A run far below that means
 	// the checker broke, not the sector.
 	if !firstEverCheck && len(outcomes) >= minSampleForSanity && upRate < minPlausibleUpRate {
+		// Print real examples. "up_rate 0.04" says something is wrong; it does
+		// not say whether this host cannot resolve DNS, cannot complete TLS, or
+		// is simply slow — and those have completely different fixes.
+		samples := make([]string, 0, 3)
+		for _, o := range outcomes {
+			if !o.up && len(samples) < 3 {
+				samples = append(samples, fmt.Sprintf("%s => %s", o.mon.URL, o.errMsg))
+			}
+		}
 		c.log.Error("implausible up-rate, refusing to record",
 			"up_rate", fmt.Sprintf("%.3f", upRate),
 			"baseline", baselineUpRate, "checked", len(outcomes),
-			"note", "suspect the checker, not the internet")
+			"sample_errors", strings.Join(samples, " | "),
+			"note", "suspect the checker or its network, not the internet")
 		return
 	}
 

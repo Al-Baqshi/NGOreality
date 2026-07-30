@@ -1,9 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { UserPlus } from 'lucide-react';
+import { Users, UserPlus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { linkExistingOrganization, provisionNgoOrganization } from '../../lib/ngoSignup';
+import {
+  clearPendingRegistration,
+  getPendingRegistration,
+  joinOrganization,
+  linkExistingOrganization,
+  provisionNgoOrganization,
+  resumePendingRegistration,
+  type OrgManagerInfo,
+  type PendingRegistration,
+} from '../../lib/ngoSignup';
 import { CATEGORIES } from '../../types';
 import OrganizationClaimSearch from '../OrganizationClaimSearch';
 import NgoDirectoryOrgPreview from './NgoDirectoryOrgPreview';
@@ -12,6 +21,12 @@ import { verifyTurnstileToken } from '../../lib/turnstile';
 import type { ClaimSearchOrganization } from '../../hooks/useOrganizationClaimSearch';
 
 type SignupMode = 'existing' | 'new';
+
+type AlreadyManagedState = {
+  organizationId: string;
+  organizationName: string;
+  managers: OrgManagerInfo[];
+};
 
 type NgoOrganizationRegistrationFormProps = {
   /** Already signed in — only link/create org, do not create auth user again. */
@@ -43,6 +58,9 @@ export default function NgoOrganizationRegistrationForm({
   const [submitting, setSubmitting] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [alreadyManaged, setAlreadyManaged] = useState<AlreadyManagedState | null>(null);
+  const [resuming, setResuming] = useState(false);
+  const resumeAttempted = useRef(false);
 
   useEffect(() => {
     if (!loggedIn || !user) return;
@@ -55,33 +73,100 @@ export default function NgoOrganizationRegistrationForm({
     }));
   }, [loggedIn, user]);
 
-  const finishRegistration = async (userId: string) => {
+  // A signup interrupted by email confirmation left the chosen organisation in
+  // user metadata — finish linking it automatically on first login.
+  useEffect(() => {
+    if (!loggedIn || !user || resumeAttempted.current) return;
+    if (!getPendingRegistration(user)) return;
+    resumeAttempted.current = true;
+    setResuming(true);
+    void resumePendingRegistration(user).then((result) => {
+      setResuming(false);
+      if (!result) return;
+      if (result.status === 'linked') {
+        onSuccess?.();
+        return;
+      }
+      if (result.status === 'already_managed' && result.pending.mode === 'existing') {
+        setAlreadyManaged({
+          organizationId: result.pending.organizationId,
+          organizationName: result.pending.organizationName,
+          managers: result.managers,
+        });
+        return;
+      }
+      if (result.error) setError(result.error);
+    });
+  }, [loggedIn, user, onSuccess]);
+
+  const finishRegistration = async (): Promise<{ error: string | null; parked: boolean }> => {
     if (mode === 'new') {
       if (!form.organizationName.trim()) {
-        return 'Enter your organization name.';
+        return { error: 'Enter your organization name.', parked: false };
       }
-      const { error: provisionError } = await provisionNgoOrganization({
-        userId,
+      const result = await provisionNgoOrganization({
         organizationName: form.organizationName.trim(),
         contactName: form.fullName.trim() || 'Primary contact',
-        email: form.email.trim(),
         category: form.category,
         location: form.location,
         websiteUrl: form.websiteUrl,
       });
-      return provisionError;
+      return { error: result.error, parked: false };
     }
 
     if (!selectedOrg) {
-      return 'Search the directory and select your organization, or register as new.';
+      return { error: 'Search the directory and select your organization, or register as new.', parked: false };
     }
 
-    const { error: linkError } = await linkExistingOrganization({
-      userId,
-      organizationId: selectedOrg.id,
-      email: form.email.trim(),
-    });
-    return linkError;
+    const result = await linkExistingOrganization(selectedOrg.id);
+    if (result.status === 'already_managed') {
+      setAlreadyManaged({
+        organizationId: selectedOrg.id,
+        organizationName: selectedOrg.name,
+        managers: result.managers,
+      });
+      return { error: null, parked: true };
+    }
+    return { error: result.error, parked: false };
+  };
+
+  const pendingRegistrationMetadata = (): PendingRegistration | null => {
+    if (mode === 'existing') {
+      if (!selectedOrg) return null;
+      return { mode: 'existing', organizationId: selectedOrg.id, organizationName: selectedOrg.name };
+    }
+    if (!form.organizationName.trim()) return null;
+    return {
+      mode: 'new',
+      organizationName: form.organizationName.trim(),
+      contactName: form.fullName.trim() || 'Primary contact',
+      category: form.category,
+      location: form.location,
+      websiteUrl: form.websiteUrl,
+    };
+  };
+
+  const handleJoinAnyway = async () => {
+    if (!alreadyManaged) return;
+    setSubmitting(true);
+    setError('');
+    const result = await joinOrganization(alreadyManaged.organizationId);
+    if (result.status === 'linked') {
+      await clearPendingRegistration();
+      setSubmitting(false);
+      setAlreadyManaged(null);
+      onSuccess?.();
+      return;
+    }
+    setError(result.error ?? 'Could not join the organization.');
+    setSubmitting(false);
+  };
+
+  const handlePickDifferentOrg = async () => {
+    await clearPendingRegistration();
+    setAlreadyManaged(null);
+    setSelectedOrg(null);
+    setError('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -113,7 +198,15 @@ export default function NgoOrganizationRegistrationForm({
     let userId = user?.id;
 
     if (!loggedIn) {
-      const { error: signUpError } = await signUp(form.email, form.password, form.fullName);
+      // Carry the chosen organisation through the email-confirmation
+      // round-trip: if no session comes back, the first login resumes it.
+      const pending = pendingRegistrationMetadata();
+      const { error: signUpError } = await signUp(
+        form.email,
+        form.password,
+        form.fullName,
+        pending ? { pending_registration: pending } : undefined,
+      );
       if (signUpError) {
         setError(signUpError);
         setSubmitting(false);
@@ -136,7 +229,7 @@ export default function NgoOrganizationRegistrationForm({
       return;
     }
 
-    const regError = await finishRegistration(userId);
+    const { error: regError, parked } = await finishRegistration();
     if (regError) {
       setError(regError);
       setSubmitting(false);
@@ -144,7 +237,11 @@ export default function NgoOrganizationRegistrationForm({
     }
 
     setSubmitting(false);
-    onSuccess?.();
+    // finishRegistration may have parked us on the "already managed" choice.
+    if (!parked) {
+      await clearPendingRegistration();
+      onSuccess?.();
+    }
   };
 
   if (checkEmail) {
@@ -152,12 +249,76 @@ export default function NgoOrganizationRegistrationForm({
       <div className={`card-brutal text-center ${compact ? 'p-5' : 'p-6 sm:p-8'}`}>
         <h2 className="text-lg font-black uppercase tracking-tight mb-3">Check your email</h2>
         <p className="text-sm text-ink-500 mb-6">
-          We sent a confirmation link to <strong>{form.email}</strong>. After confirming, sign in and
-          finish linking your organization.
+          We sent a confirmation link to <strong>{form.email}</strong>. After confirming, sign in —
+          {mode === 'existing' && selectedOrg
+            ? ` ${selectedOrg.name} will be linked to your account automatically.`
+            : ' your organization will be set up automatically.'}
         </p>
         <Link to="/ngo/login" className="btn-brutal-accent inline-block min-h-[44px] px-6 leading-[44px]">
           Go to sign in
         </Link>
+      </div>
+    );
+  }
+
+  if (resuming) {
+    return (
+      <div className={`card-brutal text-center ${compact ? 'p-5' : 'p-6 sm:p-8'}`}>
+        <h2 className="text-lg font-black uppercase tracking-tight mb-3">Finishing your registration…</h2>
+        <p className="text-sm text-ink-500">Linking your organization to your account.</p>
+      </div>
+    );
+  }
+
+  if (alreadyManaged) {
+    return (
+      <div className={`card-brutal space-y-5 ${compact ? 'p-5' : 'p-6 sm:p-8'}`}>
+        <div className="flex items-center gap-2">
+          <Users size={20} className="text-teal" aria-hidden />
+          <h2 className="text-lg sm:text-xl font-black uppercase tracking-tight">
+            Already managed
+          </h2>
+        </div>
+        <p className="text-sm text-ink-600 dark:text-muted-foreground leading-relaxed">
+          <strong>{alreadyManaged.organizationName}</strong> is already managed on NGOreality by:
+        </p>
+        <ul className="space-y-1">
+          {alreadyManaged.managers.map((m) => (
+            <li key={m.email} className="text-sm font-mono border-2 border-ink-200 px-3 py-2">
+              {m.full_name ? `${m.full_name} — ` : ''}
+              <a href={`mailto:${m.email}`} className="font-semibold underline">
+                {m.email}
+              </a>
+            </li>
+          ))}
+        </ul>
+        <p className="text-sm text-ink-600 dark:text-muted-foreground leading-relaxed">
+          You can keep going and join as an additional manager (the current managers will be
+          notified), or contact them first.
+        </p>
+
+        {error && (
+          <p className="text-accent text-xs font-mono border-2 border-accent bg-accent-light px-3 py-2" role="alert">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={handleJoinAnyway}
+          disabled={submitting}
+          className="btn-brutal-accent w-full min-h-[48px] disabled:opacity-60"
+        >
+          {submitting ? 'Joining…' : 'Keep going — join as a manager'}
+        </button>
+        <button
+          type="button"
+          onClick={() => void handlePickDifferentOrg()}
+          disabled={submitting}
+          className="btn-brutal w-full min-h-[44px] disabled:opacity-60"
+        >
+          Choose a different organization
+        </button>
       </div>
     );
   }

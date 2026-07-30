@@ -49,7 +49,12 @@ function NgoPortalFrame() {
   const navigate = useNavigate();
   const { pathname, hash } = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
-  const { needsRegistration, loading: portalLoading } = useNgoPortal();
+  const { needsRegistration, loading: portalLoading, organization, badges } = useNgoPortal();
+  const hasActiveBadge = badges.some((b) => b.is_active);
+  const isVerified =
+    hasActiveBadge ||
+    organization?.verification_level === 'verified' ||
+    organization?.verification_level === 'transparent_financial';
 
   const onboarding = !portalLoading && needsRegistration;
   const navItems = useMemo(
@@ -95,8 +100,10 @@ function NgoPortalFrame() {
               >
                 <img src="/logo-icon-dark.svg" alt="" className="size-8 shrink-0 rounded-md object-contain" />
                 <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">NGOreality</span>
-                  <span className="truncate text-xs opacity-70">Member portal</span>
+                  <span className="truncate font-semibold">{organization?.name ?? 'NGOreality'}</span>
+                  <span className="truncate text-xs opacity-70">
+                    {organization ? (isVerified ? 'Verified member ✓' : 'Member portal') : 'Member portal'}
+                  </span>
                 </div>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -168,6 +175,14 @@ function NgoPortalFrame() {
           </SidebarTrigger>
           <Separator orientation="vertical" className="mx-1 hidden h-4 sm:block" />
           <h1 className="min-w-0 flex-1 truncate text-base font-medium">{pageTitle}</h1>
+          {organization && (
+            <span className="hidden min-w-0 items-center gap-1.5 truncate font-mono text-2xs uppercase tracking-wider text-ink-500 sm:flex">
+              {isVerified && (
+                <img src="/reality-badge.png" alt="Reality Badge" className="size-5 shrink-0 object-contain" />
+              )}
+              <span className="truncate">{organization.name}</span>
+            </span>
+          )}
           {!onboarding && <PortalNotificationBell audience="ngo" to="/ngo/notifications" />}
         </header>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">

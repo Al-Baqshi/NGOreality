@@ -26,6 +26,7 @@ import { markRegisteredInbound, registerAsCustomer, setOutreachStatus } from '..
 import { FINANCIAL_VERIFICATION_ENABLED } from '../../config/features';
 import FinancialComingSoon from '../../components/FinancialComingSoon';
 import OrganizationEngagements from '../../components/crm/OrganizationEngagements';
+import OrganizationPortalMembers from '../../components/crm/OrganizationPortalMembers';
 import OrganizationPayments from '../../components/crm/OrganizationPayments';
 import { updateCriterionStatuses, tryAutoVerifyOrganization, allPublicCriteriaPass } from '../../lib/verification';
 import { publicCriteriaScore } from '../../lib/criteria';
@@ -643,6 +644,7 @@ export default function OrganizationDetail() {
 
         {/* Right column */}
         <div className="space-y-6">
+          {id && <OrganizationPortalMembers organizationId={id} />}
           {id && <OrganizationEngagements organizationId={id} />}
           {id && organization && (
             <OrganizationPayments

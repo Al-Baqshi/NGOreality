@@ -20,7 +20,12 @@ interface AuthContextValue {
   profileLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signInAsStaff: (username: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+    extraMetadata?: Record<string, unknown>,
+  ) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -95,14 +100,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName } },
-    });
-    return { error: error?.message ?? null };
-  }, []);
+  const signUp = useCallback(
+    async (
+      email: string,
+      password: string,
+      fullName: string,
+      extraMetadata?: Record<string, unknown>,
+    ) => {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: fullName, ...extraMetadata } },
+      });
+      return { error: error?.message ?? null };
+    },
+    [],
+  );
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();

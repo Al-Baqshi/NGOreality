@@ -38,12 +38,14 @@ export default function NgoLogin() {
 
     let destination = from;
     if (userId) {
-      const { data: member } = await supabase
+      const { data: members } = await supabase
         .from('organization_members')
         .select('id')
         .eq('user_id', userId)
-        .maybeSingle();
-      if (!member) {
+        .limit(1);
+      if (!members?.length) {
+        // No organisation yet — /ngo/signup resumes a registration that was
+        // interrupted by email confirmation, or shows the form.
         destination = '/ngo/signup';
       }
     }

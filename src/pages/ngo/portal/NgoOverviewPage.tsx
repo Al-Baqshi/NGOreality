@@ -9,9 +9,10 @@ import { NgoPortalQuickLinks } from '../../../components/ngo/NgoPortalPageShell'
 import SEO from '../../../components/SEO';
 
 export default function NgoOverviewPage() {
-  const { organization } = useNgoPortalContext();
+  const { organization, badges } = useNgoPortalContext();
   if (!organization) return null;
 
+  const activeBadge = badges.find((b) => b.is_active);
   const profilePct = profileCompletionPercent(getProfileCompletionItems(organization));
 
   return (
@@ -31,6 +32,31 @@ export default function NgoOverviewPage() {
             </Link>
           </div>
         </div>
+
+        {activeBadge && (
+          <div className="card-brutal flex flex-col items-start gap-4 border-teal p-5 sm:flex-row sm:items-center sm:p-6">
+            <img
+              src="/reality-badge.png"
+              alt="NGOreality Reality Badge"
+              className="h-20 w-20 shrink-0 object-contain"
+            />
+            <div className="min-w-0">
+              <h2 className="text-lg font-black uppercase tracking-tight">
+                You&rsquo;re verified — Reality Badge active
+              </h2>
+              <p className="mt-1 text-sm text-ink-600 dark:text-muted-foreground">
+                Badge <span className="font-mono font-semibold">{activeBadge.verification_id}</span>. Download
+                the badge asset and add it to your website.
+              </p>
+              <Link
+                to="/ngo/badge"
+                className="btn-brutal-teal mt-3 inline-block px-4 py-2 text-xs"
+              >
+                Get your badge assets
+              </Link>
+            </div>
+          </div>
+        )}
 
         <p className="text-sm text-ink-600 dark:text-muted-foreground leading-relaxed">
           Use the menu to manage your profile, request a trust landing page, check membership, and track your Reality

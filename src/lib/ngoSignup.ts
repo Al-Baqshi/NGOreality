@@ -1,199 +1,148 @@
+import type { User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
-import { DEFAULT_CRITERIA } from '../types';
 
-function generateSlug(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+export type OrgManagerInfo = {
+  email: string;
+  full_name: string;
+  role: string;
+};
+
+export type LinkResult = {
+  status: 'linked' | 'already_managed' | 'error';
+  organizationId: string | null;
+  managers: OrgManagerInfo[];
+  error: string | null;
+};
+
+/**
+ * Registration details captured before the email-confirmation round-trip.
+ * Stored in auth user metadata at signUp() so the link/provision step can be
+ * resumed on first login even though the original browser session is gone.
+ */
+export type PendingRegistration =
+  | { mode: 'existing'; organizationId: string; organizationName: string }
+  | {
+      mode: 'new';
+      organizationName: string;
+      contactName: string;
+      category: string;
+      location: string;
+      websiteUrl: string;
+    };
+
+const okStatuses = new Set(['claimed', 'joined', 'already_member', 'created']);
+
+function rpcError(message: string): LinkResult {
+  return { status: 'error', organizationId: null, managers: [], error: message };
 }
 
-async function notifyStaffPortalRegistration(
-  organizationId: string,
-  description: string,
-): Promise<void> {
-  await supabase.rpc('notify_staff_ngo_portal_event', {
+/** Claim an organisation from the directory. The RPC links the caller as
+ *  owner when the organisation has no managers yet; otherwise it reports who
+ *  already manages it so the caller can choose to join or contact them. */
+export async function linkExistingOrganization(organizationId: string): Promise<LinkResult> {
+  const { data, error } = await supabase.rpc('claim_organization', {
     p_organization_id: organizationId,
-    p_action: 'ngo_portal_registration',
-    p_description: description,
-  });
-}
-
-async function uniqueSlug(base: string): Promise<string> {
-  let slug = base;
-  let attempt = 0;
-  while (attempt < 20) {
-    const { data } = await supabase.from('organizations').select('id').eq('slug', slug).maybeSingle();
-    if (!data) return slug;
-    attempt += 1;
-    slug = `${base}-${attempt}`;
-  }
-  return `${base}-${Date.now()}`;
-}
-
-export async function provisionNgoOrganization(input: {
-  userId: string;
-  organizationName: string;
-  contactName: string;
-  email: string;
-  category: string;
-  location: string;
-  websiteUrl: string;
-}): Promise<{ organizationId: string | null; error: string | null }> {
-  const baseSlug = generateSlug(input.organizationName);
-  const slug = await uniqueSlug(baseSlug || 'organization');
-
-  const { data: org, error: orgError } = await supabase
-    .from('organizations')
-    .insert({
-      name: input.organizationName,
-      slug,
-      email: input.email,
-      category: input.category,
-      location: input.location,
-      website_url: input.websiteUrl,
-      status: 'onboarding',
-      verification_level: 'none',
-      onboarding_stage: 'intake',
-    })
-    .select('id')
-    .maybeSingle();
-
-  if (orgError || !org) {
-    return { organizationId: null, error: orgError?.message ?? 'Could not create organization' };
-  }
-
-  const { error: memberError } = await supabase.from('organization_members').insert({
-    user_id: input.userId,
-    organization_id: org.id,
-    role: 'owner',
   });
 
-  if (memberError) {
-    return { organizationId: null, error: memberError.message };
-  }
+  if (error) return rpcError(error.message);
 
-  const criteriaRows = DEFAULT_CRITERIA.map((c) => ({
-    organization_id: org.id,
-    ...c,
-  }));
-  const { error: criteriaError } = await supabase.from('verification_criteria').insert(criteriaRows);
-  if (criteriaError) {
-    return { organizationId: null, error: criteriaError.message };
-  }
-
-  const { error: contactError } = await supabase.from('contacts').insert({
-    organization_id: org.id,
-    name: input.contactName,
-    email: input.email,
-    is_primary: true,
-    role: 'Primary contact',
-  });
-  if (contactError) {
-    return { organizationId: null, error: contactError.message };
-  }
-
-  await supabase.from('activity_log').insert({
-    organization_id: org.id,
-    action: 'ngo_signup',
-    description: 'Organization registered via NGO portal',
-    performed_by: input.contactName,
-  });
-
-  await notifyStaffPortalRegistration(
-    org.id,
-    `New organization registered via portal: ${input.organizationName}`,
-  );
-
-  return { organizationId: org.id, error: null };
-}
-
-export async function linkExistingOrganization(input: {
-  userId: string;
-  email: string;
-  organizationId?: string;
-  organizationSlug?: string;
-}): Promise<{ organizationId: string | null; error: string | null }> {
-  if (!input.organizationId && !input.organizationSlug?.trim()) {
-    return { organizationId: null, error: 'Select your organization from the directory search.' };
-  }
-
-  let query = supabase.from('organizations').select('id, email, status');
-
-  if (input.organizationId) {
-    query = query.eq('id', input.organizationId);
-  } else {
-    query = query.eq('slug', input.organizationSlug!.trim().toLowerCase());
-  }
-
-  const { data: org, error: orgError } = await query.maybeSingle();
-
-  if (orgError || !org) {
-    return { organizationId: null, error: 'Organization not found. Search again or register as a new organization.' };
-  }
-
-  const orgEmail = org.email?.trim();
-  if (orgEmail && orgEmail.toLowerCase() !== input.email.toLowerCase()) {
+  if (data?.status === 'already_managed') {
     return {
-      organizationId: null,
-      error:
-        'This signup email must match the email on file for that organization. Use the same email or contact NGOreality staff.',
+      status: 'already_managed',
+      organizationId,
+      managers: (data.managers ?? []) as OrgManagerInfo[],
+      error: null,
     };
   }
 
-  const { data: existingMember } = await supabase
-    .from('organization_members')
-    .select('id')
-    .eq('organization_id', org.id)
-    .maybeSingle();
-
-  if (existingMember) {
-    return { organizationId: null, error: 'This organization already has a portal account.' };
+  if (okStatuses.has(data?.status)) {
+    return { status: 'linked', organizationId, managers: [], error: null };
   }
 
-  const { error: memberError } = await supabase.from('organization_members').insert({
-    user_id: input.userId,
-    organization_id: org.id,
-    role: 'owner',
+  if (data?.status === 'not_found') {
+    return rpcError('Organization not found. Search again or register as a new organization.');
+  }
+
+  return rpcError(data?.message ?? 'Could not link the organization. Please try again.');
+}
+
+/** Join an organisation that already has managers ("keep going" choice). */
+export async function joinOrganization(organizationId: string): Promise<LinkResult> {
+  const { data, error } = await supabase.rpc('join_organization', {
+    p_organization_id: organizationId,
   });
 
-  if (memberError) {
-    return { organizationId: null, error: memberError.message };
+  if (error) return rpcError(error.message);
+
+  if (okStatuses.has(data?.status)) {
+    return { status: 'linked', organizationId, managers: [], error: null };
   }
 
-  if (!orgEmail) {
-    await supabase.from('organizations').update({ email: input.email }).eq('id', org.id);
-  }
+  return rpcError(data?.message ?? 'Could not join the organization. Please try again.');
+}
 
-  if (org.status === 'listed') {
-    await supabase
-      .from('organizations')
-      .update({ status: 'onboarding', onboarding_stage: 'intake' })
-      .eq('id', org.id);
-  }
-
-  await supabase.from('activity_log').insert({
-    organization_id: org.id,
-    action: 'ngo_claim',
-    description: 'Organization claimed via NGO portal signup',
-    performed_by: input.email,
+export async function provisionNgoOrganization(input: {
+  organizationName: string;
+  contactName: string;
+  category: string;
+  location: string;
+  websiteUrl: string;
+}): Promise<LinkResult> {
+  const { data, error } = await supabase.rpc('register_new_organization', {
+    p_name: input.organizationName,
+    p_contact_name: input.contactName,
+    p_category: input.category,
+    p_location: input.location,
+    p_website_url: input.websiteUrl,
   });
 
-  const { count: criteriaCount } = await supabase
-    .from('verification_criteria')
-    .select('id', { count: 'exact', head: true })
-    .eq('organization_id', org.id);
+  if (error) return rpcError(error.message);
 
-  if (!criteriaCount) {
-    const { error: criteriaError } = await supabase.from('verification_criteria').insert(
-      DEFAULT_CRITERIA.map((c) => ({ organization_id: org.id, ...c })),
-    );
-    if (criteriaError) {
-      return { organizationId: null, error: criteriaError.message };
-    }
+  if (data?.status === 'created') {
+    return { status: 'linked', organizationId: data.organization_id ?? null, managers: [], error: null };
   }
 
-  await notifyStaffPortalRegistration(
-    org.id,
-    'Existing directory organization linked to a new NGO portal account',
-  );
+  return rpcError(data?.message ?? 'Could not create the organization. Please try again.');
+}
 
-  return { organizationId: org.id, error: null };
+export function getPendingRegistration(user: User | null | undefined): PendingRegistration | null {
+  const pending = user?.user_metadata?.pending_registration as PendingRegistration | undefined;
+  if (!pending || typeof pending !== 'object') return null;
+  if (pending.mode === 'existing' && pending.organizationId) return pending;
+  if (pending.mode === 'new' && pending.organizationName) return pending;
+  return null;
+}
+
+export async function clearPendingRegistration(): Promise<void> {
+  await supabase.auth.updateUser({ data: { pending_registration: null } });
+}
+
+/**
+ * Finish a registration that was interrupted by the email-confirmation
+ * round-trip. Returns null when there is nothing pending. On
+ * 'already_managed' the pending metadata is kept so the signup page can offer
+ * the join/contact choice.
+ */
+export async function resumePendingRegistration(
+  user: User | null | undefined,
+): Promise<(LinkResult & { pending: PendingRegistration }) | null> {
+  const pending = getPendingRegistration(user);
+  if (!pending) return null;
+
+  const result =
+    pending.mode === 'existing'
+      ? await linkExistingOrganization(pending.organizationId)
+      : await provisionNgoOrganization({
+          organizationName: pending.organizationName,
+          contactName: pending.contactName,
+          category: pending.category,
+          location: pending.location,
+          websiteUrl: pending.websiteUrl,
+        });
+
+  if (result.status === 'linked') {
+    await clearPendingRegistration();
+  }
+
+  return { ...result, pending };
 }

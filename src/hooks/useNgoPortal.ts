@@ -40,11 +40,15 @@ export function useNgoPortal() {
     setLoading(true);
     setError(null);
 
-    const { data: memberRow, error: memberError } = await supabase
+    // A user can manage more than one organisation (co-management); the
+    // portal shows the first one they joined.
+    const { data: memberRows, error: memberError } = await supabase
       .from('organization_members')
       .select('*')
       .eq('user_id', user.id)
-      .maybeSingle();
+      .order('created_at', { ascending: true })
+      .limit(1);
+    const memberRow = memberRows?.[0] ?? null;
 
     if (memberError) {
       setError(memberError.message);
