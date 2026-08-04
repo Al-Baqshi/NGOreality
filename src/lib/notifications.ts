@@ -80,7 +80,7 @@ function buildMessage(
           `Amount: NZD $70.00 annual membership`,
           `Allow up to 3 business days after we receive your transfer for it to be applied.`,
           ``,
-          `Stripe and Airwallet will be available in the portal when enabled.`,
+          `Paymark (Online EFTPOS) and Airwallex payments are coming soon to the portal.`,
           ``,
           `— NGOreality`,
         ].join('\n'),

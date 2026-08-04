@@ -1,5 +1,6 @@
 import { useOrganizationsPage } from '../../hooks/useCrm';
 import { OrgTrustStatusBadge, SectionHeader } from '../../components/ui';
+import OrgOriginChip from '../../components/crm/OrgOriginChip';
 import { Shield, Landmark, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { FINANCIAL_VERIFICATION_ENABLED } from '../../config/features';
@@ -56,6 +57,10 @@ export default function Verification() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
+                  <OrgOriginChip
+                    sourceRegistry={org.source_registry}
+                    registrationNumber={org.charity_registration_number}
+                  />
                   <OrgTrustStatusBadge org={org} showHint={false} />
                   <ArrowRight size={16} className="text-ink-300" />
                 </div>

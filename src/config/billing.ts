@@ -27,11 +27,19 @@ export const NGO_BANK_ACCOUNT = {
 /** True when we can actually tell someone where to send money. */
 export const BANK_TRANSFER_AVAILABLE = Boolean(NGO_BANK_ACCOUNT.accountNumber);
 
-export const STRIPE_CHECKOUT_AVAILABLE = Boolean(
-  (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined)?.trim(),
+/**
+ * Paymark Online EFTPOS — the backend callback verifier already exists
+ * (backend/internal/crm/payments/paymark.go); flip this on once Paymark
+ * issues our production tokens.
+ */
+export const PAYMARK_AVAILABLE = Boolean(
+  (import.meta.env.VITE_PAYMARK_ENABLED as string | undefined)?.toLowerCase() === 'true',
 );
 
-/** Airwallet — enable when API key is configured */
-export const AIRWALLET_AVAILABLE = Boolean(
-  (import.meta.env.VITE_AIRWALLET_ENABLED as string | undefined)?.toLowerCase() === 'true',
+/** Airwallex — enable when API key is configured */
+export const AIRWALLEX_AVAILABLE = Boolean(
+  (
+    (import.meta.env.VITE_AIRWALLEX_ENABLED as string | undefined) ??
+    (import.meta.env.VITE_AIRWALLET_ENABLED as string | undefined)
+  )?.toLowerCase() === 'true',
 );

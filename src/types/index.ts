@@ -26,6 +26,7 @@ export interface Organization {
   outreach_status: OutreachStatus;
   is_customer: boolean;
   payment_reference: string | null;
+  claimed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -311,6 +312,16 @@ export function isNgorealityVerified(org: Pick<Organization, 'status' | 'verific
 
 export function isRegistryListed(org: Pick<Organization, 'status' | 'source_registry'>): boolean {
   return org.status === 'listed' && Boolean(org.source_registry);
+}
+
+/**
+ * True when the org row originated from an official registry import,
+ * regardless of what has happened to it since. `isRegistryListed` stops being
+ * true the moment an NGO claims the org (claiming flips status to
+ * 'onboarding'), so provenance checks must use this instead.
+ */
+export function hasRegistryProvenance(org: Pick<Organization, 'source_registry'>): boolean {
+  return Boolean(org.source_registry);
 }
 
 export const VERIFICATION_LEVEL_LABELS: Record<VerificationLevel, string> = {

@@ -21,7 +21,9 @@ import {
 } from '../../lib/orgTrustStatus';
 import { isPublicCriterion, isMemberCriterion } from '../../lib/criteria';
 import type { OutreachStatus } from '../../types';
-import { isRegistryListed, OUTREACH_KANBAN_STATUSES } from '../../types';
+import { hasRegistryProvenance, OUTREACH_KANBAN_STATUSES } from '../../types';
+import OrgOriginChip from '../../components/crm/OrgOriginChip';
+import RegistryMatchCheck from '../../components/crm/RegistryMatchCheck';
 import { markRegisteredInbound, registerAsCustomer, setOutreachStatus } from '../../lib/crmOutreach';
 import { FINANCIAL_VERIFICATION_ENABLED } from '../../config/features';
 import FinancialComingSoon from '../../components/FinancialComingSoon';
@@ -258,8 +260,12 @@ export default function OrganizationDetail() {
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="text-lg sm:text-2xl font-black uppercase tracking-tight break-words">{organization.name}</h1>
-              <div className="mt-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <OrgTrustStatusBadge org={organization} />
+                <OrgOriginChip
+                  sourceRegistry={organization.source_registry}
+                  registrationNumber={organization.charity_registration_number}
+                />
               </div>
             </div>
           </div>
@@ -281,9 +287,9 @@ export default function OrganizationDetail() {
           </div>
         </div>
 
-        {isRegistryListed(organization) && (
+        {hasRegistryProvenance(organization) ? (
           <div className="mt-6 border-t-3 border-ink-950 pt-6">
-            <div className="label-brutal">Registry import</div>
+            <div className="label-brutal">Origin — registry import</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 text-sm">
               <div>
                 <span className="font-mono text-2xs uppercase tracking-wider text-ink-400">Source</span>
@@ -303,36 +309,59 @@ export default function OrganizationDetail() {
                 </div>
               )}
             </div>
-            <div className="flex flex-col sm:flex-row gap-3 mt-4">
-              <div className="flex-1 min-w-0">
-                <label className="label-brutal">Outreach status</label>
-                <select
-                  className="input-brutal w-full mt-1 text-base"
-                  value={organization.outreach_status}
-                  onChange={(e) => handleOutreachChange(e.target.value as OutreachStatus)}
-                  disabled={organization.is_customer}
-                >
-                  {[...OUTREACH_KANBAN_STATUSES, 'registered' as const, 'declined' as const].map((k) => (
-                    <option key={k} value={k}>
-                      {OUTREACH_STATUS_LABELS[k]}
-                    </option>
-                  ))}
-                  {organization.is_customer && (
-                    <option value="not_applicable">{OUTREACH_STATUS_LABELS.not_applicable}</option>
-                  )}
-                </select>
-              </div>
-              {organization.status === 'listed' && !organization.is_customer && (
-                <div className="flex items-end">
-                  <button
-                    type="button"
-                    onClick={handleRegisterAsCustomer}
-                    className="btn-brutal-accent w-full sm:w-auto text-sm min-h-[44px]"
+            {organization.claimed_at && (
+              <p className="text-xs text-ink-600 mt-3">
+                Claimed through the NGO portal on {new Date(organization.claimed_at).toLocaleDateString()} — the
+                accounts managing it are listed under Portal members below.
+              </p>
+            )}
+            {organization.status === 'listed' && (
+              <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                <div className="flex-1 min-w-0">
+                  <label className="label-brutal">Outreach status</label>
+                  <select
+                    className="input-brutal w-full mt-1 text-base"
+                    value={organization.outreach_status}
+                    onChange={(e) => handleOutreachChange(e.target.value as OutreachStatus)}
+                    disabled={organization.is_customer}
                   >
-                    Register as customer
-                  </button>
+                    {[...OUTREACH_KANBAN_STATUSES, 'registered' as const, 'declined' as const].map((k) => (
+                      <option key={k} value={k}>
+                        {OUTREACH_STATUS_LABELS[k]}
+                      </option>
+                    ))}
+                    {organization.is_customer && (
+                      <option value="not_applicable">{OUTREACH_STATUS_LABELS.not_applicable}</option>
+                    )}
+                  </select>
                 </div>
-              )}
+                {!organization.is_customer && (
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={handleRegisterAsCustomer}
+                      className="btn-brutal-accent w-full sm:w-auto text-sm min-h-[44px]"
+                    >
+                      Register as customer
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            <p className="text-2xs text-ink-400 mt-3 font-mono">
+              Public profile: /public/org/{organization.slug}
+            </p>
+          </div>
+        ) : (
+          <div className="mt-6 border-t-3 border-ink-950 pt-6">
+            <div className="label-brutal">Origin — new submission</div>
+            <p className="text-xs text-ink-600 mt-2">
+              {organization.claimed_at
+                ? `Self-submitted through the NGO portal on ${new Date(organization.claimed_at).toLocaleDateString()} — not linked to a registry import.`
+                : 'Added manually in the CRM — not linked to a registry import.'}
+            </p>
+            <div className="mt-3">
+              <RegistryMatchCheck organizationId={organization.id} organizationName={organization.name} />
             </div>
             <p className="text-2xs text-ink-400 mt-3 font-mono">
               Public profile: /public/org/{organization.slug}

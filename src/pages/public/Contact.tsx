@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
 import { CATEGORIES } from '../../types';
 import { Send, CheckCircle } from 'lucide-react';
 import SEO from '../../components/SEO';
-import Turnstile, { isTurnstileEnabled } from '../../components/Turnstile';
-import { verifyTurnstileToken } from '../../lib/turnstile';
+import Turnstile from '../../components/Turnstile';
 import { usePublicOrganizationBySlug } from '../../hooks/useSupabase';
 import { isRegistryListed } from '../../types';
+
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '');
 
 export default function Contact() {
   const [searchParams] = useSearchParams();
@@ -44,30 +44,49 @@ export default function Contact() {
     e.preventDefault();
     setError('');
 
-    if (isTurnstileEnabled() && !turnstileToken) {
+    // Turnstile is now MANDATORY, not conditional. The old code skipped the
+    // challenge whenever the site key was unset, and its verify helper returned
+    // true when its API URL was unset — two silent ways to disable spam
+    // protection by forgetting a variable.
+    if (!turnstileToken) {
       setError('Please complete the security check.');
       return;
     }
 
     setSubmitting(true);
 
-    if (isTurnstileEnabled() && turnstileToken) {
-      const verified = await verifyTurnstileToken(turnstileToken);
-      if (!verified) {
-        setError('Security check failed. Please try again.');
-        setTurnstileToken(null);
-        setSubmitting(false);
-        return;
-      }
+    // Submit through the Edge Function, which verifies the Turnstile token with
+    // the SECRET key and then writes the row itself. The browser no longer
+    // inserts into the table — it cannot, anon INSERT has been revoked. That is
+    // the whole point: a bot that skips this page has nowhere to post to.
+    let response: Response;
+    try {
+      response = await fetch(`${SUPABASE_URL}/functions/v1/submit-inquiry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organization_name: form.organization_name,
+          contact_name: form.contact_name,
+          email: form.email,
+          phone: form.phone,
+          message: form.message,
+          category: form.category,
+          organization_id: organizationId,
+          turnstile_token: turnstileToken,
+        }),
+      });
+    } catch {
+      setError('Could not reach us just now. Please check your connection and try again.');
+      setTurnstileToken(null);
+      setSubmitting(false);
+      return;
     }
 
-    const { error: insertError } = await supabase.from('inquiry_submissions').insert({
-      ...form,
-      organization_id: organizationId,
-    });
-
-    if (insertError) {
-      setError('Something went wrong. Please try again.');
+    if (!response.ok) {
+      const detail = await response.json().catch(() => null);
+      setError(detail?.error ?? 'Something went wrong. Please try again.');
+      // A used token cannot be replayed, so always force a fresh challenge.
+      setTurnstileToken(null);
       setSubmitting(false);
       return;
     }
@@ -209,7 +228,7 @@ export default function Contact() {
 
               <button
                 type="submit"
-                disabled={submitting || (isTurnstileEnabled() && !turnstileToken)}
+                disabled={submitting || !turnstileToken}
                 className="btn-brutal-accent w-full flex items-center justify-center gap-2 text-base min-h-[44px] disabled:opacity-60"
               >
                 <Send size={16} /> {submitting ? 'Submitting...' : 'Submit Inquiry'}

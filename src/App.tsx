@@ -37,6 +37,7 @@ const OrganizationsList = lazy(() => import('./pages/crm/OrganizationsList'));
 const OrganizationDetail = lazy(() => import('./pages/crm/OrganizationDetail'));
 const OrganizationNew = lazy(() => import('./pages/crm/OrganizationNew'));
 const Verification = lazy(() => import('./pages/crm/Verification'));
+const Registrations = lazy(() => import('./pages/crm/Registrations'));
 const Contacts = lazy(() => import('./pages/crm/Contacts'));
 const Inquiries = lazy(() => import('./pages/crm/Inquiries'));
 const BlogManager = lazy(() => import('./pages/crm/BlogManager'));
@@ -112,6 +113,7 @@ export default function App() {
               <Route path="/organizations/new" element={<OrganizationNew />} />
               <Route path="/organizations/:id" element={<OrganizationDetail />} />
               <Route path="/verification" element={<Verification />} />
+              <Route path="/registrations" element={<Registrations />} />
               <Route path="/outreach" element={<OutreachBoard />} />
               <Route path="/inbound" element={<InboundQueue />} />
               <Route path="/customers" element={<CustomersList />} />

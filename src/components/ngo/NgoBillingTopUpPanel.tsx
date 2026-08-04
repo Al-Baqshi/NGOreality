@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Copy, Check, CreditCard, Landmark, Wallet } from 'lucide-react';
+import { Building2, Copy, Check, Landmark, Smartphone, Wallet } from 'lucide-react';
 import { ensurePaymentReference } from '../../lib/payments';
 import {
   bankTransferDetailsConfigured,
@@ -10,9 +10,9 @@ import {
   MEMBERSHIP_PRICE_LABEL,
 } from '../../lib/ngoBilling';
 import {
-  AIRWALLET_AVAILABLE,
+  AIRWALLEX_AVAILABLE,
   BANK_TRANSFER_PROCESSING_BUSINESS_DAYS,
-  STRIPE_CHECKOUT_AVAILABLE,
+  PAYMARK_AVAILABLE,
 } from '../../config/billing';
 
 type NgoBillingTopUpPanelProps = {
@@ -120,19 +120,19 @@ export default function NgoBillingTopUpPanel({
         <p className="label-brutal">Other ways to pay</p>
         <ul className="text-xs text-ink-600 space-y-2">
           <li className="flex items-start gap-2">
-            <CreditCard size={14} className="shrink-0 mt-0.5 text-ink-400" aria-hidden />
+            <Smartphone size={14} className="shrink-0 mt-0.5 text-ink-400" aria-hidden />
             <span>
-              <strong className="text-ink-950">Stripe (card)</strong>
-              {STRIPE_CHECKOUT_AVAILABLE
-                ? ' — available soon from this portal.'
-                : ' — coming soon once our payment verification is complete.'}
+              <strong className="text-ink-950">Paymark (Online EFTPOS)</strong>
+              {PAYMARK_AVAILABLE
+                ? ' — pay directly from your banking app.'
+                : ' — coming soon.'}
             </span>
           </li>
           <li className="flex items-start gap-2">
             <Wallet size={14} className="shrink-0 mt-0.5 text-ink-400" aria-hidden />
             <span>
-              <strong className="text-ink-950">Airwallet</strong>
-              {AIRWALLET_AVAILABLE
+              <strong className="text-ink-950">Airwallex</strong>
+              {AIRWALLEX_AVAILABLE
                 ? ' — connect your wallet from Membership when enabled.'
                 : ' — we are enabling this shortly.'}
             </span>

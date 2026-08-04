@@ -17,6 +17,7 @@ import {
   Shield,
   Table2,
   UserCheck,
+  UserPlus,
   Users,
 } from 'lucide-react';
 
@@ -35,6 +36,7 @@ export const CRM_NAV_GROUPS: CrmNavGroup[] = [
   {
     label: 'Pipeline',
     items: [
+      { to: '/registrations', icon: UserPlus, label: 'Registrations' },
       { to: '/outreach', icon: Kanban, label: 'Outreach' },
       { to: '/inbound', icon: Inbox, label: 'Inbound' },
       { to: '/customers', icon: UserCheck, label: 'Customers' },

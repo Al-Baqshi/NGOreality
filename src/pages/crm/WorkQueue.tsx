@@ -94,7 +94,17 @@ export default function WorkQueue() {
             ))}
           </QueueSection>
 
-          <QueueSection title="Badge requests" icon={<Award size={14} />} empty="No pending requests" count={badgeRequests.length}>
+          <QueueSection
+            title="Badge requests"
+            icon={<Award size={14} />}
+            empty="No pending requests"
+            count={badgeRequests.length}
+            action={
+              <Link to="/registrations" className="font-mono text-2xs uppercase tracking-wider text-teal hover:underline">
+                Review & approve →
+              </Link>
+            }
+          >
             {badgeRequests.map((r) => (
               <QueueRow
                 key={r.id}
@@ -111,6 +121,11 @@ export default function WorkQueue() {
             icon={<Sparkles size={14} />}
             empty="No pending setup requests"
             count={setupRequests.length}
+            action={
+              <Link to="/registrations" className="font-mono text-2xs uppercase tracking-wider text-teal hover:underline">
+                Review & approve →
+              </Link>
+            }
           >
             {setupRequests.map((r) => (
               <QueueRow
@@ -165,21 +180,26 @@ function QueueSection({
   icon,
   empty,
   count,
+  action,
   children,
 }: {
   title: string;
   icon: React.ReactNode;
   empty: string;
   count: number;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="card-brutal">
-      <div className="border-b-3 border-ink-950 px-4 py-3 flex items-center justify-between">
+      <div className="border-b-3 border-ink-950 px-4 py-3 flex items-center justify-between gap-2">
         <h3 className="font-mono text-xs uppercase tracking-wider font-semibold flex items-center gap-2">
           {icon} {title}
         </h3>
-        <span className="font-mono text-2xs text-ink-400">{count}</span>
+        <div className="flex items-center gap-3">
+          {action}
+          <span className="font-mono text-2xs text-ink-400">{count}</span>
+        </div>
       </div>
       {count === 0 ? (
         <p className="px-4 py-6 text-sm text-ink-400 text-center">{empty}</p>

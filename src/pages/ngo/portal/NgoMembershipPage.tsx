@@ -99,7 +99,7 @@ export default function NgoMembershipPage() {
               <Link to="/ngo/requests" className="font-semibold underline">
                 verification request
               </Link>{' '}
-              and pay using the bank reference below (or card / Airwallet when available).
+              and pay using the bank reference below (or Paymark / Airwallex when available).
             </p>
           )}
 
