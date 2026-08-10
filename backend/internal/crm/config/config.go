@@ -25,6 +25,13 @@ type Config struct {
 	// SupabaseProjectRef builds the expected issuer claim.
 	SupabaseProjectRef string
 
+	// Central Baqshi auth (auth.baqshi.com). When Issuer is set, its tokens
+	// are accepted alongside Supabase's, resolved to seat user ids through
+	// platform.identity_links. Empty = off; nothing changes.
+	CentralAuthIssuer   string
+	CentralAuthAudience string
+	CentralAuthAppKey   string
+
 	// AdminAPIKey guards control-plane endpoints (tenant provisioning).
 	AdminAPIKey string
 
@@ -95,20 +102,23 @@ func Load() (Config, error) {
 	}
 
 	return Config{
-		DatabaseURL:        dbURL,
-		APIAddr:            apiAddr,
-		SupabaseJWTSecret:  jwtSecret,
-		SupabaseProjectRef: projectRef,
-		AdminAPIKey:        strings.TrimSpace(os.Getenv("CRM_ADMIN_API_KEY")),
-		SupabaseAnonKey:    strings.TrimSpace(os.Getenv("SUPABASE_ANON_KEY")),
-		PaymarkEnv:         envString("PAYMARK_ENV", "sandbox"),
-		AllowedOrigins:     splitList(envString("CRM_ALLOWED_ORIGINS", "https://www.ngoreality.com,http://localhost:5173")),
-		MaxConns:           maxConns,
-		MinConns:           minConns,
-		StatementTimeout:   envDuration("CRM_STATEMENT_TIMEOUT", 15*time.Second),
-		ProvisionTimeout:   envDuration("CRM_PROVISION_TIMEOUT", 60*time.Second),
-		ShutdownTimeout:    envDuration("CRM_SHUTDOWN_TIMEOUT", 15*time.Second),
-		ReadHeaderTimeout:  envDuration("CRM_READ_HEADER_TIMEOUT", 10*time.Second),
+		DatabaseURL:         dbURL,
+		APIAddr:             apiAddr,
+		SupabaseJWTSecret:   jwtSecret,
+		SupabaseProjectRef:  projectRef,
+		CentralAuthIssuer:   strings.TrimSpace(os.Getenv("CENTRAL_AUTH_ISSUER")),
+		CentralAuthAudience: firstNonEmpty(strings.TrimSpace(os.Getenv("CENTRAL_AUTH_AUDIENCE")), "ngoreality"),
+		CentralAuthAppKey:   strings.TrimSpace(os.Getenv("CENTRAL_AUTH_APP_KEY")),
+		AdminAPIKey:         strings.TrimSpace(os.Getenv("CRM_ADMIN_API_KEY")),
+		SupabaseAnonKey:     strings.TrimSpace(os.Getenv("SUPABASE_ANON_KEY")),
+		PaymarkEnv:          envString("PAYMARK_ENV", "sandbox"),
+		AllowedOrigins:      splitList(envString("CRM_ALLOWED_ORIGINS", "https://www.ngoreality.com,http://localhost:5173")),
+		MaxConns:            maxConns,
+		MinConns:            minConns,
+		StatementTimeout:    envDuration("CRM_STATEMENT_TIMEOUT", 15*time.Second),
+		ProvisionTimeout:    envDuration("CRM_PROVISION_TIMEOUT", 60*time.Second),
+		ShutdownTimeout:     envDuration("CRM_SHUTDOWN_TIMEOUT", 15*time.Second),
+		ReadHeaderTimeout:   envDuration("CRM_READ_HEADER_TIMEOUT", 10*time.Second),
 	}, nil
 }
 

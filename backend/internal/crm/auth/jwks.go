@@ -54,8 +54,14 @@ type JWKSCache struct {
 }
 
 func NewJWKSCache(projectRef string) *JWKSCache {
+	return newJWKSCacheFromURL(fmt.Sprintf("https://%s.supabase.co/auth/v1/.well-known/jwks.json", projectRef))
+}
+
+// newJWKSCacheFromURL builds a cache for any JWKS endpoint — the central
+// Baqshi issuer publishes the same document shape at its own URL.
+func newJWKSCacheFromURL(url string) *JWKSCache {
 	return &JWKSCache{
-		url:                fmt.Sprintf("https://%s.supabase.co/auth/v1/.well-known/jwks.json", projectRef),
+		url:                url,
 		client:             &http.Client{Timeout: 10 * time.Second},
 		keys:               map[string]*ecdsa.PublicKey{},
 		TTL:                10 * time.Minute,

@@ -85,6 +85,13 @@ type Verifier struct {
 	secret         []byte
 	jwks           *JWKSCache
 	expectedIssuer string
+	// expectedAudience, when set, must appear in the aud claim — and the claim
+	// must be present. Used by the central-issuer verifier (central.go), where
+	// the audience is the whole point: one signing key serves every Baqshi
+	// product, and aud is what keeps their tokens apart.
+	expectedAudience string
+	// strictClaims requires iss to be present (not merely matching-if-present).
+	strictClaims bool
 	// Leeway absorbs small clock differences between Supabase and this host.
 	Leeway time.Duration
 }
@@ -180,8 +187,15 @@ func (v *Verifier) Verify(token string) (*Claims, error) {
 	if claims.NotBefore > 0 && now.Before(time.Unix(claims.NotBefore, 0).Add(-v.Leeway)) {
 		return nil, ErrNotYetValid
 	}
-	if !claims.Audience.Contains("authenticated") {
+	if v.expectedAudience != "" {
+		if len(claims.Audience) == 0 || !claims.Audience.Contains(v.expectedAudience) {
+			return nil, ErrBadAudience
+		}
+	} else if !claims.Audience.Contains("authenticated") {
 		return nil, ErrBadAudience
+	}
+	if v.strictClaims && claims.Issuer == "" {
+		return nil, ErrBadIssuer
 	}
 	if v.expectedIssuer != "" && claims.Issuer != "" && claims.Issuer != v.expectedIssuer {
 		return nil, ErrBadIssuer

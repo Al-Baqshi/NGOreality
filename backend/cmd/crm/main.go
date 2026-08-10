@@ -95,6 +95,17 @@ func main() {
 	// Verify the token-signing keys are reachable before accepting traffic, so
 	// a wrong project ref fails at boot rather than on a user's first login.
 	verifier := auth.NewVerifier(cfg.SupabaseJWTSecret, cfg.SupabaseProjectRef)
+	// Central Baqshi auth: a second trusted issuer, resolved to seat user ids.
+	// Off unless configured; Supabase behaviour is untouched either way.
+	var tokenVerifier auth.TokenVerifier = verifier
+	var centralResolver *auth.CentralResolver
+	if cfg.CentralAuthIssuer != "" {
+		tokenVerifier = auth.Chain{verifier, auth.NewCentralVerifier(cfg.CentralAuthIssuer, cfg.CentralAuthAudience)}
+		centralResolver = auth.NewCentralResolver(pool, cfg.CentralAuthIssuer, cfg.CentralAuthAppKey)
+		log.Info("central auth enabled", "issuer", cfg.CentralAuthIssuer, "audience", cfg.CentralAuthAudience)
+	} else {
+		log.Info("central auth off (set CENTRAL_AUTH_ISSUER to enable)")
+	}
 	if verifier.SupportsAsymmetric() {
 		if err := verifier.WarmKeys(); err != nil {
 			if cfg.SupabaseJWTSecret == "" {
@@ -120,7 +131,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              cfg.APIAddr,
-		Handler:           httpapi.New(cfg, registry, verifier, sb, log).Handler(),
+		Handler:           httpapi.New(cfg, registry, tokenVerifier, centralResolver, sb, log).Handler(),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		IdleTimeout:       120 * time.Second,
 	}

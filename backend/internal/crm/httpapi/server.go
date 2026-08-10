@@ -32,17 +32,19 @@ const maxBody = 1 << 20 // 1 MiB
 type Server struct {
 	cfg      config.Config
 	registry *tenant.Registry
-	verifier *auth.Verifier
+	verifier auth.TokenVerifier
+	central  *auth.CentralResolver
 	supabase *supabase.Client
 	paymark  *payments.Verifier
 	log      *slog.Logger
 }
 
-func New(cfg config.Config, registry *tenant.Registry, verifier *auth.Verifier, sb *supabase.Client, log *slog.Logger) *Server {
+func New(cfg config.Config, registry *tenant.Registry, verifier auth.TokenVerifier, central *auth.CentralResolver, sb *supabase.Client, log *slog.Logger) *Server {
 	return &Server{
 		cfg:      cfg,
 		registry: registry,
 		verifier: verifier,
+		central:  central,
 		supabase: sb,
 		paymark:  payments.NewVerifier(payments.Environment(cfg.PaymarkEnv)),
 		log:      log,
@@ -51,7 +53,7 @@ func New(cfg config.Config, registry *tenant.Registry, verifier *auth.Verifier, 
 
 // Handler builds the full route table.
 func (s *Server) Handler() http.Handler {
-	mw := &auth.Middleware{Verifier: s.verifier, Registry: s.registry}
+	mw := &auth.Middleware{Verifier: s.verifier, Registry: s.registry, Central: s.central}
 
 	// Unauthenticated: health + control plane (admin API key).
 	root := http.NewServeMux()

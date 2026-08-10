@@ -76,8 +76,11 @@ func FromContext(ctx context.Context) (*Principal, bool) {
 // caller's seats), otherwise the caller's only seat. A user with several seats
 // and no header gets 400 rather than an arbitrary pick.
 type Middleware struct {
-	Verifier *Verifier
+	Verifier TokenVerifier
 	Registry *tenant.Registry
+	// Central, when set, maps subjects from the central Baqshi issuer to the
+	// Supabase-era user ids that seats are keyed by. See central.go.
+	Central *CentralResolver
 }
 
 func (m *Middleware) Wrap(next http.Handler) http.Handler {
@@ -96,6 +99,22 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		ctx := r.Context()
+		// A central token's subject is a foreign uuid; swap it for the seat
+		// user id before any membership lookup. Same refusal shape as "no
+		// workspace access" — a central account without a seat learns nothing
+		// about which emails hold seats here.
+		if m.Central != nil && claims.Issuer == m.Central.Issuer() {
+			uid, email, rerr := m.Central.Resolve(ctx, claims.Subject, raw)
+			if rerr != nil {
+				if errors.Is(rerr, ErrNoSeat) {
+					writeErr(w, http.StatusForbidden, "no workspace access")
+					return
+				}
+				writeErr(w, http.StatusUnauthorized, "invalid token")
+				return
+			}
+			claims.Subject, claims.Email = uid, email
+		}
 		requested := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 
 		var principal *Principal
