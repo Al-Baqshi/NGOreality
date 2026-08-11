@@ -10,10 +10,35 @@ import {
 import type { Session, User } from '@supabase/supabase-js';
 import { fetchUserProfile, type UserProfile } from '../lib/profile';
 import { supabase } from '../lib/supabase';
+import {
+  centralSignIn,
+  centralSignOut,
+  onCentralAuthChange,
+  restoreCentralSession,
+  type CentralUser,
+} from '../lib/baqshiAuth';
+
+/**
+ * Two issuers, deliberately.
+ *
+ * NGO users (clients) sign in through the central Baqshi identity service;
+ * staff and the super admin stay on Supabase. The CRM API trusts both, so a
+ * central token opens the workspace. `signInAsStaff` is untouched.
+ *
+ * Note what a central-only session does NOT get: the portal screens that read
+ * Supabase directly (badges, trust standards, memberships) are gated by RLS on
+ * auth.uid(), which is null without a Supabase session. Those move behind the
+ * Go API in a later step; until then a central user reaches their workspace,
+ * not the whole portal.
+ */
 
 interface AuthContextValue {
   user: User | null;
   session: Session | null;
+  /** Set when signed in through the central Baqshi service. */
+  centralUser: CentralUser | null;
+  /** Signed in through EITHER issuer. Guards should use this, not `user`. */
+  isAuthenticated: boolean;
   profile: UserProfile | null;
   isStaff: boolean;
   loading: boolean;
@@ -38,6 +63,7 @@ function normalizeStaffLogin(username: string): string {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [centralUser, setCentralUser] = useState<CentralUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -55,12 +81,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    let cancelled = false;
+
+    // Restore both issuers before dropping the loading flag. Resolving only
+    // Supabase first would flash the login screen at a signed-in central user
+    // and bounce them out of a deep link.
+    void (async () => {
+      const [{ data }, central] = await Promise.all([
+        supabase.auth.getSession(),
+        restoreCentralSession(),
+      ]);
+      if (cancelled) return;
       setSession(data.session);
       setUser(data.session?.user ?? null);
+      setCentralUser(central);
       setLoading(false);
       void loadProfile(data.session?.user?.id);
-    });
+    })();
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
@@ -69,12 +106,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void loadProfile(nextSession?.user?.id);
     });
 
-    return () => subscription.subscription.unsubscribe();
+    // The client refreshes and clears sessions on its own (rotation, revoked
+    // families); mirror that into React rather than polling.
+    const offCentral = onCentralAuthChange(setCentralUser);
+
+    return () => {
+      cancelled = true;
+      subscription.subscription.unsubscribe();
+      offCentral();
+    };
   }, [loadProfile]);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+  /**
+   * Default sign-in for NGO users: central Baqshi auth.
+   *
+   * Accepts a username or an email — the central service takes either, and NGO
+   * users were invited by email, so that is what they will type.
+   */
+  const signIn = useCallback(async (usernameOrEmail: string, password: string) => {
+    try {
+      await centralSignIn(usernameOrEmail, password);
+      return { error: null };
+    } catch (err) {
+      return {
+        error: err instanceof Error ? err.message : 'Could not sign in. Please try again.',
+      };
+    }
   }, []);
 
   const signInAsStaff = useCallback(
@@ -117,17 +174,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // Sign out of BOTH issuers. A user who has been on each at different times
+  // must not be left half signed-in, still holding a usable refresh token.
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    await Promise.allSettled([supabase.auth.signOut(), centralSignOut()]);
     setProfile(null);
+    setCentralUser(null);
   }, []);
 
   const isStaff = profile?.is_staff ?? false;
+  const isAuthenticated = Boolean(user || centralUser);
 
   const value = useMemo(
     () => ({
       user,
       session,
+      centralUser,
+      isAuthenticated,
       profile,
       isStaff,
       loading,
@@ -137,7 +200,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
     }),
-    [user, session, profile, isStaff, loading, profileLoading, signIn, signInAsStaff, signUp, signOut],
+    [
+      user, session, centralUser, isAuthenticated, profile, isStaff,
+      loading, profileLoading, signIn, signInAsStaff, signUp, signOut,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

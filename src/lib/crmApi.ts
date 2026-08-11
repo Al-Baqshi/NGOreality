@@ -2,11 +2,12 @@
  * Client for the Go CRM service (Organisation Workspace).
  *
  * The CRM runs on its own Postgres, separate from Supabase — see
- * docs/CRM_SAAS.md. Authentication reuses the Supabase access token the user
+ * docs/CRM_SAAS.md. Authentication reuses whichever access token the user
  * already holds, so there is no second login.
  */
 
 import { supabase } from './supabase';
+import { getCentralAccessToken } from './baqshiAuth';
 import type {
   OrganizationRole,
   ServiceType,
@@ -85,6 +86,25 @@ export function setActiveTenant(tenantId: string | null): void {
   activeTenantId = tenantId;
 }
 
+/**
+ * The bearer token for the CRM API.
+ *
+ * The Go service verifies both issuers, so either session works. Central goes
+ * first because it is the NGO-user path: a client who has signed in centrally
+ * should reach their workspace on that identity, not on a stale Supabase
+ * session that may map to a different seat. Staff, who have no central session,
+ * fall through to Supabase unchanged.
+ *
+ * getCentralAccessToken() refreshes when the token is missing or near expiry,
+ * so callers never have to think about rotation.
+ */
+async function apiAccessToken(): Promise<string | null> {
+  const central = await getCentralAccessToken();
+  if (central) return central;
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
+}
+
 async function request<T>(
   path: string,
   init: RequestInit & { query?: Record<string, string | number | undefined | null> } = {},
@@ -93,8 +113,7 @@ async function request<T>(
     throw new CrmApiError('CRM API is not configured (set VITE_CRM_API_URL)', 0);
   }
 
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+  const token = await apiAccessToken();
   if (!token) {
     throw new CrmApiError('Not signed in', 401);
   }
@@ -430,8 +449,7 @@ async function downloadCsv(path: string, query: Record<string, string | undefine
   if (!CRM_API_CONFIGURED) {
     throw new CrmApiError('CRM API is not configured (set VITE_CRM_API_URL)', 0);
   }
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+  const token = await apiAccessToken();
   if (!token) throw new CrmApiError('Not signed in', 401);
 
   const url = new URL(BASE_URL + path);

@@ -45,7 +45,7 @@ const NGO_HASH_REDIRECTS: Record<string, string> = {
 };
 
 function NgoPortalFrame() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, centralUser } = useAuth();
   const navigate = useNavigate();
   const { pathname, hash } = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
@@ -152,7 +152,9 @@ function NgoPortalFrame() {
           </div>
           <div className="px-2 py-2 text-sm group-data-[collapsible=icon]:hidden">
             <p className="truncate font-medium text-sidebar-foreground">Signed in</p>
-            <p className="truncate text-xs text-sidebar-foreground/60">{user?.email}</p>
+            <p className="truncate text-xs text-sidebar-foreground/60">
+              {user?.email ?? centralUser?.email ?? centralUser?.username}
+            </p>
           </div>
           <Button
             type="button"

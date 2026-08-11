@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { getIdentity, CrmApiError } from '../../lib/crmApi';
+import { BAQSHI_FORGOT_PASSWORD_URL } from '../../lib/baqshiAuth';
 import SEO from '../../components/SEO';
 import BrandLogo from '../../components/BrandLogo';
 import ThemeToggle from '../../components/ThemeToggle';
 
 export default function NgoLogin() {
-  const { signIn, user, loading } = useAuth();
+  const { signIn, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? '/ngo';
@@ -18,7 +19,7 @@ export default function NgoLogin() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (!loading && user) {
+  if (!loading && isAuthenticated) {
     return <Navigate to={from === '/ngo/login' ? '/ngo' : from} replace />;
   }
 
@@ -26,6 +27,7 @@ export default function NgoLogin() {
     e.preventDefault();
     setError('');
     setSubmitting(true);
+
     const { error: signInError } = await signIn(email, password);
     if (signInError) {
       setError(signInError);
@@ -33,21 +35,25 @@ export default function NgoLogin() {
       return;
     }
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id;
-
+    // Credentials were good. Whether this person can DO anything is a separate
+    // question, answered by the CRM: it maps the central account to a seat by
+    // verified email. Asking here means a seatless account is told so on the
+    // login screen rather than landing in an empty portal.
     let destination = from;
-    if (userId) {
-      const { data: members } = await supabase
-        .from('organization_members')
-        .select('id')
-        .eq('user_id', userId)
-        .limit(1);
-      if (!members?.length) {
-        // No organisation yet — /ngo/signup resumes a registration that was
-        // interrupted by email confirmation, or shows the form.
-        destination = '/ngo/signup';
+    try {
+      await getIdentity();
+      if (from === '/ngo/login') destination = '/ngo';
+    } catch (err) {
+      if (err instanceof CrmApiError && (err.status === 403 || err.status === 404)) {
+        setError(
+          'Signed in, but this account has no workspace access yet. ' +
+            'Ask an administrator of your organisation to invite this email address.',
+        );
+        setSubmitting(false);
+        return;
       }
+      // Anything else (network, 5xx) is not a permissions answer — let them
+      // through rather than blocking a working account on a transient blip.
     }
 
     setSubmitting(false);
@@ -82,11 +88,13 @@ export default function NgoLogin() {
             )}
 
             <div>
-              <label className="label-brutal" htmlFor="ngo-email">Email</label>
+              <label className="label-brutal" htmlFor="ngo-email">Email or username</label>
+              {/* type="text": the central service accepts either, and type="email"
+                  would have the browser reject a valid username before submit. */}
               <input
                 id="ngo-email"
-                type="email"
-                autoComplete="email"
+                type="text"
+                autoComplete="username"
                 className="input-brutal w-full text-base"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -105,6 +113,17 @@ export default function NgoLogin() {
                 required
               />
             </div>
+
+            <p className="text-right">
+              <a
+                href={BAQSHI_FORGOT_PASSWORD_URL}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-xs text-ink-500 underline hover:text-ink-950"
+              >
+                Forgot password?
+              </a>
+            </p>
 
             <button
               type="submit"
