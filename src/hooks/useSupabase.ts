@@ -148,8 +148,10 @@ export function usePublicOrganizations() {
 
   useEffect(() => {
     setLoading(true);
+    // directory_listings, not organizations: the anon key ships in the bundle,
+    // and the table carries email, phone and our own outreach state.
     supabase
-      .from('organizations')
+      .from('directory_listings')
       .select('*')
       .in('status', [...VERIFIED_STATUSES])
       .order('name', { ascending: true })
@@ -170,7 +172,7 @@ export function usePublicDirectoryOrganizations() {
   useEffect(() => {
     setLoading(true);
     supabase
-      .from('organizations')
+      .from('directory_listings')
       .select('*')
       .in('status', [...DIRECTORY_STATUSES])
       .order('name', { ascending: true })
@@ -192,7 +194,7 @@ export function usePublicOrganizationBySlug(slug: string | undefined) {
     if (!slug) return;
     setLoading(true);
     supabase
-      .from('organizations')
+      .from('directory_listings')
       .select('*')
       .eq('slug', slug)
       .in('status', [...DIRECTORY_STATUSES])

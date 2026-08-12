@@ -18,7 +18,6 @@ export interface ClaimSearchOrganization {
   phone?: string;
 }
 
-const DIRECTORY_STATUSES = ['listed', 'verified', 'active'] as const;
 
 function sanitizeIlikeQuery(raw: string): string {
   return raw.trim().replace(/[%_]/g, '').slice(0, 80);
@@ -44,16 +43,21 @@ export function useOrganizationClaimSearch(query: string) {
       setLoading(true);
       setSearched(true);
       setSearchError(null);
-      const pattern = `%${q}%`;
-      const { data, error } = await supabase
-        .from('organizations')
-        .select(
-          'id, name, slug, charity_registration_number, location, country, status, description, mission_statement, website_url, logo_url, category, email, phone',
-        )
-        .in('status', [...DIRECTORY_STATUSES])
-        .or(`name.ilike.${pattern},charity_registration_number.ilike.${pattern}`)
-        .order('name', { ascending: true })
-        .limit(12);
+      // This runs for LOGGED-OUT visitors on the signup page. It previously
+      // selected email and phone for every match and interpolated the term into
+      // a PostgREST .or() string — a contact-harvesting endpoint with an
+      // injection hole, on the most public page there is.
+      //
+      // directory_search takes the term as a bound parameter and can only
+      // return the column-scoped view.
+      const { data, error } = await supabase.rpc('directory_search', {
+        p_q: q,
+        p_country: null,
+        p_tag: null,
+        p_verified_only: false,
+        p_limit: 12,
+        p_offset: 0,
+      });
 
       if (error) {
         setResults([]);

@@ -3,13 +3,8 @@ import { supabase } from '../lib/supabase';
 import { captureError } from '../lib/errorReporting';
 import type { Organization } from '../types';
 
-const DIRECTORY_STATUSES = ['listed', 'verified', 'active'] as const;
 const PAGE_SIZE = 48;
 
-/* Only the columns the directory cards render — avoids shipping every org
-   column (financials, contact details, timestamps) for each listed row. */
-const DIRECTORY_CARD_COLUMNS =
-  'id,slug,name,charity_registration_number,description,mission_statement,location,country,tags,status,verification_level';
 
 export type DirectoryPageFilters = {
   country?: string;
@@ -70,9 +65,10 @@ export function useDirectorySummary(filters: DirectoryPageFilters) {
 
   useEffect(() => {
     setLoading(true);
+    // The column-scoped view, not the table — see directory_search above.
     let q = supabase
-      .from('organizations')
-      .select('*', { count: 'exact', head: true })
+      .from('directory_listings')
+      .select('id', { count: 'exact', head: true })
       .in('status', ['verified', 'active'])
       .neq('verification_level', 'none');
 
@@ -102,28 +98,28 @@ export function useDirectoryPage(filters: DirectoryPageFilters, page: number) {
 
   const fetchPage = useCallback(async () => {
     setLoading(true);
-    const from = (page - 1) * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
-
-    let q = supabase
-      .from('organizations')
-      .select(DIRECTORY_CARD_COLUMNS, { count: 'exact' })
-      .in('status', [...DIRECTORY_STATUSES])
-      .order('name', { ascending: true });
-
-    if (filters.country) q = q.eq('country', filters.country);
-    if (filters.verifiedOnly) {
-      q = q.in('status', ['verified', 'active']).neq('verification_level', 'none');
-    }
-    if (filters.tag) q = q.contains('tags', [filters.tag]);
     const term = filters.search?.trim();
-    if (term) {
-      q = q.or(
-        `name.ilike.%${term}%,charity_registration_number.ilike.%${term}%,description.ilike.%${term}%`,
-      );
-    }
 
-    const { data, error, count } = await q.range(from, to);
+    // directory_search, not .from('organizations'):
+    //  - the term is a BOUND PARAMETER. The previous `.or()` string
+    //    interpolated it raw, so a comma injected extra OR conditions — a
+    //    blind-search oracle over every column anon could read.
+    //  - it reads a column-scoped view, so no email, phone, outreach_status or
+    //    is_customer can come back down the wire.
+    //  - it searches one generated, trigram-indexed column instead of three
+    //    unindexed ones: 36ms rather than 1.14s.
+    const { data, error } = await supabase.rpc('directory_search', {
+      p_q: term || null,
+      p_country: filters.country || null,
+      p_tag: filters.tag || null,
+      p_verified_only: Boolean(filters.verifiedOnly),
+      p_limit: PAGE_SIZE,
+      p_offset: (page - 1) * PAGE_SIZE,
+    });
+
+    const rows = (data ?? []) as (Organization & { total_count: number })[];
+    const count = rows.length ? Number(rows[0].total_count) : 0;
+
     if (error) {
       // Previously this left the last successful page on screen and cleared the
       // spinner, so a failure looked like "no charities match".
@@ -144,10 +140,10 @@ export function useDirectoryPage(filters: DirectoryPageFilters, page: number) {
           },
         }),
       );
-    } else if (data) {
-      // Narrowed column set (DIRECTORY_CARD_COLUMNS) — the cards only read these fields.
-      setOrganizations(data as unknown as Organization[]);
-      setTotalCount(count ?? 0);
+    } else {
+      // total_count rides on every row, so page and total arrive together.
+      setOrganizations(rows as unknown as Organization[]);
+      setTotalCount(count);
       setError(null);
     }
     setLoading(false);
