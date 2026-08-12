@@ -118,20 +118,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadProfile]);
 
   /**
-   * Default sign-in for NGO users: central Baqshi auth.
+   * Default sign-in for NGO users: central Baqshi auth, falling back to
+   * Supabase.
    *
    * Accepts a username or an email — the central service takes either, and NGO
    * users were invited by email, so that is what they will type.
+   *
+   * WHY THE FALLBACK EXISTS. Sign-in moved to central while /ngo/signup still
+   * creates a SUPABASE account. Without this, anyone who signed up could not
+   * sign back in once their first session expired: the form asked a service
+   * they did not exist in, and "Forgot password?" sent them somewhere they had
+   * no account either. A dead end for every new user.
+   *
+   * This is not a workaround bolted on — the API already verifies both issuers
+   * (auth/central.go), so a login form that accepts both is the consistent
+   * shape for as long as two issuers exist. It goes away when signup moves to
+   * central and Supabase Auth is retired.
+   *
+   * Central is tried first because it is where users are going, not where they
+   * came from. Both services answer a bad credential identically, so trying
+   * two does not reveal which one holds an account.
    */
   const signIn = useCallback(async (usernameOrEmail: string, password: string) => {
+    let centralError: string | null = null;
     try {
       await centralSignIn(usernameOrEmail, password);
       return { error: null };
     } catch (err) {
-      return {
-        error: err instanceof Error ? err.message : 'Could not sign in. Please try again.',
-      };
+      centralError = err instanceof Error ? err.message : 'Could not sign in.';
     }
+
+    // Supabase only understands an email address, so a username that failed
+    // centrally cannot succeed here — do not waste a round trip or a rate-limit
+    // slot on it.
+    if (!usernameOrEmail.includes('@')) {
+      return { error: centralError };
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: usernameOrEmail.trim(),
+      password,
+    });
+    if (!error) return { error: null };
+
+    // Report the central failure: that is the system the user should be in,
+    // and the Supabase message would name a service they have never heard of.
+    return { error: centralError };
   }, []);
 
   const signInAsStaff = useCallback(
