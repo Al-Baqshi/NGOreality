@@ -137,14 +137,25 @@ func looksSelfInflicted(msg string) bool {
 		// DNS answered: the domain is dead. That is real data about a real
 		// charity, and refusing to record it is how monitoring stalls.
 		return false
+	case strings.Contains(m, "connection refused"),
+		strings.Contains(m, "connection reset"),
+		strings.Contains(m, "tls handshake"),
+		strings.Contains(m, "certificate"):
+		// The host ANSWERED and the answer was a failure: a RST, or a
+		// handshake it could not complete. Our network reached it. That is a
+		// finding about the charity's hosting, not about us.
+		return false
 	case strings.Contains(m, "timeout"),
 		strings.Contains(m, "deadline exceeded"),
 		strings.Contains(m, "context canceled"),
-		strings.Contains(m, "connection reset"),
-		strings.Contains(m, "connection refused"),
 		strings.Contains(m, "no route to host"),
-		strings.Contains(m, "network is unreachable"),
-		strings.Contains(m, "tls handshake"):
+		strings.Contains(m, "network is unreachable"):
+		// AMBIGUOUS, and this is the important case. A dead-but-registered
+		// domain — DNS resolves, nothing listens — produces exactly the same
+		// connect timeout as our own egress being broken. It is the single most
+		// common state in a charity registry, and it cannot be told apart from
+		// the error string alone. Corroborate at the batch level instead: see
+		// the up-count condition where this rate is used.
 		return true
 	}
 	return false
@@ -281,7 +292,26 @@ func (c *client) runCycle(ctx context.Context) {
 	}
 	selfRate := float64(selfInflicted) / float64(len(outcomes))
 
-	if len(outcomes) >= minSampleForSanity && selfRate > maxSelfInflictedRate {
+	// Refusing needs BOTH signals, and the second one is what was missing.
+	//
+	// A high ambiguous-failure rate on its own is not evidence against us: a
+	// batch of registry charities whose hosting has lapsed produces exactly
+	// that, and it is accurate data. What distinguishes "our network is broken"
+	// is that NOTHING works — a broken egress fails every request, not 87% of
+	// them.
+	//
+	// Without this second condition the guard was permanently tripped by a
+	// correct result: monitoring recorded nothing for thirteen days while
+	// reporting self_inflicted_rate 0.54 with four sites in every batch
+	// answering perfectly well. Retuning concurrency did not move it, because
+	// contention was never the cause — the sites really are dead. Verified by
+	// hand: nsmedicaltrust.nz, qes.org.nz and southlandbeesociety.co.nz all
+	// resolve DNS in under 130ms and then never complete a TCP connection,
+	// from this container and from a laptop on a different continent.
+	//
+	// So: if even one site in the batch responded, our egress works, and every
+	// timeout in that batch is a finding about a charity rather than about us.
+	if len(outcomes) >= minSampleForSanity && selfRate > maxSelfInflictedRate && upCount == 0 {
 		samples := make([]string, 0, 3)
 		for _, o := range outcomes {
 			if o.selfInflicted && len(samples) < 3 {
