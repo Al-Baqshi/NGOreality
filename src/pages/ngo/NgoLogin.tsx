@@ -3,6 +3,9 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getIdentity, CrmApiError } from '../../lib/crmApi';
+import { supabase } from '../../lib/supabase';
+import { getPendingRegistration } from '../../lib/ngoSignup';
+import { captureError } from '../../lib/errorReporting';
 import { BAQSHI_FORGOT_PASSWORD_URL } from '../../lib/baqshiAuth';
 import SEO from '../../components/SEO';
 import BrandLogo from '../../components/BrandLogo';
@@ -35,25 +38,53 @@ export default function NgoLogin() {
       return;
     }
 
-    // Credentials were good. Whether this person can DO anything is a separate
-    // question, answered by the CRM: it maps the central account to a seat by
-    // verified email. Asking here means a seatless account is told so on the
-    // login screen rather than landing in an empty portal.
-    let destination = from;
-    try {
-      await getIdentity();
-      if (from === '/ngo/login') destination = '/ngo';
-    } catch (err) {
-      if (err instanceof CrmApiError && (err.status === 403 || err.status === 404)) {
-        setError(
-          'Signed in, but this account has no workspace access yet. ' +
-            'Ask an administrator of your organisation to invite this email address.',
-        );
-        setSubmitting(false);
-        return;
+    let destination = from === '/ngo/login' ? '/ngo' : from;
+
+    // FIRST: does this account have an organisation, or an unfinished signup?
+    //
+    // Signup deliberately parks the chosen organisation in Supabase user
+    // metadata and tells the user "after confirming, sign in — your
+    // organization will be set up automatically". The thing that actually
+    // creates it is NgoOrganizationRegistrationForm's resume effect, which only
+    // runs when that component mounts, i.e. on /ngo/signup. So sending an
+    // organisation-less account there is not a fallback, it is the final step
+    // of registration.
+    //
+    // An earlier version of this handler checked the CRM for a WORKSPACE seat
+    // instead and returned early on 403. That silently broke every new signup:
+    // the account and the confirmation existed, the organisation never did,
+    // and nothing appeared in the CRM because there was nothing to show. A
+    // workspace is a separate product — not having one says nothing about
+    // whether you have an organisation.
+    const { data: sessionData } = await supabase.auth.getSession();
+    const supabaseUser = sessionData.session?.user;
+
+    if (supabaseUser) {
+      if (getPendingRegistration(supabaseUser)) {
+        destination = '/ngo/signup';
+      } else {
+        const { data: members, error: membersError } = await supabase
+          .from('organization_members')
+          .select('id')
+          .eq('user_id', supabaseUser.id)
+          .limit(1);
+        if (membersError) {
+          captureError(membersError, { where: 'NgoLogin.membershipCheck' });
+        } else if (!members?.length) {
+          destination = '/ngo/signup';
+        }
       }
-      // Anything else (network, 5xx) is not a permissions answer — let them
-      // through rather than blocking a working account on a transient blip.
+    } else {
+      // Central-only account: no Supabase metadata, so the CRM seat is the
+      // only signal we have. This is informational, never blocking — a 403
+      // here means "no workspace", which the portal itself explains better.
+      try {
+        await getIdentity();
+      } catch (err) {
+        if (!(err instanceof CrmApiError && (err.status === 403 || err.status === 404))) {
+          captureError(err, { where: 'NgoLogin.identity' });
+        }
+      }
     }
 
     setSubmitting(false);

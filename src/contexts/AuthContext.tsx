@@ -199,7 +199,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: fullName, ...extraMetadata } },
+        options: {
+          data: { full_name: fullName, ...extraMetadata },
+          // Say where the confirmation link lands, explicitly.
+          //
+          // Without this, Supabase falls back to the project's Site URL, which
+          // is a dashboard field no code can see and which was pointing at
+          // localhost. The result was silent and total: clicking the link DID
+          // confirm the address server-side, then dropped the user on a dead
+          // local address. They never returned to the app with a session, so
+          // the registration parked in user metadata never resumed and the
+          // organisation was never created — an account with no organisation,
+          // and nothing in the CRM to show anyone had signed up.
+          //
+          // /ngo/signup is deliberate rather than the site root: that route
+          // mounts NgoOrganizationRegistrationForm, whose effect finishes the
+          // registration. Landing there IS the last step of signing up.
+          //
+          // window.location.origin so preview deploys confirm back to
+          // themselves instead of production.
+          emailRedirectTo: `${window.location.origin}/ngo/signup`,
+        },
       });
       return { error: error?.message ?? null };
     },
