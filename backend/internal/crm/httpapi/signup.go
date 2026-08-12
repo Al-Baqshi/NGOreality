@@ -23,10 +23,27 @@ func contextWithTimeout(r *http.Request, d time.Duration) (context.Context, cont
 //
 // Authorisation is delegated: the CRM asks Supabase "what is this user's role
 // in this organisation?" using the USER'S OWN token. RLS answers. A user who
-// is not an owner or admin of that NGO gets nothing back, so this cannot be
-// used to claim someone else's organisation, and the CRM needs no privileged
-// Supabase credential to check.
+// is not a member of that NGO gets nothing back, and the CRM needs no
+// privileged Supabase credential to check.
 // ---------------------------------------------------------------------------
+
+// canProvisionWorkspace decides who may turn an organisation into a workspace.
+//
+// OWNER ONLY, and excluding 'admin' is the entire point.
+//
+// join_organization mints 'admin' unconditionally for any authenticated caller
+// against an organisation that someone else already manages. Accepting 'admin'
+// here completed a takeover: a stranger joined a real charity, called this
+// endpoint, and Provision seated THEM as OwnerUserID — owner of that charity's
+// workspace, with the legitimate manager locked out of it.
+//
+// The owner is the accountable party for the beneficiary data a workspace
+// holds, so requiring that role is the right answer independently of the bug.
+// An admin who needs a workspace asks the owner: one message, rather than a
+// silent transfer of control.
+func canProvisionWorkspace(role string) bool {
+	return role == "owner"
+}
 
 type signupRequest struct {
 	OrganizationID string `json:"organization_id"`
@@ -74,11 +91,11 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, "could not verify your organisation membership")
 		return
 	}
-	if role != "owner" && role != "admin" {
+	if !canProvisionWorkspace(role) {
 		// Same response whether the org does not exist or is not theirs —
 		// distinguishing the two would let anyone enumerate organisations.
 		writeErr(w, http.StatusForbidden,
-			"you must be an owner or administrator of this organisation to create its workspace")
+			"you must be the owner of this organisation to create its workspace")
 		return
 	}
 
