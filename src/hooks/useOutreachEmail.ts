@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { captureError } from '../lib/errorReporting';
 import { OUTREACH_EMAIL_TEMPLATES } from '../types';
 
 export type OrgEmailStatus = {
@@ -32,7 +33,8 @@ export function useOutreachEmailStatus(organizationIds: string[]) {
       .order('created_at', { ascending: false })
       .limit(500);
 
-    if (!error && data) {
+    if (error) captureError(error, { where: 'useOutreachEmailStatus' });
+    else if (data) {
       const map: Record<string, OrgEmailStatus> = {};
       for (const row of data) {
         if (map[row.organization_id]) continue;

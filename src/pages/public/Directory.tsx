@@ -46,7 +46,7 @@ export default function Directory() {
     [selectedCountry, searchDebounced, selectedTag, verifiedOnly],
   );
 
-  const { organizations, totalCount, totalPages, loading } = useDirectoryPage(filters, page);
+  const { organizations, totalCount, totalPages, loading, error } = useDirectoryPage(filters, page);
   const { verifiedCount } = useDirectorySummary({ country: selectedCountry || undefined });
   const { tags: tagCounts } = useDirectoryTagCounts(selectedCountry || '');
 
@@ -227,6 +227,22 @@ export default function Directory() {
 
           {loading ? (
             <div className="text-center py-16 font-mono text-sm text-ink-400">Loading…</div>
+          ) : error ? (
+            /* Distinct from "no results" on purpose. These rendered identically
+               before, so a broken directory looked like an empty one — to
+               visitors and to us. */
+            <div className="text-center py-16">
+              <Shield size={48} className="text-accent mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-ink-700 dark:text-foreground mb-2">
+                The directory could not be loaded
+              </h3>
+              <p className="text-sm text-ink-500 dark:text-muted-foreground mb-4">
+                This is a fault on our side, not a search with no matches.
+              </p>
+              <button type="button" onClick={() => window.location.reload()} className="btn-brutal-outline text-sm min-h-[44px]">
+                Try again
+              </button>
+            </div>
           ) : organizations.length === 0 ? (
             <div className="text-center py-16">
               <Shield size={48} className="text-ink-200 mx-auto mb-4" />

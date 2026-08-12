@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { captureError } from '../lib/errorReporting';
 import type {
   Organization,
   OrganizationPayment,
@@ -178,7 +179,8 @@ export function useOrganizationsPage(
     }
 
     const { data, error, count } = await query.range(from, to);
-    if (!error && data) {
+    if (error) captureError(error, { where: 'useOrganizationsPage' });
+    else if (data) {
       setOrganizations(data);
       setTotalCount(count ?? 0);
     }
@@ -225,7 +227,8 @@ export function useServiceEngagements(organizationId: string | undefined) {
       .select('*')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false });
-    if (!error && data) setEngagements(data);
+    if (error) captureError(error, { where: 'useServiceEngagements' });
+    else if (data) setEngagements(data);
     setLoading(false);
   }, [organizationId]);
 
@@ -248,7 +251,8 @@ export function useStaffTasks(organizationId: string | undefined) {
       .select('*')
       .eq('organization_id', organizationId)
       .order('due_date', { ascending: true });
-    if (!error && data) setTasks(data);
+    if (error) captureError(error, { where: 'useStaffTasks' });
+    else if (data) setTasks(data);
     setLoading(false);
   }, [organizationId]);
 
@@ -357,7 +361,8 @@ export function useExpiringBadges(mode: 'expiring' | 'expired') {
     }
 
     query.then(({ data, error }) => {
-      if (!error && data) setRows(data as typeof rows);
+      if (error) captureError(error, { where: 'useExpiringBadges' });
+      else if (data) setRows(data as typeof rows);
       setLoading(false);
     });
   }, [mode]);
@@ -377,7 +382,8 @@ export function useOrganizationPayments(organizationId: string | undefined) {
       .select('*')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false });
-    if (!error && data) setPayments(data);
+    if (error) captureError(error, { where: 'useOrganizationPayments' });
+    else if (data) setPayments(data);
     setLoading(false);
   }, [organizationId]);
 
@@ -401,7 +407,8 @@ export function usePaymentsLedger(limit = 100) {
       .select('*, organizations(name, payment_reference)')
       .order('created_at', { ascending: false })
       .limit(limit);
-    if (!error && data) setPayments(data as typeof payments);
+    if (error) captureError(error, { where: 'usePaymentsLedger' });
+    else if (data) setPayments(data as typeof payments);
     setLoading(false);
   }, [limit]);
 

@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { captureError } from '../../lib/errorReporting';
 import { useState, useEffect } from 'react';
 import { SectionHeader, EmptyState } from '../../components/ui';
 import { Link } from 'react-router-dom';
@@ -18,7 +19,8 @@ export default function Contacts() {
       .select('*, organizations(*)')
       .order('created_at', { ascending: false })
       .then(({ data, error }) => {
-        if (!error && data) setContacts(data as ContactWithOrg[]);
+        if (error) captureError(error, { where: 'Contacts.load' });
+        else if (data) setContacts(data as ContactWithOrg[]);
         setLoading(false);
       });
   }, []);

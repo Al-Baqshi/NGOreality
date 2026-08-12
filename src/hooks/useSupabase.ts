@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { captureError } from '../lib/errorReporting';
 import type { Organization, Contact, VerificationCriterion, VerificationBadge, ActivityLogEntry, InquirySubmission, BlogPost } from '../types';
 
 export function useOrganizations() {
@@ -12,7 +13,8 @@ export function useOrganizations() {
       .from('organizations')
       .select('*')
       .order('created_at', { ascending: false });
-    if (!error && data) setOrganizations(data);
+    if (error) captureError(error, { where: 'useOrganizations' });
+    else if (data) setOrganizations(data);
     setLoading(false);
   };
 
@@ -28,7 +30,8 @@ export function useOrganization(id: string | undefined) {
     if (!id) return;
     setLoading(true);
     const { data, error } = await supabase.from('organizations').select('*').eq('id', id).maybeSingle();
-    if (!error && data) setOrganization(data);
+    if (error) captureError(error, { where: 'useOrganization' });
+    else if (data) setOrganization(data);
     setLoading(false);
   }, [id]);
 
@@ -48,7 +51,8 @@ export function useContacts(organizationId: string | undefined) {
     setLoading(true);
     supabase.from('contacts').select('*').eq('organization_id', organizationId).order('created_at', { ascending: false })
       .then(({ data, error }) => {
-        if (!error && data) setContacts(data);
+        if (error) captureError(error, { where: 'useContacts' });
+        else if (data) setContacts(data);
         setLoading(false);
       });
   }, [organizationId]);
@@ -68,7 +72,8 @@ export function useVerificationCriteria(organizationId: string | undefined) {
       .select('*')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: true });
-    if (!error && data) setCriteria(data);
+    if (error) captureError(error, { where: 'useVerificationCriteria' });
+    else if (data) setCriteria(data);
     setLoading(false);
   }, [organizationId]);
 
@@ -88,7 +93,8 @@ export function useBadges(organizationId: string | undefined) {
     setLoading(true);
     supabase.from('verification_badges').select('*').eq('organization_id', organizationId).order('issued_at', { ascending: false })
       .then(({ data, error }) => {
-        if (!error && data) setBadges(data);
+        if (error) captureError(error, { where: 'useBadges' });
+        else if (data) setBadges(data);
         setLoading(false);
       });
   }, [organizationId]);
@@ -105,7 +111,8 @@ export function useActivityLog(organizationId: string | undefined) {
     setLoading(true);
     supabase.from('activity_log').select('*').eq('organization_id', organizationId).order('created_at', { ascending: false })
       .then(({ data, error }) => {
-        if (!error && data) setEntries(data);
+        if (error) captureError(error, { where: 'useActivityLog' });
+        else if (data) setEntries(data);
         setLoading(false);
       });
   }, [organizationId]);
@@ -123,7 +130,8 @@ export function useInquiries() {
       .from('inquiry_submissions')
       .select('*')
       .order('created_at', { ascending: false });
-    if (!error && data) setInquiries(data);
+    if (error) captureError(error, { where: 'useInquiries' });
+    else if (data) setInquiries(data);
     setLoading(false);
   };
 
@@ -146,7 +154,8 @@ export function usePublicOrganizations() {
       .in('status', [...VERIFIED_STATUSES])
       .order('name', { ascending: true })
       .then(({ data, error }) => {
-        if (!error && data) setOrganizations(data);
+        if (error) captureError(error, { where: 'usePublicOrganizations' });
+        else if (data) setOrganizations(data);
         setLoading(false);
       });
   }, []);
@@ -166,7 +175,8 @@ export function usePublicDirectoryOrganizations() {
       .in('status', [...DIRECTORY_STATUSES])
       .order('name', { ascending: true })
       .then(({ data, error }) => {
-        if (!error && data) setOrganizations(data);
+        if (error) captureError(error, { where: 'usePublicDirectoryOrganizations' });
+        else if (data) setOrganizations(data);
         setLoading(false);
       });
   }, []);
@@ -188,7 +198,8 @@ export function usePublicOrganizationBySlug(slug: string | undefined) {
       .in('status', [...DIRECTORY_STATUSES])
       .maybeSingle()
       .then(({ data, error }) => {
-        if (!error && data) setOrganization(data);
+        if (error) captureError(error, { where: 'usePublicOrganizationBySlug' });
+        else if (data) setOrganization(data);
         else setOrganization(null);
         setLoading(false);
       });
@@ -205,7 +216,8 @@ export function useBlogPosts() {
     setLoading(true);
     supabase.from('blog_posts').select('*').eq('status', 'published').order('published_at', { ascending: false })
       .then(({ data, error }) => {
-        if (!error && data) setPosts(data);
+        if (error) captureError(error, { where: 'useBlogPosts' });
+        else if (data) setPosts(data);
         setLoading(false);
       });
   }, []);
@@ -222,7 +234,8 @@ export function useBlogPost(slug: string | undefined) {
     setLoading(true);
     supabase.from('blog_posts').select('*').eq('slug', slug).eq('status', 'published').maybeSingle()
       .then(({ data, error }) => {
-        if (!error && data) setPost(data);
+        if (error) captureError(error, { where: 'useBlogPost' });
+        else if (data) setPost(data);
         setLoading(false);
       });
   }, [slug]);
@@ -240,7 +253,8 @@ export function useAllBlogPosts() {
       .from('blog_posts')
       .select('*')
       .order('published_at', { ascending: false });
-    if (!error && data) setPosts(data);
+    if (error) captureError(error, { where: 'useAllBlogPosts' });
+    else if (data) setPosts(data);
     setLoading(false);
   };
 

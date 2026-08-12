@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { captureError } from '../lib/errorReporting';
 import type { Organization } from '../types';
 
 const DIRECTORY_STATUSES = ['listed', 'verified', 'active'] as const;
@@ -20,29 +21,38 @@ export type DirectoryPageFilters = {
 export function useDirectoryCountryCounts() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
     supabase.rpc('directory_country_counts').then(({ data, error }) => {
-      if (!error && data && typeof data === 'object') {
+      if (error) {
+        setError(captureError(error, { where: 'useDirectoryCountryCounts' }));
+      } else if (data && typeof data === 'object') {
         setCounts(data as Record<string, number>);
+        setError(null);
       }
       setLoading(false);
     });
   }, []);
 
-  return { counts, loading, nzTotal: counts.NZ ?? 0 };
+  return { counts, loading, error, nzTotal: counts.NZ ?? 0 };
 }
 
 export function useDirectoryTagCounts(country: string) {
   const [tags, setTags] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
     supabase.rpc('directory_tag_counts', { p_country: country || null }).then(({ data, error }) => {
-      if (!error && data && typeof data === 'object') {
+      if (error) {
+        setTags({});
+        setError(captureError(error, { where: 'useDirectoryTagCounts', detail: { country } }));
+      } else if (data && typeof data === 'object') {
         setTags(data as Record<string, number>);
+        setError(null);
       } else {
         setTags({});
       }
@@ -50,12 +60,13 @@ export function useDirectoryTagCounts(country: string) {
     });
   }, [country]);
 
-  return { tags, loading };
+  return { tags, loading, error };
 }
 
 export function useDirectorySummary(filters: DirectoryPageFilters) {
   const [verifiedCount, setVerifiedCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -67,19 +78,27 @@ export function useDirectorySummary(filters: DirectoryPageFilters) {
 
     if (filters.country) q = q.eq('country', filters.country);
 
-    q.then(({ count }) => {
-      setVerifiedCount(count ?? 0);
+    q.then(({ count, error }) => {
+      if (error) {
+        // A failed count previously showed a confident "0 verified", which is
+        // worse than showing nothing: it is a wrong number, not a missing one.
+        setError(captureError(error, { where: 'useDirectorySummary', detail: { country: filters.country } }));
+      } else {
+        setVerifiedCount(count ?? 0);
+        setError(null);
+      }
       setLoading(false);
     });
   }, [filters.country]);
 
-  return { verifiedCount, loading };
+  return { verifiedCount, loading, error };
 }
 
 export function useDirectoryPage(filters: DirectoryPageFilters, page: number) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchPage = useCallback(async () => {
     setLoading(true);
@@ -105,10 +124,31 @@ export function useDirectoryPage(filters: DirectoryPageFilters, page: number) {
     }
 
     const { data, error, count } = await q.range(from, to);
-    if (!error && data) {
+    if (error) {
+      // Previously this left the last successful page on screen and cleared the
+      // spinner, so a failure looked like "no charities match".
+      setOrganizations([]);
+      setTotalCount(0);
+      setError(
+        captureError(error, {
+          where: 'useDirectoryPage',
+          // Named individually rather than spreading `filters`: the callback's
+          // deps are the individual fields, so spreading the object would make
+          // this close over a stale one.
+          detail: {
+            page,
+            country: filters.country,
+            tag: filters.tag,
+            verifiedOnly: filters.verifiedOnly,
+            hasSearch: Boolean(term),
+          },
+        }),
+      );
+    } else if (data) {
       // Narrowed column set (DIRECTORY_CARD_COLUMNS) — the cards only read these fields.
       setOrganizations(data as unknown as Organization[]);
       setTotalCount(count ?? 0);
+      setError(null);
     }
     setLoading(false);
   }, [filters.country, filters.search, filters.tag, filters.verifiedOnly, page]);
@@ -125,6 +165,7 @@ export function useDirectoryPage(filters: DirectoryPageFilters, page: number) {
     totalPages,
     pageSize: PAGE_SIZE,
     loading,
+    error,
     refetch: fetchPage,
   };
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { captureError } from '../../lib/errorReporting';
 import type { BlogPost } from '../../types';
 import { FileText, Plus, Pencil, Trash2, Eye, EyeOff, Search, Calendar, User } from 'lucide-react';
 
@@ -18,7 +19,8 @@ export default function BlogManager() {
       .from('blog_posts')
       .select('*')
       .order('created_at', { ascending: false });
-    if (!error && data) setPosts(data);
+    if (error) captureError(error, { where: 'BlogManager.fetchPosts' });
+    else if (data) setPosts(data);
     setLoading(false);
   };
 
