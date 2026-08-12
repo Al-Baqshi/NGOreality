@@ -113,13 +113,42 @@ CREATE TABLE IF NOT EXISTS case_notes (
 
 CREATE INDEX IF NOT EXISTS idx_case_notes_case ON case_notes(case_id, created_at DESC);
 
+/*
+  Append-only, with one deliberate door.
+
+  Notes can never be EDITED. That is the point of the table and it has no
+  exception: a correction is a new note, so the record of what was believed at
+  the time survives.
+
+  DELETE is different, and treating it the same was a bug. clients -> cases ->
+  case_notes all cascade, and this trigger fires on cascade-deleted rows, so
+  "delete this client" raised restrict_violation for any client who had ever
+  been written about — which is every real client. Erasure was impossible while
+  docs/PRIVACY_AND_RESIDENCY.md promised it, and nothing tested it.
+
+  So DELETE is permitted only inside a transaction that has explicitly declared
+  itself an erasure by setting app.tenant_purge. Reusing the pattern
+  guard_organization_trust_columns already uses for ngoreality.claim_flow: a
+  local GUC is transaction-scoped, cannot be set by a PostgREST caller, and
+  makes the intent legible in the code that performs the deletion rather than
+  implicit in a cascade.
+
+  This widens what a compromised service can destroy, and that is the honest
+  trade: a Privacy Act erasure request must be answerable. It is narrowed by
+  permitting DELETE only, never UPDATE — history cannot be quietly rewritten,
+  only removed wholesale and deliberately.
+*/
 CREATE OR REPLACE FUNCTION reject_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
+  IF TG_OP = 'DELETE' AND current_setting('app.tenant_purge', true) = 'on' THEN
+    RETURN OLD;
+  END IF;
+
   RAISE EXCEPTION
-    'case_notes is append-only: notes cannot be edited or deleted (add a correcting note instead)'
+    'case_notes is append-only: notes cannot be edited, and deletion requires an explicit erasure (set app.tenant_purge)'
     USING ERRCODE = 'restrict_violation';
 END;
 $$;

@@ -251,7 +251,21 @@ func UpsertClientSensitive(ctx context.Context, tx pgx.Tx, clientID string, in S
 	return err
 }
 
+// DeleteClient erases a client and everything that cascades from them: their
+// sensitive record, consents, cases, case notes, documents and sessions.
+//
+// It must declare the erasure first. case_notes and audit_log are append-only,
+// and their trigger fires on cascade-deleted rows too — so without this, the
+// delete raised restrict_violation for any client who had ever been written
+// about, which is every real one. Erasure was impossible while the privacy
+// documentation promised it.
+//
+// SET LOCAL is transaction-scoped, so the permission ends when this
+// transaction does and cannot leak to the next caller on a pooled connection.
 func DeleteClient(ctx context.Context, tx pgx.Tx, id string) error {
+	if _, err := tx.Exec(ctx, `SET LOCAL app.tenant_purge = 'on'`); err != nil {
+		return err
+	}
 	tag, err := tx.Exec(ctx, `DELETE FROM clients WHERE id = $1`, id)
 	if err != nil {
 		return err

@@ -192,7 +192,15 @@ func UpdateCase(ctx context.Context, tx pgx.Tx, id string, in CaseInput) (*domai
 		in.AssignedTo, in.DueAt, in.ClosureReason, in.Outcome, in.Custom))
 }
 
+// DeleteCase erases a case and its notes, documents and session links.
+//
+// Declares the erasure for the same reason as DeleteClient: case_notes cascade
+// from cases and are append-only, so deleting a case with any note in it failed
+// outright before this. SET LOCAL keeps the permission inside this transaction.
 func DeleteCase(ctx context.Context, tx pgx.Tx, id string) error {
+	if _, err := tx.Exec(ctx, `SET LOCAL app.tenant_purge = 'on'`); err != nil {
+		return err
+	}
 	tag, err := tx.Exec(ctx, `DELETE FROM cases WHERE id = $1`, id)
 	if err != nil {
 		return err
