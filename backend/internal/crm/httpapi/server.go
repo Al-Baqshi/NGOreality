@@ -36,18 +36,26 @@ type Server struct {
 	central  *auth.CentralResolver
 	supabase *supabase.Client
 	paymark  *payments.Verifier
-	log      *slog.Logger
+	// paymarkClient starts payments. Separate from the verifier on purpose:
+	// receiving money only needs Paymark's public keys, while starting a
+	// payment needs our secret credentials. Verification keeps working even
+	// when initiation is unconfigured.
+	paymarkClient *payments.Client
+	log           *slog.Logger
 }
 
 func New(cfg config.Config, registry *tenant.Registry, verifier auth.TokenVerifier, central *auth.CentralResolver, sb *supabase.Client, log *slog.Logger) *Server {
+	env := payments.Environment(cfg.PaymarkEnv)
 	return &Server{
 		cfg:      cfg,
 		registry: registry,
 		verifier: verifier,
 		central:  central,
 		supabase: sb,
-		paymark:  payments.NewVerifier(payments.Environment(cfg.PaymarkEnv)),
-		log:      log,
+		paymark:  payments.NewVerifier(env),
+		paymarkClient: payments.NewClient(env,
+			cfg.PaymarkConsumerKey, cfg.PaymarkConsumerSecret, cfg.PaymarkMerchantID),
+		log: log,
 	}
 }
 
@@ -74,6 +82,9 @@ func (s *Server) Handler() http.Handler {
 	root.HandleFunc("GET /v1/payments/paymark/health", s.paymarkHealth)
 	root.HandleFunc("GET /v1/admin/payment-events", s.adminOnly(s.listPaymentEvents))
 	root.HandleFunc("POST /v1/admin/payment-events/{id}/reconcile", s.adminOnly(s.markPaymentEventReconciled))
+	// Fire a real sandbox payment without needing a customer account. Admin-key
+	// guarded because it spends against the merchant's credentials.
+	root.HandleFunc("POST /v1/admin/payments/paymark/test-intent", s.adminOnly(s.paymarkTestIntent))
 
 	root.HandleFunc("POST /v1/signup", s.signup)
 	root.HandleFunc("GET /v1/signup/eligibility", s.signupEligibility)
@@ -88,6 +99,19 @@ func (s *Server) Handler() http.Handler {
 	api := http.NewServeMux()
 	api.HandleFunc("GET /v1/me", s.me)
 	api.HandleFunc("GET /v1/workspaces", s.listWorkspaces)
+
+	// The same test intent, reachable from the browser by a signed-in user.
+	//
+	// It exists because the admin-key route above cannot be called from a web
+	// page without shipping CRM_ADMIN_API_KEY in the JS bundle — and that key
+	// also provisions and DELETES tenants, so publishing it to test a $1
+	// payment would hand every visitor the control plane.
+	//
+	// sandboxOnly is the substitute for that key: this route refuses outright
+	// unless Paymark is pointed at the sandbox host, so the worst an authorised
+	// caller can do is create play money. Production testing keeps using the
+	// admin route, from a terminal, where the key belongs.
+	api.HandleFunc("POST /v1/payments/paymark/test-intent", s.sandboxOnly(s.paymarkTestIntent))
 
 	api.HandleFunc("GET /v1/clients", s.listClients)
 	api.HandleFunc("POST /v1/clients", auth.RequireWrite(s.createClient))
@@ -165,6 +189,24 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// sandboxOnly refuses unless Paymark is pointed at its sandbox host.
+//
+// This is a blast-radius guard, not an authorisation check — the caller is
+// already authenticated by the tenant middleware. It exists so that a route
+// reachable from a browser can never move real money, whatever goes wrong
+// upstream of it. Fails closed on an unrecognised value: anything that is not
+// literally "sandbox" is treated as production.
+func (s *Server) sandboxOnly(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if payments.Environment(s.cfg.PaymarkEnv) != payments.Sandbox {
+			writeErr(w, http.StatusForbidden,
+				"test payments are only available against the Paymark sandbox")
+			return
+		}
+		next(w, r)
+	}
 }
 
 // adminOnly guards control-plane endpoints with a shared key. If no key is

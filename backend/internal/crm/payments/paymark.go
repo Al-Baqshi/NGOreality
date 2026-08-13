@@ -15,6 +15,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -78,11 +79,19 @@ type Notification struct {
 }
 
 // Succeeded reports whether this notification represents money received.
-// Paymark's vocabulary varies by product, so match generously but explicitly —
-// never treat "unknown" as success.
+//
+// AUTHORISED is the one that matters: it is what Online EFTPOS actually sends
+// for a successful payment (the documented terminal states are AUTHORISED,
+// DECLINED, EXPIRED and ERROR). It was missing from this list, so every real
+// sandbox success would have been recorded as a failure — the payment lands in
+// the bank and the platform says it did not.
+//
+// The rest are kept because Paymark's vocabulary varies by product. Match
+// generously but explicitly; never treat "unknown" as success.
 func (n *Notification) Succeeded() bool {
 	switch strings.ToUpper(strings.TrimSpace(n.Status)) {
-	case "COMPLETED", "COMPLETE", "SUCCESS", "SUCCESSFUL", "APPROVED", "PAID", "SETTLED":
+	case "AUTHORISED", "AUTHORIZED",
+		"COMPLETED", "COMPLETE", "SUCCESS", "SUCCESSFUL", "APPROVED", "PAID", "SETTLED":
 		return true
 	}
 	return false
@@ -146,6 +155,18 @@ type Verifier struct {
 	TTL                time.Duration
 	MinRefreshInterval time.Duration
 	Leeway             time.Duration
+
+	// jwksURLOverride points the verifier at a stub key set in tests. Empty in
+	// production, where the URL comes from the environment.
+	jwksURLOverride string
+}
+
+// jwksURL is the key set to fetch.
+func (v *Verifier) jwksURL() string {
+	if v.jwksURLOverride != "" {
+		return v.jwksURLOverride
+	}
+	return v.env.JWKSURL()
 }
 
 func NewVerifier(env Environment) *Verifier {
@@ -170,7 +191,7 @@ func (v *Verifier) refresh() error {
 	v.lastAttempt = time.Now()
 	v.mu.Unlock()
 
-	resp, err := v.client.Get(v.env.JWKSURL())
+	resp, err := v.client.Get(v.jwksURL())
 	if err != nil {
 		return fmt.Errorf("fetch paymark jwks: %w", err)
 	}
@@ -208,7 +229,21 @@ func (v *Verifier) refresh() error {
 func (k jwk) publicKey() (crypto.PublicKey, error) {
 	switch k.Kty {
 	case "EC":
-		if k.Crv != "P-256" {
+		// All three JOSE curves, not just P-256.
+		//
+		// Paymark's sandbox JWKS serves a single P-521 key. Accepting only
+		// P-256 meant the key set parsed to nothing, Warm() reported "no usable
+		// keys", and every payment notification would have failed signature
+		// verification — money taken at the bank, nothing recorded here.
+		var curve elliptic.Curve
+		switch k.Crv {
+		case "P-256":
+			curve = elliptic.P256()
+		case "P-384":
+			curve = elliptic.P384()
+		case "P-521":
+			curve = elliptic.P521()
+		default:
 			return nil, fmt.Errorf("unsupported curve %q", k.Crv)
 		}
 		xb, err := base64.RawURLEncoding.DecodeString(k.X)
@@ -220,12 +255,12 @@ func (k jwk) publicKey() (crypto.PublicKey, error) {
 			return nil, err
 		}
 		pub := &ecdsa.PublicKey{
-			Curve: elliptic.P256(),
+			Curve: curve,
 			X:     new(big.Int).SetBytes(xb),
 			Y:     new(big.Int).SetBytes(yb),
 		}
 		if !pub.Curve.IsOnCurve(pub.X, pub.Y) {
-			return nil, fmt.Errorf("point is not on P-256")
+			return nil, fmt.Errorf("point is not on %s", k.Crv)
 		}
 		return pub, nil
 
@@ -301,30 +336,54 @@ func (v *Verifier) Verify(token string) (*Notification, error) {
 		return nil, err
 	}
 
-	signingInput := parts[0] + "." + parts[1]
-	digest := sha256.Sum256([]byte(signingInput))
+	signingInput := []byte(parts[0] + "." + parts[1])
 
-	// Pin the algorithm to the key type. Trusting the header alone is how
-	// algorithm-confusion attacks work.
+	// Pin the algorithm to the key type AND, for ECDSA, to the key's own curve.
+	// Trusting the header alone is how algorithm-confusion attacks work — and
+	// accepting ES256 against a P-521 key would also simply fail, since the
+	// digest size and coordinate width both come from the curve.
 	switch header.Alg {
-	case "ES256":
+	case "ES256", "ES384", "ES512":
 		ecKey, ok := pub.(*ecdsa.PublicKey)
 		if !ok {
-			return nil, fmt.Errorf("%w: ES256 header but key is not ECDSA", ErrBadSignature)
+			return nil, fmt.Errorf("%w: %s header but key is not ECDSA", ErrBadSignature, header.Alg)
 		}
-		if len(sig) != 64 {
+
+		var digest []byte
+		var wantCurve elliptic.Curve
+		switch header.Alg {
+		case "ES256":
+			d := sha256.Sum256(signingInput)
+			digest, wantCurve = d[:], elliptic.P256()
+		case "ES384":
+			d := sha512.Sum384(signingInput)
+			digest, wantCurve = d[:], elliptic.P384()
+		default: // ES512
+			d := sha512.Sum512(signingInput)
+			digest, wantCurve = d[:], elliptic.P521()
+		}
+		if ecKey.Curve != wantCurve {
+			return nil, fmt.Errorf("%w: %s header does not match the key's curve", ErrBadSignature, header.Alg)
+		}
+
+		// JOSE ECDSA signatures are the fixed-width r||s pair, each padded to
+		// the curve's coordinate size — 32 bytes for P-256, 66 for P-521.
+		n := (ecKey.Curve.Params().BitSize + 7) / 8
+		if len(sig) != 2*n {
 			return nil, ErrBadSignature
 		}
-		r := new(big.Int).SetBytes(sig[:32])
-		s := new(big.Int).SetBytes(sig[32:])
-		if !ecdsa.Verify(ecKey, digest[:], r, s) {
+		r := new(big.Int).SetBytes(sig[:n])
+		s := new(big.Int).SetBytes(sig[n:])
+		if !ecdsa.Verify(ecKey, digest, r, s) {
 			return nil, ErrBadSignature
 		}
+
 	case "RS256":
 		rsaKey, ok := pub.(*rsa.PublicKey)
 		if !ok {
 			return nil, fmt.Errorf("%w: RS256 header but key is not RSA", ErrBadSignature)
 		}
+		digest := sha256.Sum256(signingInput)
 		if err := rsa.VerifyPKCS1v15(rsaKey, crypto.SHA256, digest[:], sig); err != nil {
 			return nil, ErrBadSignature
 		}

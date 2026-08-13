@@ -220,12 +220,22 @@ export default function Homepage() {
                   </p>
                 </div>
 
+                {/* Pricing sits in the hero, not just the footer: "what does it
+                    cost" is the question that follows "get verified", and
+                    making people hunt for it loses the ones who would have
+                    paid. */}
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                   <Link
                     to="/public/contact"
                     className="btn-brutal-gold flex items-center justify-center gap-2 text-base"
                   >
                     Get Verified <ArrowRight size={18} />
+                  </Link>
+                  <Link
+                    to="/public/pricing"
+                    className="btn-brutal-teal flex items-center justify-center gap-2 text-base"
+                  >
+                    See Pricing <ArrowRight size={18} />
                   </Link>
                   <Link
                     to="/public/directory"

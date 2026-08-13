@@ -40,6 +40,29 @@ type Config struct {
 	// refusing a real payment loudly.
 	PaymarkEnv string
 
+	// PaymarkConsumerKey and PaymarkConsumerSecret are the API credentials
+	// from the Paymark merchant portal, exchanged for a bearer token when
+	// initiating payments. Webhook verification does not use them — it relies
+	// on Paymark's public JWKS — so they may be empty until initiation ships.
+	PaymarkConsumerKey    string
+	PaymarkConsumerSecret string
+
+	// PaymarkMerchantID is the merchant identifier issued with those
+	// credentials. Online EFTPOS requires it in every create-intent call, so
+	// payment initiation is refused without it rather than sending a request
+	// that Paymark would reject anyway.
+	PaymarkMerchantID string
+
+	// PublicBaseURL is this service's own externally reachable origin, e.g.
+	// https://api.ngoreality.com. Paymark POSTs its signed notification here,
+	// so it must be a real public URL — localhost will silently never be
+	// called back and the payment will look stuck forever.
+	PublicBaseURL string
+
+	// SiteBaseURL is the customer-facing site, used for the return link a
+	// payer lands on after approving in their banking app.
+	SiteBaseURL string
+
 	// SupabaseAnonKey is the project's public key. It is required by
 	// Supabase's gateway on every PostgREST call; it grants nothing on its
 	// own, since RLS decides access from the user's token.
@@ -102,23 +125,28 @@ func Load() (Config, error) {
 	}
 
 	return Config{
-		DatabaseURL:         dbURL,
-		APIAddr:             apiAddr,
-		SupabaseJWTSecret:   jwtSecret,
-		SupabaseProjectRef:  projectRef,
-		CentralAuthIssuer:   strings.TrimSpace(os.Getenv("CENTRAL_AUTH_ISSUER")),
-		CentralAuthAudience: firstNonEmpty(strings.TrimSpace(os.Getenv("CENTRAL_AUTH_AUDIENCE")), "ngoreality"),
-		CentralAuthAppKey:   strings.TrimSpace(os.Getenv("CENTRAL_AUTH_APP_KEY")),
-		AdminAPIKey:         strings.TrimSpace(os.Getenv("CRM_ADMIN_API_KEY")),
-		SupabaseAnonKey:     strings.TrimSpace(os.Getenv("SUPABASE_ANON_KEY")),
-		PaymarkEnv:          envString("PAYMARK_ENV", "sandbox"),
-		AllowedOrigins:      splitList(envString("CRM_ALLOWED_ORIGINS", "https://www.ngoreality.com,http://localhost:5173")),
-		MaxConns:            maxConns,
-		MinConns:            minConns,
-		StatementTimeout:    envDuration("CRM_STATEMENT_TIMEOUT", 15*time.Second),
-		ProvisionTimeout:    envDuration("CRM_PROVISION_TIMEOUT", 60*time.Second),
-		ShutdownTimeout:     envDuration("CRM_SHUTDOWN_TIMEOUT", 15*time.Second),
-		ReadHeaderTimeout:   envDuration("CRM_READ_HEADER_TIMEOUT", 10*time.Second),
+		DatabaseURL:           dbURL,
+		APIAddr:               apiAddr,
+		SupabaseJWTSecret:     jwtSecret,
+		SupabaseProjectRef:    projectRef,
+		CentralAuthIssuer:     strings.TrimSpace(os.Getenv("CENTRAL_AUTH_ISSUER")),
+		CentralAuthAudience:   firstNonEmpty(strings.TrimSpace(os.Getenv("CENTRAL_AUTH_AUDIENCE")), "ngoreality"),
+		CentralAuthAppKey:     strings.TrimSpace(os.Getenv("CENTRAL_AUTH_APP_KEY")),
+		AdminAPIKey:           strings.TrimSpace(os.Getenv("CRM_ADMIN_API_KEY")),
+		SupabaseAnonKey:       strings.TrimSpace(os.Getenv("SUPABASE_ANON_KEY")),
+		PaymarkEnv:            envString("PAYMARK_ENV", "sandbox"),
+		PaymarkConsumerKey:    strings.TrimSpace(os.Getenv("PAYMARK_CONSUMER_KEY")),
+		PaymarkConsumerSecret: strings.TrimSpace(os.Getenv("PAYMARK_CONSUMER_SECRET")),
+		PaymarkMerchantID:     strings.TrimSpace(os.Getenv("PAYMARK_MERCHANT_ID")),
+		PublicBaseURL:         strings.TrimRight(envString("CRM_PUBLIC_BASE_URL", "https://api.ngoreality.com"), "/"),
+		SiteBaseURL:           strings.TrimRight(envString("CRM_SITE_BASE_URL", "https://www.ngoreality.com"), "/"),
+		AllowedOrigins:        splitList(envString("CRM_ALLOWED_ORIGINS", "https://www.ngoreality.com,http://localhost:5173")),
+		MaxConns:              maxConns,
+		MinConns:              minConns,
+		StatementTimeout:      envDuration("CRM_STATEMENT_TIMEOUT", 15*time.Second),
+		ProvisionTimeout:      envDuration("CRM_PROVISION_TIMEOUT", 60*time.Second),
+		ShutdownTimeout:       envDuration("CRM_SHUTDOWN_TIMEOUT", 15*time.Second),
+		ReadHeaderTimeout:     envDuration("CRM_READ_HEADER_TIMEOUT", 10*time.Second),
 	}, nil
 }
 

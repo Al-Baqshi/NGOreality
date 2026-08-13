@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -238,5 +239,114 @@ func (s *Server) paymarkHealth(w http.ResponseWriter, r *http.Request) {
 		"jwks":        "ok",
 		"environment": string(s.cfg.PaymarkEnv),
 		"url":         payments.Environment(s.cfg.PaymarkEnv).JWKSURL(),
+		// Receiving and starting payments fail independently, so report them
+		// separately: "jwks ok" alone would imply a working checkout.
+		"initiation_configured": s.paymarkClient.Configured(),
+		"notification_url":      s.paymarkNotificationURL(),
 	})
+}
+
+// paymarkNotificationURL is where Paymark POSTs the signed result. It must be
+// publicly reachable; if it is not, a payment succeeds at the bank and this
+// platform never hears about it.
+func (s *Server) paymarkNotificationURL() string {
+	return s.cfg.PublicBaseURL + "/v1/payments/paymark/callback"
+}
+
+type paymarkTestIntentRequest struct {
+	AmountCents int64  `json:"amount_cents"`
+	Reference   string `json:"reference"`
+}
+
+// paymarkTestIntent starts a real payment against whichever Paymark environment
+// is configured, without requiring a customer account.
+//
+// It exists so the sandbox round-trip — create intent, approve in the banking
+// app, receive the signed callback — can be proved end to end before any
+// customer-facing checkout is wired to it. The notification field names in
+// paymark.go are still best-effort against the documentation; this is how they
+// get confirmed against a real callback.
+//
+// Defaults to $1.00 so a mistyped environment costs a dollar, not a membership.
+func (s *Server) paymarkTestIntent(w http.ResponseWriter, r *http.Request) {
+	if !s.paymarkClient.Configured() {
+		missing := []string{}
+		if s.cfg.PaymarkConsumerKey == "" {
+			missing = append(missing, "PAYMARK_CONSUMER_KEY")
+		}
+		if s.cfg.PaymarkConsumerSecret == "" {
+			missing = append(missing, "PAYMARK_CONSUMER_SECRET")
+		}
+		if s.cfg.PaymarkMerchantID == "" {
+			missing = append(missing, "PAYMARK_MERCHANT_ID")
+		}
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error":       "paymark initiation is not configured",
+			"missing":     missing,
+			"environment": string(s.cfg.PaymarkEnv),
+		})
+		return
+	}
+
+	var in paymarkTestIntentRequest
+	if r.ContentLength > 0 && !decode(w, r, &in) {
+		return
+	}
+	if in.AmountCents <= 0 {
+		in.AmountCents = 100
+	}
+	if strings.TrimSpace(in.Reference) == "" {
+		in.Reference = "NGR-TEST"
+	}
+
+	ctx, cancel := contextWithTimeout(r, 30*time.Second)
+	defer cancel()
+
+	intent, err := s.paymarkClient.CreateIntent(ctx, payments.IntentRequest{
+		AmountCents:     in.AmountCents,
+		Currency:        "NZD",
+		Reference:       in.Reference,
+		NotificationURL: s.paymarkNotificationURL(),
+		ReturnURL:       s.cfg.SiteBaseURL + "/public/payment-complete",
+		UserAgent:       r.Header.Get("User-Agent"),
+		UserIP:          clientIP(r),
+	})
+	if err != nil {
+		s.log.Error("paymark test intent failed", "err", err, "env", s.cfg.PaymarkEnv)
+		writeJSON(w, http.StatusBadGateway, map[string]any{
+			"error":       "could not create the payment",
+			"detail":      err.Error(),
+			"environment": string(s.cfg.PaymarkEnv),
+		})
+		return
+	}
+
+	s.log.Info("paymark test intent created",
+		"payment_id", intent.PaymentID, "reference", in.Reference, "env", s.cfg.PaymarkEnv)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"payment_url":             intent.PaymentURL,
+		"payment_id":              intent.PaymentID,
+		"merchant_transaction_id": intent.MerchantTransactionID,
+		"amount_cents":            in.AmountCents,
+		"reference":               in.Reference,
+		"environment":             string(s.cfg.PaymarkEnv),
+		"notification_url":        s.paymarkNotificationURL(),
+		"next":                    "Open payment_url, approve in your banking app, then GET /v1/admin/payment-events to see the signed callback.",
+	})
+}
+
+// clientIP prefers the proxy-forwarded address, since Railway terminates TLS.
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if first, _, ok := strings.Cut(xff, ","); ok {
+			return strings.TrimSpace(first)
+		}
+		return strings.TrimSpace(xff)
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }

@@ -478,6 +478,28 @@ export const exportClientsCsv = () => downloadCsv('/v1/export/clients.csv', {});
 export const exportSessionsCsv = (from?: string, to?: string) =>
   downloadCsv('/v1/export/sessions.csv', { from, to });
 
+export interface SandboxPaymentIntent {
+  payment_url: string;
+  payment_id: string;
+  merchant_transaction_id: string;
+  amount_cents: number;
+  environment: string;
+}
+
+/**
+ * Starts a real payment against Paymark's SANDBOX and returns the hosted page
+ * to send the payer to.
+ *
+ * The server refuses this route outright unless PAYMARK_ENV is "sandbox", so
+ * it cannot take real money even if it is called from somewhere it should not
+ * be. Amount is in cents and defaults server-side to $1.00.
+ */
+export const createSandboxPaymentIntent = (amountCents?: number, reference?: string) =>
+  request<SandboxPaymentIntent>('/v1/payments/paymark/test-intent', {
+    method: 'POST',
+    body: JSON.stringify({ amount_cents: amountCents, reference }),
+  });
+
 /** Saves a Blob to the user's machine. */
 export function saveBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);

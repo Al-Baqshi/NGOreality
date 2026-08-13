@@ -13,6 +13,7 @@ const navItems = [
   { to: '/public/directory', label: 'Directory' },
   { to: '/public/reality-badge', label: 'Reality Badge' },
   { to: '/public/workspace', label: 'Workspace' },
+  { to: '/public/pricing', label: 'Pricing' },
   { to: '/public/blog', label: 'Blog' },
   { to: '/public/about', label: 'About' },
   { to: '/public/contact', label: 'Contact' },
@@ -131,6 +132,7 @@ export default function PublicLayout() {
                 <NavLink to="/public/reality-badge" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Reality Badge</NavLink>
                 <NavLink to="/public/workspace" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Organisation Workspace</NavLink>
                 <NavLink to="/public/how-it-works" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">How It Works</NavLink>
+                <NavLink to="/public/pricing" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Pricing</NavLink>
                 <Link
                   to="/ngo/login"
                   className="inline-flex items-center gap-1.5 text-xs text-ink-400 hover:text-white transition-colors py-0.5 min-h-[44px] sm:min-h-0"

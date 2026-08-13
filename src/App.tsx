@@ -16,6 +16,7 @@ const HowItWorks = lazy(() => import('./pages/public/HowItWorks'));
 const Directory = lazy(() => import('./pages/public/Directory'));
 const VerificationPublic = lazy(() => import('./pages/public/Verification'));
 const RealityBadge = lazy(() => import('./pages/public/RealityBadge'));
+const Pricing = lazy(() => import('./pages/public/Pricing'));
 const Workspace = lazy(() => import('./pages/public/Workspace'));
 const Verified = lazy(() => import('./pages/public/Verified'));
 const Blog = lazy(() => import('./pages/public/Blog'));
@@ -168,6 +169,7 @@ export default function App() {
             <Route path="org/:slug" element={<OrganizationProfile />} />
             <Route path="verified" element={<Verified />} />
             <Route path="reality-badge" element={<RealityBadge />} />
+            <Route path="pricing" element={<Pricing />} />
             <Route path="workspace" element={<Workspace />} />
             <Route path="verification" element={<VerificationPublic />} />
             <Route path="blog" element={<Blog />} />
