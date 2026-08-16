@@ -40,10 +40,10 @@ export default function CrmNavUser({ onSignOut }: CrmNavUserProps) {
       <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
           size="sm"
           onClick={onSignOut}
-          className="h-9 w-full border-sidebar-border bg-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:w-9 group-data-[collapsible=icon]:p-0"
+          className="h-9 w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:w-9 group-data-[collapsible=icon]:p-0"
         >
           <LogOut className="size-4 shrink-0" />
           <span className="group-data-[collapsible=icon]:sr-only">Sign out</span>

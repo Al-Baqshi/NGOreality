@@ -29,7 +29,28 @@ export function usePortalNotifications(audience: PortalNotificationAudience, lim
 
   useEffect(() => {
     refetch();
-  }, [refetch]);
+
+    // Subscribe to real-time changes
+    const channel = supabase
+      .channel(`portal_notifications_${audience}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'portal_notifications',
+          filter: `audience=eq.${audience}`,
+        },
+        () => {
+          refetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch, audience]);
 
   const unreadCount = items.filter((n) => !n.read_at).length;
 

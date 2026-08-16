@@ -1,13 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CATEGORIES } from '../../types';
-import { Send, CheckCircle } from 'lucide-react';
+import { Send, CheckCircle, AlertCircle } from 'lucide-react';
 import SEO from '../../components/SEO';
 import Turnstile from '../../components/Turnstile';
 import { usePublicOrganizationBySlug } from '../../hooks/useSupabase';
 import { isRegistryListed } from '../../types';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '');
+
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isValidPhone(phone: string): boolean {
+  if (!phone.trim()) return true;
+  return /^[\d\s+\-()]{7,}$/.test(phone);
+}
 
 export default function Contact() {
   const [searchParams] = useSearchParams();
@@ -24,7 +33,7 @@ export default function Contact() {
   });
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -40,14 +49,39 @@ export default function Contact() {
     }));
   }, [listedOrg]);
 
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!form.organization_name.trim()) {
+      newErrors.organization_name = 'Organization name is required';
+    }
+    if (!form.contact_name.trim()) {
+      newErrors.contact_name = 'Contact name is required';
+    }
+    if (!form.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!isValidEmail(form.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+    if (form.phone.trim() && !isValidPhone(form.phone)) {
+      newErrors.phone = 'Please enter a valid phone number';
+    }
+    if (!form.message.trim()) {
+      newErrors.message = 'Message is required';
+    } else if (form.message.trim().length < 20) {
+      newErrors.message = 'Message must be at least 20 characters';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    
+    if (!validateForm()) return;
 
-    // Turnstile is now MANDATORY, not conditional. The old code skipped the
-    // challenge whenever the site key was unset, and its verify helper returned
-    // true when its API URL was unset — two silent ways to disable spam
-    // protection by forgetting a variable.
     if (!turnstileToken) {
       setError('Please complete the security check.');
       return;
@@ -55,10 +89,6 @@ export default function Contact() {
 
     setSubmitting(true);
 
-    // Submit through the Edge Function, which verifies the Turnstile token with
-    // the SECRET key and then writes the row itself. The browser no longer
-    // inserts into the table — it cannot, anon INSERT has been revoked. That is
-    // the whole point: a bot that skips this page has nowhere to post to.
     let response: Response;
     try {
       response = await fetch(`${SUPABASE_URL}/functions/v1/submit-inquiry`, {
@@ -85,7 +115,6 @@ export default function Contact() {
     if (!response.ok) {
       const detail = await response.json().catch(() => null);
       setError(detail?.error ?? 'Something went wrong. Please try again.');
-      // A used token cannot be replayed, so always force a fresh challenge.
       setTurnstileToken(null);
       setSubmitting(false);
       return;
@@ -94,6 +123,8 @@ export default function Contact() {
     setSubmitting(false);
     setSubmitted(true);
   };
+
+  const [error, setError] = useState('');
 
   return (
     <>
@@ -152,11 +183,15 @@ export default function Contact() {
               <div>
                 <label className="label-brutal">Organization Name *</label>
                 <input
-                  className="input-brutal w-full"
+                  className={`input-brutal w-full ${errors.organization_name ? 'border-accent' : ''}`}
                   value={form.organization_name}
-                  onChange={(e) => setForm({ ...form, organization_name: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, organization_name: e.target.value });
+                    if (errors.organization_name) setErrors({ ...errors, organization_name: '' });
+                  }}
                   required
                 />
+                {errors.organization_name && <p className="text-accent text-xs font-mono mt-1" role="alert">{errors.organization_name}</p>}
               </div>
               <div>
                 <label className="label-brutal">Category</label>
@@ -180,29 +215,41 @@ export default function Contact() {
               <div>
                 <label className="label-brutal">Contact Name *</label>
                 <input
-                  className="input-brutal w-full"
+                  className={`input-brutal w-full ${errors.contact_name ? 'border-accent' : ''}`}
                   value={form.contact_name}
-                  onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, contact_name: e.target.value });
+                    if (errors.contact_name) setErrors({ ...errors, contact_name: '' });
+                  }}
                   required
                 />
+                {errors.contact_name && <p className="text-accent text-xs font-mono mt-1" role="alert">{errors.contact_name}</p>}
               </div>
               <div>
                 <label className="label-brutal">Email *</label>
                 <input
-                  className="input-brutal w-full"
+                  className={`input-brutal w-full ${errors.email ? 'border-accent' : ''}`}
                   type="email"
                   value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, email: e.target.value });
+                    if (errors.email) setErrors({ ...errors, email: '' });
+                  }}
                   required
                 />
+                {errors.email && <p className="text-accent text-xs font-mono mt-1" role="alert">{errors.email}</p>}
               </div>
               <div>
                 <label className="label-brutal">Phone</label>
                 <input
-                  className="input-brutal w-full"
+                  className={`input-brutal w-full ${errors.phone ? 'border-accent' : ''}`}
                   value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, phone: e.target.value });
+                    if (errors.phone) setErrors({ ...errors, phone: '' });
+                  }}
                 />
+                {errors.phone && <p className="text-accent text-xs font-mono mt-1" role="alert">{errors.phone}</p>}
               </div>
 
               <div className="border-t-3 border-ink-950 pt-5 mt-5">
@@ -211,14 +258,18 @@ export default function Contact() {
               <div>
                 <label className="label-brutal">Message</label>
                 <textarea
-                  className="input-brutal w-full h-32 text-base"
+                  className={`input-brutal w-full h-32 text-base ${errors.message ? 'border-accent' : ''}`}
                   value={form.message}
-                  onChange={(e) => setForm({ ...form, message: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, message: e.target.value });
+                    if (errors.message) setErrors({ ...errors, message: '' });
+                  }}
                   placeholder="Tell us about your organization and why you want to get verified..."
                 />
+                {errors.message && <p className="text-accent text-xs font-mono mt-1" role="alert">{errors.message}</p>}
               </div>
 
-              {error && <p className="text-accent text-sm font-mono">{error}</p>}
+              {error && <p className="text-accent text-sm font-mono flex items-center gap-1"><AlertCircle size={14} /> {error}</p>}
 
               <Turnstile
                 onSuccess={setTurnstileToken}

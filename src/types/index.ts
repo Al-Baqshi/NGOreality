@@ -7,6 +7,7 @@ export interface Organization {
   category: string;
   location: string;
   country: string;
+  city: string;
   website_url: string;
   email: string;
   phone: string;
@@ -27,6 +28,7 @@ export interface Organization {
   is_customer: boolean;
   payment_reference: string | null;
   claimed_at: string | null;
+  auto_renew_membership: boolean;
   created_at: string;
   updated_at: string;
 }

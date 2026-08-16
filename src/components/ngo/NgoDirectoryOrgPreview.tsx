@@ -12,6 +12,8 @@ export default function NgoDirectoryOrgPreview({ org }: NgoDirectoryOrgPreviewPr
     mission_statement: org.mission_statement ?? '',
     category: org.category ?? '',
     location: org.location ?? '',
+    country: org.country ?? '',
+    city: org.city ?? '',
     email: org.email ?? '',
     phone: org.phone ?? '',
     website_url: org.website_url ?? '',

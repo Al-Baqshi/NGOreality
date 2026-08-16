@@ -8,6 +8,7 @@ export interface ClaimSearchOrganization {
   charity_registration_number: string | null;
   location: string;
   country: string;
+  city?: string;
   status: string;
   description?: string;
   mission_statement?: string;

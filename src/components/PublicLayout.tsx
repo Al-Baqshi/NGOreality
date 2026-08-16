@@ -21,9 +21,9 @@ const navItems = [
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `inline-flex items-center whitespace-nowrap px-2.5 xl:px-3 py-2 font-mono text-2xs xl:text-xs uppercase tracking-wider transition-colors shrink-0
+  `inline-flex items-center whitespace-nowrap px-2.5 xl:px-3 py-2 font-mono text-2xs xl:text-xs uppercase tracking-wider transition-colors shrink-0 min-h-[44px]
   ${isActive
-    ? 'bg-ink-950 text-white'
+    ? 'bg-ink-950 text-white dark:bg-ink-950 dark:text-white'
     : 'text-ink-600 hover:bg-ink-50 hover:text-ink-950 dark:text-ink-300 dark:hover:bg-ink-800 dark:hover:text-white'
   }`;
 
@@ -32,7 +32,7 @@ export default function PublicLayout() {
 
   return (
     <div className="min-h-screen bg-surface overflow-x-hidden">
-      <header className="sticky top-0 z-40 border-b-3 border-ink-950 bg-surface-raised">
+      <header className="sticky top-0 z-40 border-b-3 border-ink-950 bg-surface-raised dark:bg-ink-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between gap-3 min-h-[56px] py-2 sm:py-2.5">
             <div className="shrink-0 min-w-0 max-w-[45%] sm:max-w-none">
@@ -61,7 +61,7 @@ export default function PublicLayout() {
               <button
                 type="button"
                 onClick={() => setMobileOpen(!mobileOpen)}
-                className="lg:hidden text-ink-950 dark:text-ink-50 min-h-[44px] min-w-[44px] flex items-center justify-center border-2 border-transparent hover:border-ink-950 dark:hover:border-ink-200 transition-colors"
+                className="lg:hidden text-ink-950 dark:text-ink-50 min-h-[44px] min-w-[44px] flex items-center justify-center border-2 border-ink-950 dark:border-ink-200 bg-white dark:bg-ink-800 hover:bg-ink-50 dark:hover:bg-ink-700 transition-colors"
                 aria-expanded={mobileOpen}
                 aria-controls="public-mobile-nav"
                 aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
@@ -75,7 +75,7 @@ export default function PublicLayout() {
         {mobileOpen && (
           <nav
             id="public-mobile-nav"
-            className="lg:hidden border-t-3 border-ink-950 bg-surface-raised max-h-[min(70vh,480px)] overflow-y-auto"
+            className="lg:hidden border-t-3 border-ink-950 bg-surface-raised dark:bg-ink-800 max-h-[min(70vh,480px)] overflow-y-auto"
             aria-label="Mobile navigation"
           >
             {navItems.map((item) => (
@@ -87,8 +87,8 @@ export default function PublicLayout() {
                 className={({ isActive }) =>
                   `flex items-center px-4 sm:px-6 py-3 border-b border-ink-100 dark:border-ink-800 font-mono text-xs uppercase tracking-wider min-h-[44px]
                   ${isActive
-                    ? 'bg-ink-950 text-white'
-                    : 'text-ink-600 dark:text-ink-300'
+                    ? 'bg-ink-950 text-white dark:bg-ink-950 dark:text-white'
+                    : 'text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-700'
                   }`
                 }
               >

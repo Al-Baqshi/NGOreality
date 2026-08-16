@@ -14,12 +14,15 @@ export function getProfileCompletionItems(org: Pick<
   | 'mission_statement'
   | 'category'
   | 'location'
+  | 'country'
+  | 'city'
   | 'email'
   | 'phone'
   | 'website_url'
   | 'logo_url'
 >): ProfileCompletionItem[] {
   const hasWebsite = Boolean(org.website_url?.trim());
+  const hasLocation = Boolean(org.location?.trim()) || Boolean(org.country?.trim()) || Boolean(org.city?.trim());
 
   return [
     {
@@ -45,8 +48,8 @@ export function getProfileCompletionItems(org: Pick<
     },
     {
       key: 'location',
-      label: 'Location',
-      complete: Boolean(org.location?.trim()),
+      label: 'Location (Country & City)',
+      complete: hasLocation,
     },
     {
       key: 'email',
