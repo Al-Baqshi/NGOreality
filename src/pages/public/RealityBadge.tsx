@@ -311,7 +311,7 @@ export default function RealityBadge() {
               <Link to="/ngo/signup" className="btn-brutal-teal text-base inline-flex items-center gap-2 justify-center min-h-[48px]">
                 NGO sign up <ArrowRight size={18} />
               </Link>
-              <Link to="/public/contact" className="btn-brutal-outline border-ink-600 text-white text-base inline-flex items-center gap-2 justify-center min-h-[48px]">
+              <Link to="/public/contact" className="btn-brutal-outline border-white bg-transparent text-white hover:bg-white hover:text-ink-950 text-base inline-flex items-center gap-2 justify-center min-h-[48px]">
                 Contact us <ArrowRight size={18} />
               </Link>
             </div>

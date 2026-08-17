@@ -1,201 +1,225 @@
-import { useCrmDashboardStats } from '../../hooks/useCrm';
-import { useInquiries } from '../../hooks/useSupabase';
-import { MetricCard, SectionHeader } from '../../components/ui';
-import { Mail, ArrowRight, Globe, AlertTriangle } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  ArrowRight, AlertTriangle, Award, CreditCard, Inbox, Send, UserPlus,
+  CheckCircle2, History,
+} from 'lucide-react';
+import { useCrmDashboardStats } from '../../hooks/useCrm';
+import { useCrmNavCounts } from '../../hooks/useCrmNavCounts';
+import { supabase } from '../../lib/supabase';
+import { MetricCard } from '../../components/ui';
 import RegistryInsights from '../../components/crm/RegistryInsights';
 
+/**
+ * The super-admin command centre.
+ *
+ * The previous dashboard showed 25 numbers of equal visual weight with no
+ * ordering, so "what should I do right now" and "is anything on fire" both took
+ * a scan of the whole page. Numbers are not the job; deciding is.
+ *
+ * So: what needs a human first, then the funnel, then what is selling, then a
+ * window on recent history. A count of zero is not shown at all — an empty
+ * "Needs you" list is the strongest possible signal that nothing is waiting.
+ */
+
+interface ActionItem {
+  key: string;
+  count: number;
+  label: string;
+  verb: string;
+  to: string;
+  icon: typeof Inbox;
+  urgent?: boolean;
+}
+
+interface RecentActivity {
+  id: string;
+  organization_id: string;
+  action: string;
+  description: string | null;
+  created_at: string;
+  organizations: { name: string } | null;
+}
+
+function useRecentActivity(limit = 8) {
+  const [rows, setRows] = useState<RecentActivity[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('activity_log')
+      .select('id, organization_id, action, description, created_at, organizations(name)')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+      .then(({ data }) => {
+        if (!cancelled) setRows((data ?? []) as unknown as RecentActivity[]);
+      });
+    return () => { cancelled = true; };
+  }, [limit]);
+  return rows;
+}
+
+function ago(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (mins < 60) return `${Math.max(mins, 1)}m`;
+  if (mins < 1440) return `${Math.floor(mins / 60)}h`;
+  return `${Math.floor(mins / 1440)}d`;
+}
+
 export default function Dashboard() {
-  const { stats, loading: statsLoading, error: statsError, websitePct, monitorPct } = useCrmDashboardStats();
-  const { inquiries, loading: inqLoading } = useInquiries();
+  const { stats, loading, error, websitePct, monitorPct } = useCrmDashboardStats();
+  const counts = useCrmNavCounts();
+  const recent = useRecentActivity();
 
-  const newInquiries = inquiries.filter((i) => i.status === 'new').length;
-  const recentInquiries = inquiries.filter((i) => i.status === 'new').slice(0, 5);
+  const actions: ActionItem[] = [
+    { key: 'inquiries', count: counts.inquiries, label: 'new enquiry', verb: 'Reply', to: '/inquiries', icon: Inbox, urgent: true },
+    { key: 'badges', count: stats?.badge_requests_pending ?? 0, label: 'badge request', verb: 'Review', to: '/registrations', icon: Award, urgent: true },
+    { key: 'setup', count: stats?.ngo_setup_requests_pending ?? 0, label: 'setup request', verb: 'Review', to: '/registrations', icon: UserPlus, urgent: true },
+    { key: 'unreconciled', count: counts.unreconciled, label: 'payment to reconcile', verb: 'Match', to: '/reconciliation', icon: CreditCard },
+    { key: 'followups', count: stats?.follow_ups_due ?? 0, label: 'follow-up due', verb: 'Work', to: '/work-queue', icon: Send },
+    { key: 'tasks', count: stats?.tasks_due_today ?? 0, label: 'task due', verb: 'Do', to: '/work-queue', icon: CheckCircle2 },
+    { key: 'incidents', count: stats?.incidents_open ?? 0, label: 'site down', verb: 'Check', to: '/monitoring', icon: AlertTriangle },
+  ].filter((a) => a.count > 0);
 
-  const pipelineStatuses = ['listed', 'onboarding', 'under_review', 'verified', 'active', 'lapsed'] as const;
-  const pipelineLabels: Record<string, string> = {
-    listed: 'Listed (registry)',
-    onboarding: 'Onboarding',
-    under_review: 'Under Review',
-    verified: 'Verified',
-    active: 'Active',
-    lapsed: 'Lapsed',
-  };
-  const pipelineColors: Record<string, string> = {
-    listed: 'text-ink-500',
-    onboarding: 'text-ink-600',
-    under_review: 'text-amber-600',
-    verified: 'text-teal',
-    active: 'text-teal',
-    lapsed: 'text-accent',
-  };
+  const n = (v: number | undefined) => (loading || v === undefined ? '—' : v.toLocaleString());
 
   return (
-    <div className="w-full min-w-0">
-      <SectionHeader>Dashboard</SectionHeader>
-
-      {statsError && (
-        <div className="mb-4 border-3 border-accent bg-accent-light px-4 py-3 text-sm text-accent">
-          Stats unavailable: {statsError}. Apply migration <code className="font-mono text-xs">010_crm_dashboard_stats</code> and refresh.
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
-        <MetricCard label="Total in CRM" value={statsLoading ? '—' : stats.total.toLocaleString()} />
-        <MetricCard label="NZ registry" value={statsLoading ? '—' : stats.nz_registry.toLocaleString()} />
-        <MetricCard label="Listed (directory)" value={statsLoading ? '—' : stats.listed.toLocaleString()} />
-        <MetricCard label="NGOreality verified" value={statsLoading ? '—' : stats.verified.toLocaleString()} accent />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        <MetricCard label="Outreach due" value={statsLoading ? '—' : stats.outreach_due.toLocaleString()} />
-        <MetricCard label="Follow-ups due" value={statsLoading ? '—' : (stats.follow_ups_due ?? 0)} />
-        <MetricCard label="Active engagements" value={statsLoading ? '—' : (stats.engagements_active ?? 0)} />
-        <MetricCard label="Badge requests" value={statsLoading ? '—' : stats.badge_requests_pending} />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-        <MetricCard label="In verification" value={statsLoading ? '—' : stats.pending.toLocaleString()} />
-        <MetricCard label="New inquiries" value={inqLoading ? '—' : newInquiries} />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <MetricCard
-          label="Listed with website"
-          value={statsLoading ? '—' : `${websitePct}%`}
-          sub={statsLoading ? undefined : `${stats.listed_with_website.toLocaleString()} / ${stats.listed.toLocaleString()}`}
-        />
-        <MetricCard
-          label="Monitors up"
-          value={statsLoading ? '—' : `${monitorPct}%`}
-          sub={statsLoading ? undefined : `${stats.monitors_up} / ${stats.monitors_total}`}
-        />
-        <MetricCard label="Sites down" value={statsLoading ? '—' : stats.monitors_down} />
-        <MetricCard label="Open incidents" value={statsLoading ? '—' : stats.incidents_open} />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <MetricCard label="Active badges" value={statsLoading ? '—' : stats.badges_active} />
-        <MetricCard label="Expiring (30d)" value={statsLoading ? '—' : stats.badges_expiring_30d} />
-        <MetricCard label="Expired badges" value={statsLoading ? '—' : stats.badges_expired} />
-      </div>
-
-      <div className="card-brutal mb-8">
-        <div className="border-b-3 border-ink-950 px-6 py-4">
-          <h3 className="font-mono text-xs uppercase tracking-wider font-semibold">
-            NZ registry insights (outreach)
-          </h3>
-        </div>
-        <div className="p-6">
-          <RegistryInsights country="NZ" />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card-brutal">
-          <div className="flex items-center justify-between border-b-3 border-ink-950 px-6 py-4">
-            <h3 className="font-mono text-xs uppercase tracking-wider font-semibold flex items-center gap-2">
-              <Globe size={14} /> Quick actions
-            </h3>
-          </div>
-          <div className="divide-y divide-ink-100">
-            <Link to="/work-queue" className="flex items-center justify-between px-6 py-3 hover:bg-ink-50 transition-colors text-sm">
-              <span>Today&apos;s work queue</span>
-              <ArrowRight size={14} className="text-ink-300" />
-            </Link>
-            <Link to="/outreach" className="flex items-center justify-between px-6 py-3 hover:bg-ink-50 transition-colors text-sm">
-              <span>Outreach board</span>
-              <ArrowRight size={14} className="text-ink-300" />
-            </Link>
-            <Link to="/organizations?status=listed&outreach=not_contacted" className="flex items-center justify-between px-6 py-3 hover:bg-ink-50 transition-colors text-sm">
-              <span>Start outreach (not contacted)</span>
-              <ArrowRight size={14} className="text-ink-300" />
-            </Link>
-            <Link to="/badges" className="flex items-center justify-between px-6 py-3 hover:bg-ink-50 transition-colors text-sm">
-              <span>Badges expiring / expired</span>
-              <ArrowRight size={14} className="text-ink-300" />
-            </Link>
-            <Link to="/monitoring" className="flex items-center justify-between px-6 py-3 hover:bg-ink-50 transition-colors text-sm">
-              <span>Website monitoring</span>
-              <ArrowRight size={14} className="text-ink-300" />
-            </Link>
-            <Link to="/organizations?status=onboarding" className="flex items-center justify-between px-6 py-3 hover:bg-ink-50 transition-colors text-sm">
-              <span>Orgs in verification</span>
-              <ArrowRight size={14} className="text-ink-300" />
-            </Link>
-            <Link to="/organizations?hasWebsite=no&status=listed" className="flex items-center justify-between px-6 py-3 hover:bg-ink-50 transition-colors text-sm">
-              <span>Listed — no website</span>
-              <ArrowRight size={14} className="text-ink-300" />
-            </Link>
-            <Link to="/verification" className="flex items-center justify-between px-6 py-3 hover:bg-ink-50 transition-colors text-sm">
-              <span>Verification queue</span>
-              <ArrowRight size={14} className="text-ink-300" />
-            </Link>
-          </div>
-        </div>
-
-        <div className="card-brutal">
-          <div className="flex items-center justify-between border-b-3 border-ink-950 px-6 py-4">
-            <h3 className="font-mono text-xs uppercase tracking-wider font-semibold">New Inquiries</h3>
-            <Link to="/inquiries" className="flex items-center gap-1 font-mono text-2xs uppercase tracking-wider text-ink-500 hover:text-accent transition-colors">
-              View all <ArrowRight size={12} />
-            </Link>
-          </div>
-          <div className="divide-y divide-ink-100">
-            {recentInquiries.length === 0 ? (
-              <div className="px-6 py-8 text-center text-sm text-ink-400">No new inquiries</div>
-            ) : (
-              recentInquiries.map((inq) => (
-                <div key={inq.id} className="flex items-center justify-between px-6 py-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center border-2 border-accent bg-accent-light font-mono text-xs font-bold text-accent">
-                      <Mail size={14} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold truncate">{inq.organization_name}</div>
-                      <div className="font-mono text-2xs text-ink-400 truncate">{inq.contact_name} · {inq.email}</div>
-                    </div>
-                  </div>
-                  <span className="badge-pending shrink-0">New</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-8 card-brutal">
-        <div className="border-b-3 border-ink-950 px-6 py-4">
-          <h3 className="font-mono text-xs uppercase tracking-wider font-semibold">Pipeline overview</h3>
-        </div>
-        <div className="grid grid-cols-2 gap-px bg-ink-100 sm:grid-cols-3 lg:grid-cols-6 dark:bg-border">
-          {pipelineStatuses.map((status) => {
-            const count = stats.pipeline[status] ?? 0;
-            return (
-              <Link
-                key={status}
-                to={`/organizations?status=${status}`}
-                className="bg-[var(--card-bg)] px-3 py-5 text-center transition-colors hover:bg-ink-50 dark:hover:bg-muted sm:px-4 sm:py-6"
-              >
-                <div className={`text-2xl sm:text-3xl font-black ${pipelineColors[status]}`}>
-                  {statsLoading ? '—' : count.toLocaleString()}
-                </div>
-                <div className="label-brutal mt-1 text-2xs">{pipelineLabels[status]}</div>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
-      {!statsLoading && stats.nz_registry > 0 && stats.nz_registry < 10000 && (
-        <div className="mt-6 flex gap-3 border-3 border-amber-500 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm">
-          <AlertTriangle size={18} className="shrink-0 text-amber-600" />
-          <p>
-            Registry count looks low ({stats.nz_registry.toLocaleString()} NZ rows). Run{' '}
-            <code className="font-mono text-xs">npm run import:nz-charities</code> without{' '}
-            <code className="font-mono text-xs">IMPORT_LIMIT</code> to load ~29k charities.
+    <div className="page-shell">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Dashboard</h1>
+          <p className="text-sm text-ink-600 dark:text-muted-foreground mt-1">
+            What needs you, how the funnel is moving, and what is selling.
           </p>
         </div>
+        <Link to="/activity" className="btn-brutal-outline text-sm inline-flex items-center gap-2 min-h-[44px]">
+          <History size={16} /> Full history
+        </Link>
+      </div>
+
+      {error && (
+        <div className="card-brutal border-accent p-3 mb-4 text-sm text-accent">
+          Stats unavailable: {error}
+        </div>
       )}
+
+      {/* 1. What needs a human */}
+      <section className="mb-8">
+        <h2 className="label-brutal mb-2">Needs you now</h2>
+        {actions.length === 0 ? (
+          <div className="card-brutal p-5 flex items-center gap-3">
+            <CheckCircle2 size={20} className="text-teal shrink-0" />
+            <p className="text-sm">
+              {loading ? 'Checking…' : 'Nothing is waiting. Everything in the queues is clear.'}
+            </p>
+          </div>
+        ) : (
+          <div className="card-brutal divide-y-2 divide-ink-200 dark:divide-border">
+            {actions.map(({ key, count, label, verb, to, icon: Icon, urgent }) => (
+              <Link key={key} to={to}
+                className="flex items-center gap-3 p-4 hover:bg-paper dark:hover:bg-muted transition-colors group">
+                <Icon size={18} className={urgent ? 'text-accent shrink-0' : 'text-ink-500 shrink-0'} />
+                <span className="text-2xl font-black tabular-nums">{count.toLocaleString()}</span>
+                <span className="text-sm text-ink-700 dark:text-foreground/80">
+                  {label}{count === 1 ? '' : 's'} waiting
+                </span>
+                <span className="ml-auto text-sm font-semibold inline-flex items-center gap-1 group-hover:text-teal">
+                  {verb} <ArrowRight size={15} />
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 2. Funnel — the registry becoming customers */}
+      <section className="mb-8">
+        <h2 className="label-brutal mb-2">Funnel</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <Link to="/outreach" className="card-brutal-hover p-4 block">
+            <p className="label-brutal">Leads to contact</p>
+            <p className="stat-value">{n(stats?.outreach_due)}</p>
+            <p className="stat-sub">not yet contacted</p>
+          </Link>
+          <Link to="/outreach?segment=site_down" className="card-brutal-hover p-4 block">
+            <p className="label-brutal">Site down</p>
+            <p className="stat-value text-accent">{n(stats?.monitors_down)}</p>
+            <p className="stat-sub">strongest reason to call</p>
+          </Link>
+          <Link to="/outreach?segment=no_website" className="card-brutal-hover p-4 block">
+            <p className="label-brutal">No website</p>
+            <p className="stat-value">{n(stats?.listed_without_website)}</p>
+            <p className="stat-sub">needs one built</p>
+          </Link>
+          <Link to="/organizations?status=onboarding" className="card-brutal-hover p-4 block">
+            <p className="label-brutal">Onboarding</p>
+            <p className="stat-value">{n(stats?.pending)}</p>
+            <p className="stat-sub">signed up, in progress</p>
+          </Link>
+          <Link to="/customers" className="card-brutal-hover p-4 block">
+            <p className="label-brutal">Customers</p>
+            <p className="stat-value text-teal">{n(stats?.verified)}</p>
+            <p className="stat-sub">verified or active</p>
+          </Link>
+        </div>
+      </section>
+
+      {/* 3. Products — what is actually selling */}
+      <section className="mb-8">
+        <h2 className="label-brutal mb-2">Products</h2>
+        <div className="responsive-grid">
+          <MetricCard label="Active badges" value={n(stats?.badges_active)} />
+          <MetricCard label="Expiring in 30 days" value={n(stats?.badges_expiring_30d)} />
+          <MetricCard label="Expired badges" value={n(stats?.badges_expired)} />
+          <MetricCard label="Active engagements" value={n(stats?.engagements_active)} />
+        </div>
+        <p className="mt-2 font-mono text-2xs text-ink-500 dark:text-muted-foreground">
+          Pricing lives on{' '}
+          <Link to="/public/pricing" className="underline underline-offset-2 hover:text-teal">the public pricing page</Link>.
+        </p>
+      </section>
+
+      {/* 4. Coverage — the health of the registry we monitor */}
+      <section className="mb-8">
+        <h2 className="label-brutal mb-2">Registry coverage</h2>
+        <div className="responsive-grid">
+          <MetricCard label="Listed with a website" value={loading ? '—' : `${websitePct}%`} />
+          <MetricCard label="Monitors reporting up" value={loading ? '—' : `${monitorPct}%`} />
+          <MetricCard label="Without a website" value={n(stats?.listed_without_website)} />
+          <MetricCard label="In NZ registry" value={n(stats?.nz_registry)} />
+        </div>
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-2 mb-8">
+        {/* 5. Recent history */}
+        <section>
+          <h2 className="label-brutal mb-2">Latest activity</h2>
+          <div className="card-brutal divide-y-2 divide-ink-200 dark:divide-border">
+            {recent.length === 0 && (
+              <p className="p-4 text-sm text-ink-500 dark:text-muted-foreground">Nothing recorded yet.</p>
+            )}
+            {recent.map((row) => (
+              <div key={row.id} className="flex items-start gap-3 p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm truncate">{row.description || row.action}</p>
+                  <Link to={`/organizations/${row.organization_id}`}
+                    className="font-mono text-2xs text-ink-500 dark:text-muted-foreground hover:text-teal">
+                    {row.organizations?.name ?? 'Unknown organisation'}
+                  </Link>
+                </div>
+                <span className="font-mono text-2xs text-ink-400 shrink-0">{ago(row.created_at)}</span>
+              </div>
+            ))}
+            <Link to="/activity" className="flex items-center justify-between p-3 text-sm font-semibold hover:text-teal">
+              See full history <ArrowRight size={15} />
+            </Link>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="label-brutal mb-2">Registry insight</h2>
+          <RegistryInsights country="NZ" />
+        </section>
+      </div>
     </div>
   );
 }

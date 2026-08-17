@@ -3,7 +3,10 @@ import { CRM_NAV_GROUPS } from './crm-nav';
 const EXTRA_TITLES: Record<string, string> = {
   '/organizations/new': 'New organization',
   '/notifications': 'Notifications',
-  '/email-notifications': 'Email notifications',
+  '/email-notifications': 'Email queue',
+  // Without this, prefix matching on '/outreach' would title the board
+  // "Outreach" too, and the two views would be indistinguishable in the header.
+  '/outreach/board': 'Outreach board',
 };
 
 export function getCrmPageTitle(pathname: string): string {
