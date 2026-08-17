@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search, Globe, GlobeLock, AlertTriangle, CheckCircle2, HelpCircle,
-  Loader2, ChevronLeft, ChevronRight, Kanban, ExternalLink, X,
+  Loader2, ChevronLeft, ChevronRight, Kanban, ExternalLink, Plus, X,
 } from 'lucide-react';
+import NewLeadDialog from '../../components/crm/NewLeadDialog';
 import {
   useOutreachLeads, useOutreachSegmentCounts, useOutreachSelection,
   bulkSetOutreachByFilter, bulkSetOutreachByIds, selectionCount, isRowSelected,
@@ -81,6 +82,7 @@ export default function OutreachWorklist() {
   const page = Math.max(1, Number(params.get('page')) || 1);
 
   const [refreshKey, setRefreshKey] = useState(0);
+  const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [searchDraft, setSearchDraft] = useState(filters.q);
   const [moveTo, setMoveTo] = useState<OutreachStatus>('cold_email');
   const [busy, setBusy] = useState(false);
@@ -150,10 +152,26 @@ export default function OutreachWorklist() {
             Work the backlog by segment. Pick the reason to call, then act on the whole segment.
           </p>
         </div>
-        <Link to="/outreach/board" className="btn-brutal-outline text-sm inline-flex items-center gap-2 min-h-[44px]">
-          <Kanban size={16} /> Board view
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setNewLeadOpen(true)}
+            className="btn-brutal-teal text-sm inline-flex items-center gap-2 min-h-[44px]"
+          >
+            <Plus size={16} /> New lead
+          </button>
+          <Link to="/outreach/board" className="btn-brutal-outline text-sm inline-flex items-center gap-2 min-h-[44px]">
+            <Kanban size={16} /> Board view
+          </Link>
+        </div>
       </div>
+
+      <NewLeadDialog
+        open={newLeadOpen}
+        onClose={() => setNewLeadOpen(false)}
+        onCreated={() => setRefreshKey((k) => k + 1)}
+        initialStage={filters.outreach || 'not_contacted'}
+      />
 
       {/* Segments */}
       <div className="flex flex-wrap gap-2 mb-4">

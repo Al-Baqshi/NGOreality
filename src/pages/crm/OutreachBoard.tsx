@@ -1,10 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, ChevronDown, ChevronRight, Inbox, Mail, Users } from 'lucide-react';
+import {
+  AlertTriangle, ArrowRight, ChevronDown, ChevronRight, Inbox, List, Loader2, Mail, Plus, Users,
+} from 'lucide-react';
 import { useCrmDashboardStats, useOrganizationsPage } from '../../hooks/useCrm';
 import { useOutreachEmailStatus, useOutreachFailedCount } from '../../hooks/useOutreachEmail';
-import { SectionHeader } from '../../components/ui';
 import OutreachKanbanCard from '../../components/crm/OutreachKanbanCard';
+import NewLeadDialog from '../../components/crm/NewLeadDialog';
 import OutreachBulkToolbar, { OutreachBatchManager } from '../../components/crm/OutreachBulkToolbar';
 import {
   OUTREACH_COLUMN_HINTS,
@@ -23,7 +25,29 @@ import OutreachSendPanel from '../../components/crm/OutreachSendPanel';
 import RegistryInsights from '../../components/crm/RegistryInsights';
 import { supabase } from '../../lib/supabase';
 
-const KANBAN_PAGE_SIZE = 20;
+const KANBAN_PAGE_SIZE = 30;
+/** How much a column grows per "Load more"; the ceiling keeps the DOM sane. */
+const KANBAN_LOAD_STEP = 50;
+const KANBAN_MAX_VISIBLE = 500;
+const SELECT_SIZES = [50, 100, 1000] as const;
+
+/**
+ * First-N selection asks the SERVER for the column's leading ids instead of
+ * slicing whatever happens to be rendered — "First 50" on a column showing 30
+ * cards used to select 30 and say nothing.
+ */
+async function fetchColumnLeadIds(status: OutreachStatus, limit: number): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('status', 'listed')
+    .eq('is_customer', false)
+    .eq('outreach_status', status)
+    .order('name')
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map((r) => r.id);
+}
 
 function CollapsibleSection({
   title,
@@ -69,10 +93,12 @@ function OutreachColumn({
   onSelectMany: (ids: string[]) => void;
   onClearSelection: () => void;
 }) {
+  const [limit, setLimit] = useState(KANBAN_PAGE_SIZE);
+  const [dragOver, setDragOver] = useState(false);
   const { organizations, totalCount, loading, refetch } = useOrganizationsPage(
     { leadsOnly: true, outreach: status },
     1,
-    KANBAN_PAGE_SIZE,
+    limit,
   );
 
   const orgIds = useMemo(() => organizations.map((o) => o.id), [organizations]);
@@ -91,6 +117,7 @@ function OutreachColumn({
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
+    setDragOver(false);
     const idsRaw = e.dataTransfer.getData('application/org-ids');
     const single = e.dataTransfer.getData('application/org-id');
     const ids = idsRaw
@@ -105,7 +132,17 @@ function OutreachColumn({
   };
 
   const selectAllVisible = () => onSelectMany(organizations.map((o) => o.id));
-  const selectFirst50 = () => onSelectMany(organizations.slice(0, 50).map((o) => o.id));
+
+  const selectFirstN = async (n: number) => {
+    setColumnMsg(null);
+    try {
+      const ids = await fetchColumnLeadIds(status, n);
+      onSelectMany(ids);
+      setColumnMsg(`Selected first ${ids.length.toLocaleString()}`);
+    } catch (err) {
+      setColumnMsg(err instanceof Error ? err.message : 'Selection failed');
+    }
+  };
 
   const selectedInColumn = organizations.filter((o) => selectedIds.has(o.id));
 
@@ -140,29 +177,55 @@ function OutreachColumn({
       onDragOver={(e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+        setDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false);
       }}
       onDrop={handleDrop}
-      className="kanban-column"
+      className={`kanban-column transition-colors ${dragOver ? 'bg-gold/10' : ''}`}
     >
-      <div className="kanban-column-header space-y-2">
+      <div className={`kanban-column-header space-y-2 ${dragOver ? '!bg-ink-800' : ''}`}>
         <div>
-          <h3 className="font-mono text-2xs uppercase tracking-wider font-semibold">
-            {OUTREACH_STATUS_LABELS[status]}
-          </h3>
+          <div className="flex items-baseline justify-between gap-2">
+            <h3
+              className="min-w-0 truncate font-mono text-2xs uppercase tracking-wider font-semibold"
+              title={OUTREACH_COLUMN_HINTS[status] || OUTREACH_STATUS_LABELS[status]}
+            >
+              {OUTREACH_STATUS_LABELS[status]}
+            </h3>
+            <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 font-mono text-2xs tabular-nums">
+              {loading ? '…' : totalCount.toLocaleString()}
+            </span>
+          </div>
           {OUTREACH_COLUMN_HINTS[status] && (
-            <p className="text-2xs text-ink-400 mt-0.5 leading-snug">{OUTREACH_COLUMN_HINTS[status]}</p>
+            <p className="text-2xs text-ink-400 mt-0.5 leading-snug line-clamp-2">
+              {OUTREACH_COLUMN_HINTS[status]}
+            </p>
           )}
-          <p className="font-mono text-2xs text-ink-400 mt-0.5">
-            {loading ? '…' : `${totalCount.toLocaleString()} total · showing ${organizations.length}`}
-          </p>
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <button type="button" onClick={selectAllVisible} className="btn-brutal-outline text-2xs py-1 px-2 min-h-[32px]">
             All visible
           </button>
-          <button type="button" onClick={selectFirst50} className="btn-brutal-outline text-2xs py-1 px-2 min-h-[32px]">
-            First 50
-          </button>
+          <select
+            aria-label={`Select the first N leads in ${OUTREACH_STATUS_LABELS[status]}`}
+            className="input-brutal text-2xs py-1 min-h-[32px] bg-white text-ink-950"
+            value=""
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (n) void selectFirstN(n);
+            }}
+          >
+            <option value="" disabled>
+              Select first…
+            </option>
+            {SELECT_SIZES.map((n) => (
+              <option key={n} value={n}>
+                First {n.toLocaleString()}
+              </option>
+            ))}
+          </select>
         </div>
         {emailTemplate && (
           <OutreachSendPanel
@@ -194,18 +257,35 @@ function OutreachColumn({
         ) : organizations.length === 0 ? (
           <p className="text-xs text-ink-400 p-2">Drop cards here or use auto-fill</p>
         ) : (
-          organizations.map((org) => (
-            <OutreachKanbanCard
-              key={org.id}
-              org={org}
-              column={status}
-              onUpdated={refresh}
-              selected={selectedIds.has(org.id)}
-              onToggleSelect={onToggleSelect}
-              emailStatus={byOrgId[org.id]}
-              dragPayloadIds={dragPayloadFor(org)}
-            />
-          ))
+          <>
+            {organizations.map((org) => (
+              <OutreachKanbanCard
+                key={org.id}
+                org={org}
+                column={status}
+                onUpdated={refresh}
+                selected={selectedIds.has(org.id)}
+                onToggleSelect={onToggleSelect}
+                emailStatus={byOrgId[org.id]}
+                dragPayloadIds={dragPayloadFor(org)}
+              />
+            ))}
+            {organizations.length < totalCount && (
+              organizations.length < KANBAN_MAX_VISIBLE ? (
+                <button
+                  type="button"
+                  onClick={() => setLimit((l) => Math.min(l + KANBAN_LOAD_STEP, KANBAN_MAX_VISIBLE))}
+                  className="w-full border-2 border-dashed border-ink-300 py-2 font-mono text-2xs uppercase tracking-wider text-ink-500 transition-colors hover:border-ink-950 hover:text-ink-950 dark:border-ink-700 dark:hover:border-ink-300 dark:hover:text-white"
+                >
+                  Load {KANBAN_LOAD_STEP} more · {organizations.length} of {totalCount.toLocaleString()}
+                </button>
+              ) : (
+                <p className="p-2 text-center font-mono text-2xs text-ink-400">
+                  Showing the first {KANBAN_MAX_VISIBLE} — use View all or the worklist for the rest.
+                </p>
+              )
+            )}
+          </>
         )}
       </div>
       <Link
@@ -225,6 +305,8 @@ export default function OutreachBoard() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [newLeadOpen, setNewLeadOpen] = useState(false);
+  const [selectBusy, setSelectBusy] = useState(false);
 
   const bump = () => {
     setTick((t) => t + 1);
@@ -250,30 +332,41 @@ export default function OutreachBoard() {
 
   const clearSelection = () => setSelectedIds(new Set());
 
-  const selectAllColumnsFirst50 = async () => {
-    const ids: string[] = [];
-    for (const status of OUTREACH_KANBAN_STATUSES) {
-      const { data } = await supabase
-        .from('organizations')
-        .select('id')
-        .eq('status', 'listed')
-        .eq('is_customer', false)
-        .eq('outreach_status', status)
-        .order('name')
-        .limit(50);
-      if (data) ids.push(...data.map((r) => r.id));
+  const selectFirstNPerColumn = async (n: number) => {
+    setSelectBusy(true);
+    try {
+      const ids: string[] = [];
+      for (const status of OUTREACH_KANBAN_STATUSES) {
+        ids.push(...(await fetchColumnLeadIds(status, n)));
+      }
+      selectMany(ids);
+    } finally {
+      setSelectBusy(false);
     }
-    selectMany(ids);
   };
 
   return (
     <div className="page-shell w-full min-w-0 max-w-none pb-24">
-      <SectionHeader>Outreach — leads</SectionHeader>
-      <p className="font-mono text-2xs text-ink-500 uppercase tracking-wider -mt-4 mb-4 max-w-3xl">
-        Drag cards to organise — <strong>no email is sent on drop</strong>. Select cards, edit the message in Cold email
-        / No website / Website issues, then press <strong>Send</strong> (uses the email on each card). Deliver from Email
-        notifications. Inbound = interested; Customers = verified / services.
-      </p>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Outreach board</h1>
+          <p className="mt-1 text-sm text-ink-600 dark:text-muted-foreground">
+            Drag to organise — <strong>nothing is emailed on drop</strong>. Select cards, then press Send in a column.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setNewLeadOpen(true)}
+            className="btn-brutal-teal inline-flex min-h-[44px] items-center gap-2 text-sm"
+          >
+            <Plus size={16} /> New lead
+          </button>
+          <Link to="/outreach" className="btn-brutal-outline inline-flex min-h-[44px] items-center gap-2 text-sm">
+            <List size={16} /> Worklist view
+          </Link>
+        </div>
+      </div>
 
       <CollapsibleSection
         title="Inbound & customers"
@@ -338,18 +431,24 @@ export default function OutreachBoard() {
       </CollapsibleSection>
 
       <div className="flex flex-wrap gap-2 mb-4 items-center">
-        <button
-          type="button"
-          onClick={selectAllColumnsFirst50}
-          className="btn-brutal-outline text-xs min-h-[44px] px-3"
-        >
-          Select first 50 per column
-        </button>
+        <span className="label-brutal">Select per column</span>
+        {SELECT_SIZES.map((n) => (
+          <button
+            key={n}
+            type="button"
+            disabled={selectBusy}
+            onClick={() => void selectFirstNPerColumn(n)}
+            className="btn-brutal-outline text-xs min-h-[44px] px-3 disabled:opacity-50"
+          >
+            First {n.toLocaleString()}
+          </button>
+        ))}
         <button type="button" onClick={clearSelection} className="btn-brutal-outline text-xs min-h-[44px] px-3">
           Clear selection
         </button>
+        {selectBusy && <Loader2 size={15} className="animate-spin text-ink-500" aria-label="Selecting…" />}
         {selectedIds.size > 0 && (
-          <span className="font-mono text-2xs text-ink-500">{selectedIds.size} selected globally</span>
+          <span className="font-mono text-2xs text-ink-500">{selectedIds.size.toLocaleString()} selected globally</span>
         )}
       </div>
       <OutreachBatchManager />
@@ -381,6 +480,15 @@ export default function OutreachBoard() {
           refetch();
         }}
         onLoadBatch={selectMany}
+      />
+
+      <NewLeadDialog
+        open={newLeadOpen}
+        onClose={() => setNewLeadOpen(false)}
+        onCreated={() => {
+          bump();
+          refetch();
+        }}
       />
     </div>
   );
