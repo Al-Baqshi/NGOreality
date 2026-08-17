@@ -164,6 +164,46 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 	})
 }
 
+// RequireAuthenticated verifies the bearer token identifies a real signed-in
+// user, without resolving them to a CRM workspace seat.
+//
+// Wrap requires both a valid token AND a tenant seat, because almost every
+// route acts on one organisation's data and must be pinned to it. A few
+// routes touch nothing tenant-scoped — firing a Paymark sandbox payment is
+// the first — and for those, demanding a seat rejects any staff account that
+// has never been seated in a customer's workspace, which is most of them.
+func (m *Middleware) RequireAuthenticated(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		raw := bearerToken(r)
+		if raw == "" {
+			writeErr(w, http.StatusUnauthorized, "missing bearer token")
+			return
+		}
+
+		claims, err := m.Verifier.Verify(raw)
+		if err != nil {
+			writeErr(w, http.StatusUnauthorized, "invalid token")
+			return
+		}
+
+		ctx := r.Context()
+		email := claims.Email
+		if m.Central != nil && claims.Issuer == m.Central.Issuer() {
+			// A missing seat does not disqualify here — only an invalid or
+			// unresolvable identity does.
+			if uid, em, rerr := m.Central.Resolve(ctx, claims.Subject, raw); rerr == nil {
+				claims.Subject, email = uid, em
+			} else if !errors.Is(rerr, ErrNoSeat) {
+				writeErr(w, http.StatusUnauthorized, "invalid token")
+				return
+			}
+		}
+
+		principal := &Principal{UserID: claims.Subject, Email: email}
+		next(w, r.WithContext(context.WithValue(ctx, principalKey, principal)))
+	}
+}
+
 // RequireWrite / RequireAdmin wrap individual handlers.
 func RequireWrite(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

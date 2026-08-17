@@ -85,6 +85,21 @@ func (s *Server) Handler() http.Handler {
 	// Fire a real sandbox payment without needing a customer account. Admin-key
 	// guarded because it spends against the merchant's credentials.
 	root.HandleFunc("POST /v1/admin/payments/paymark/test-intent", s.adminOnly(s.paymarkTestIntent))
+	// The same test intent, reachable from the browser by any signed-in user.
+	//
+	// It exists because the admin-key route above cannot be called from a web
+	// page without shipping CRM_ADMIN_API_KEY in the JS bundle — and that key
+	// also provisions and DELETES tenants, so publishing it to test a $1
+	// payment would hand every visitor the control plane.
+	//
+	// Registered on root, authenticated by RequireAuthenticated rather than
+	// mw.Wrap: this handler touches no tenant data, so it must not also
+	// require a CRM workspace seat — a staff account testing payments usually
+	// has none. sandboxOnly is the actual safety rail: this route refuses
+	// outright unless Paymark is pointed at the sandbox host, so the worst an
+	// authenticated caller can do is create play money.
+	root.HandleFunc("POST /v1/payments/paymark/test-intent",
+		mw.RequireAuthenticated(s.sandboxOnly(s.paymarkTestIntent)))
 
 	root.HandleFunc("POST /v1/signup", s.signup)
 	root.HandleFunc("GET /v1/signup/eligibility", s.signupEligibility)
@@ -99,19 +114,6 @@ func (s *Server) Handler() http.Handler {
 	api := http.NewServeMux()
 	api.HandleFunc("GET /v1/me", s.me)
 	api.HandleFunc("GET /v1/workspaces", s.listWorkspaces)
-
-	// The same test intent, reachable from the browser by a signed-in user.
-	//
-	// It exists because the admin-key route above cannot be called from a web
-	// page without shipping CRM_ADMIN_API_KEY in the JS bundle — and that key
-	// also provisions and DELETES tenants, so publishing it to test a $1
-	// payment would hand every visitor the control plane.
-	//
-	// sandboxOnly is the substitute for that key: this route refuses outright
-	// unless Paymark is pointed at the sandbox host, so the worst an authorised
-	// caller can do is create play money. Production testing keeps using the
-	// admin route, from a terminal, where the key belongs.
-	api.HandleFunc("POST /v1/payments/paymark/test-intent", s.sandboxOnly(s.paymarkTestIntent))
 
 	api.HandleFunc("GET /v1/clients", s.listClients)
 	api.HandleFunc("POST /v1/clients", auth.RequireWrite(s.createClient))
