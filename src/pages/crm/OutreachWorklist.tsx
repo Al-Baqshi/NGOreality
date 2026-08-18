@@ -279,24 +279,24 @@ export default function OutreachWorklist() {
       <div className="card-brutal overflow-hidden">
         <div className="table-scroll">
           <table className="w-full text-sm">
-            <thead className="bg-ink-950 text-white">
-              <tr>
-                <th className="p-3 w-10 text-left">
-                  <input
-                    type="checkbox"
-                    aria-label="Select all on this page"
-                    className="size-5 accent-teal"
-                    checked={pageAllSelected}
-                    onChange={() => (pageAllSelected ? clear() : selectIds(leads.map((l) => l.id)))}
-                  />
-                </th>
-                <th className="p-3 text-left label-brutal text-ink-300">Organisation</th>
-                <th className="p-3 text-left label-brutal text-ink-300">Website</th>
-                <th className="p-3 text-left label-brutal text-ink-300">Stage</th>
-                <th className="p-3 text-left label-brutal text-ink-300">Last touched</th>
-                <th className="p-3 text-left label-brutal text-ink-300">Contact</th>
-              </tr>
-            </thead>
+<thead className="bg-ink-950 text-white">
+  <tr>
+    <th className="p-3 w-10 text-left whitespace-nowrap">
+      <input
+        type="checkbox"
+        aria-label="Select all on this page"
+        className="size-5 accent-teal"
+        checked={pageAllSelected}
+        onChange={() => (pageAllSelected ? clear() : selectIds(leads.map((l) => l.id)))}
+      />
+    </th>
+    <th className="p-3 text-left label-brutal text-ink-300 whitespace-nowrap">Organisation</th>
+    <th className="p-3 text-left label-brutal text-ink-300 whitespace-nowrap">Website</th>
+    <th className="p-3 text-left label-brutal text-ink-300 whitespace-nowrap">Stage</th>
+    <th className="p-3 text-left label-brutal text-ink-300 whitespace-nowrap">Last touched</th>
+    <th className="p-3 text-left label-brutal text-ink-300 whitespace-nowrap">Contact</th>
+  </tr>
+</thead>
             <tbody>
               {loading && (
                 <tr>
