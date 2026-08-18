@@ -15,18 +15,20 @@ type Props = {
   onMessage: (msg: string | null) => void;
 };
 
+const orgs = selectedOrgs ?? [];
+
 export default function OutreachSendPanel({
   column,
   columnLabel,
   template,
-  selectedOrgs,
+  selectedOrgs: _selectedOrgs,
   busy,
   setBusy,
   onSent,
   onMessage,
 }: Props) {
-  const selectionKey = selectedOrgs.map((o) => o.id).join(',');
-  const previewName = selectedOrgs[0]?.name ?? 'Your organisation';
+  const selectionKey = orgs.map((o) => o.id).join(',');
+  const previewName = orgs[0]?.name ?? 'Your organisation';
   const defaultDraft = useMemo(
     () => draftOutreachEmailForOrg(template, previewName),
     [template, previewName, selectionKey],
@@ -41,8 +43,8 @@ export default function OutreachSendPanel({
     setBody(defaultDraft.body);
   }, [defaultDraft.subject, defaultDraft.body]);
 
-  const withEmail = selectedOrgs.filter((o) => o.email?.trim());
-  const withoutEmail = selectedOrgs.filter((o) => !o.email?.trim());
+  const withEmail = orgs.filter((o) => o.email?.trim());
+  const withoutEmail = orgs.filter((o) => !o.email?.trim());
 
   const handleSend = async () => {
     if (!withEmail.length) {
@@ -83,7 +85,7 @@ export default function OutreachSendPanel({
         <strong className="text-white">Send</strong>.
       </p>
 
-      {selectedOrgs.length === 0 ? (
+      {orgs.length === 0 ? (
         <p className="font-mono text-2xs text-amber-200/90">Select one or more cards in this column to send.</p>
       ) : (
         <>

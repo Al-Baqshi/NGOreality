@@ -15,7 +15,7 @@ import {
 import { isMonitorApiConfigured } from '../../lib/monitorApi';
 
 type Props = {
-  selectedIds: string[];
+  selectedIds: Set<string>;
   onClear: () => void;
   onMoved: () => void;
   onLoadBatch: (ids: string[]) => void;
@@ -28,7 +28,7 @@ export default function OutreachBulkToolbar({ selectedIds, onClear, onMoved, onL
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  if (selectedIds.length === 0) return null;
+  if (selectedIds.size === 0) return null;
 
   const refreshBatches = () => setBatches(listOutreachBatches());
 
@@ -37,7 +37,7 @@ export default function OutreachBulkToolbar({ selectedIds, onClear, onMoved, onL
     setMessage(null);
     try {
       await bulkSetOutreachStatus(selectedIds, moveTo);
-      setMessage(`Moved ${selectedIds.length} to ${OUTREACH_STATUS_LABELS[moveTo]}`);
+      setMessage(`Moved ${selectedIds.size} to ${OUTREACH_STATUS_LABELS[moveTo]}`);
       onMoved();
       onClear();
     } catch (e) {
@@ -51,7 +51,7 @@ export default function OutreachBulkToolbar({ selectedIds, onClear, onMoved, onL
     saveOutreachBatch(batchName, selectedIds);
     setBatchName('');
     refreshBatches();
-    setMessage(`Saved batch (${selectedIds.length} orgs)`);
+    setMessage(`Saved batch (${selectedIds.size} orgs)`);
   };
 
   return (
@@ -62,7 +62,7 @@ export default function OutreachBulkToolbar({ selectedIds, onClear, onMoved, onL
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <p className="font-mono text-xs uppercase tracking-wider font-semibold shrink-0">
-          {selectedIds.length} selected
+          {selectedIds.size} selected
         </p>
 
         <div className="flex flex-wrap gap-2 items-center flex-1 min-w-0">
