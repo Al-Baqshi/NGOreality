@@ -14,7 +14,7 @@ import KanbanColumn from '../../components/crm/KanbanColumn';
 import SendEmailModal from '../../components/crm/SendEmailModal';
 import ChangeStatusModal from '../../components/crm/ChangeStatusModal';
 import NewLeadDialog from '../../components/crm/NewLeadDialog';
-import OutreachBatchManager from '../../components/crm/OutreachBulkToolbar';
+import { OutreachBatchManager } from '../../components/crm/OutreachBulkToolbar';
 import RegistryInsights from '../../components/crm/RegistryInsights';
 
 const SELECT_SIZES = [50, 100, 1000] as const;
