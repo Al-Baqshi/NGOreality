@@ -234,6 +234,7 @@ export default function OutreachBoard() {
         busy={busy}
       />
 
+      {sendEmailOpen && (
       <SendEmailModal
         open={sendEmailOpen}
         onClose={() => { setSendEmailOpen(false); setSendEmailOrganizations([]); }}
@@ -243,7 +244,9 @@ export default function OutreachBoard() {
         template={statusFilter ? OUTREACH_EMAIL_BY_COLUMN[statusFilter as 'cold_email' | 'no_website' | 'website_issues'] : 'outreach_cold_invite'}
         onSent={handleSendEmailComplete}
       />
+    )}
 
+    {changeStatusOpen && (
       <ChangeStatusModal
         open={changeStatusOpen}
         onClose={() => setChangeStatusOpen(false)}
@@ -251,6 +254,7 @@ export default function OutreachBoard() {
         currentStatus={statusFilter || ''}
         onChanged={handleChangeStatusComplete}
       />
+    )}
 
       <NewLeadDialog
         open={newLeadOpen}
