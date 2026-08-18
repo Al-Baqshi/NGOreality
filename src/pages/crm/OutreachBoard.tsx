@@ -59,6 +59,7 @@ export default function OutreachBoard() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [sortBy, setSortBy] = useState('');
   const [sendEmailOpen, setSendEmailOpen] = useState(false);
+  const [sendEmailOrganizations, setSendEmailOrganizations] = useState<{ id: string; name: string; email: string }[]>([]);
   const [changeStatusOpen, setChangeStatusOpen] = useState(false);
   const [changeStatusOrgs, setChangeStatusOrgs] = useState<{ id: string; name: string }[]>([]);
   const [busy, setBusy] = useState(false);
@@ -100,14 +101,44 @@ export default function OutreachBoard() {
     }
   }, [selectMany]);
 
-  const handleSendEmail = () => {
-    setSendEmailOpen(true);
+  const handleSendEmail = async () => {
+    if (selectedIds.size === 0) return;
+    setBusy(true);
+    try {
+      const { supabase } = await import('../../lib/supabase');
+      const { data } = await supabase
+        .from('organizations')
+        .select('id, name, email')
+        .in('id', Array.from(selectedIds));
+      if (data) {
+        setSendEmailOrganizations(data as { id: string; name: string; email: string }[]);
+        setSendEmailOpen(true);
+      }
+    } catch (err) {
+      console.error('Failed to fetch organizations:', err);
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleChangeStatus = () => {
-    const orgs = Array.from(selectedIds).map((id) => ({ id, name: '' }));
-    setChangeStatusOrgs(orgs);
-    setChangeStatusOpen(true);
+  const handleChangeStatus = async () => {
+    if (selectedIds.size === 0) return;
+    setBusy(true);
+    try {
+      const { supabase } = await import('../../lib/supabase');
+      const { data } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .in('id', Array.from(selectedIds));
+      if (data) {
+        setChangeStatusOrgs(data as { id: string; name: string }[]);
+        setChangeStatusOpen(true);
+      }
+    } catch (err) {
+      console.error('Failed to fetch organizations:', err);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleSendEmailComplete = useCallback(() => {
@@ -205,8 +236,8 @@ export default function OutreachBoard() {
 
       <SendEmailModal
         open={sendEmailOpen}
-        onClose={() => setSendEmailOpen(false)}
-        organizations={Array.from(selectedIds).map((id) => ({ id, name: '' }))}
+        onClose={() => { setSendEmailOpen(false); setSendEmailOrganizations([]); }}
+        organizations={sendEmailOrganizations}
         column={statusFilter || 'cold_email'}
         columnLabel={statusFilter ? OUTREACH_STATUS_LABELS[statusFilter as 'cold_email' | 'no_website' | 'website_issues'] : 'Selected'}
         template={statusFilter ? OUTREACH_EMAIL_BY_COLUMN[statusFilter as 'cold_email' | 'no_website' | 'website_issues'] : 'outreach_cold_invite'}

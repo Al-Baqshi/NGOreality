@@ -47,7 +47,7 @@ export default function OutreachToolbar({
     <div className={`card-brutal p-4 mb-4 ${className}`}>
       <div className="flex flex-wrap items-center gap-3 mb-3">
         <span className="font-mono text-2xs uppercase tracking-wider text-ink-500">
-          {loading ? '...' : totalCount.toLocaleString()} organizations
+          {totalCount.toLocaleString()} organizations
         </span>
 
         <form
