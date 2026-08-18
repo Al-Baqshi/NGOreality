@@ -219,7 +219,6 @@ export default function OutreachBoard() {
               onGlobalRefresh={bump}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
-              onSelectMany={selectMany}
               onClearSelection={clearSelection}
             />
           ))}

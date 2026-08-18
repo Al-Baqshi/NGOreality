@@ -1,5 +1,5 @@
 import { Link, useState } from 'react-router-dom';
-import { Globe, GripVertical, Mail, UserPlus, MoreHorizontal, ExternalLink, Loader2 } from 'lucide-react';
+import { Globe, Mail, UserPlus, MoreHorizontal, ExternalLink, Loader2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Organization, OutreachStatus } from '../../types';
 import { setOutreachStatus, markRegisteredInbound, registerAsCustomer } from '../../lib/crmOutreach';
@@ -111,7 +111,6 @@ export default function OrganizationCard({
             onClick={(e) => e.stopPropagation()}
           />
         )}
-        <GripVertical size={14} className="text-ink-300 shrink-0 mt-0.5" aria-hidden />
         <div className="min-w-0 flex-1">
           <Link
             to={`/organizations/${org.id}`}
@@ -197,24 +196,7 @@ export default function OrganizationCard({
             >
               → Cold email
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                setMenuOpen(false);
-                move('no_website');
-              }}
-              disabled={busyAction === 'move-no_website' || column === 'no_website'}
-            >
-              → No website
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                setMenuOpen(false);
-                move('website_issues');
-              }}
-              disabled={busyAction === 'move-website_issues' || column === 'website_issues'}
-            >
-              → Website issues
-            </DropdownMenuItem>
+            
             <DropdownMenuItem
               onClick={() => {
                 setMenuOpen(false);

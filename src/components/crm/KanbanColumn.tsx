@@ -1,26 +1,23 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, ChevronRight } from 'lucide-react';
+import { Loader2, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { useOrganizationsPage } from '../../hooks/useCrm';
 import { useOutreachEmailStatus } from '../../hooks/useOutreachEmail';
-import { OUTREACH_STATUS_LABELS, OUTREACH_COLUMN_HINTS, type OutreachStatus, type Organization } from '../../types';
+import { OUTREACH_STATUS_LABELS, type OutreachStatus, type Organization } from '../../types';
 import { bulkSetOutreachStatus } from '../../lib/crmOutreach';
 import OutreachKanbanCard from './OutreachKanbanCard';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Props {
   status: OutreachStatus;
   onGlobalRefresh: () => void;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
-  onSelectMany: (ids: string[]) => void;
   onClearSelection: () => void;
 }
 
 const KANBAN_PAGE_SIZE = 30;
 const KANBAN_LOAD_STEP = 50;
 const KANBAN_MAX_VISIBLE = 500;
-const SELECT_SIZES = [50, 100, 1000] as const;
 
 export async function fetchColumnLeadIds(status: OutreachStatus, limit: number): Promise<string[]> {
   const { supabase } = await import('../../lib/supabase');
@@ -41,12 +38,10 @@ export default function KanbanColumn({
   onGlobalRefresh,
   selectedIds,
   onToggleSelect,
-  onSelectMany,
   onClearSelection,
 }: Props) {
   const [limit, setLimit] = useState(KANBAN_PAGE_SIZE);
   const [dragOver, setDragOver] = useState(false);
-  const [columnMsg, setColumnMsg] = useState<string | null>(null);
 
   const { organizations, totalCount, loading, refetch } = useOrganizationsPage(
     { leadsOnly: true, outreach: status },
@@ -79,19 +74,6 @@ export default function KanbanColumn({
     refresh();
   };
 
-  const selectAllVisible = () => onSelectMany(organizations.map((o) => o.id));
-
-  const selectFirstN = async (n: number) => {
-    setColumnMsg(null);
-    try {
-      const ids = await fetchColumnLeadIds(status, n);
-      onSelectMany(ids);
-      setColumnMsg(`Selected first ${ids.length.toLocaleString()}`);
-    } catch (err) {
-      setColumnMsg(err instanceof Error ? err.message : 'Selection failed');
-    }
-  };
-
   const dragPayloadFor = (org: Organization) => {
     if (selectedIds.has(org.id) && selectedIds.size > 1) {
       return [...selectedIds];
@@ -100,7 +82,6 @@ export default function KanbanColumn({
   };
 
   const label = OUTREACH_STATUS_LABELS[status];
-  const hint = OUTREACH_COLUMN_HINTS[status];
 
   return (
     <div
@@ -115,49 +96,22 @@ export default function KanbanColumn({
       onDrop={handleDrop}
       className={`kanban-column flex flex-col h-full min-h-0 transition-colors ${dragOver ? 'bg-teal/5' : ''}`}
     >
-      <div className={`kanban-column-header space-y-2 shrink-0 ${dragOver ? '!bg-teal/10' : ''}`}>
-        <div>
-          <div className="flex items-baseline justify-between gap-2">
-            <h3
-              className="min-w-0 truncate font-mono text-2xs uppercase tracking-wider font-semibold"
-              title={hint || label}
-            >
-              {label}
-            </h3>
-            <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 font-mono text-2xs tabular-nums">
-              {loading ? '…' : totalCount.toLocaleString()}
-            </span>
-          </div>
-          {hint && (
-            <p className="text-2xs text-ink-400 mt-0.5 leading-snug line-clamp-2">
-              {hint}
-            </p>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1">
+      <div className={`kanban-column-header shrink-0 flex items-center justify-between gap-2 px-2 py-2 ${dragOver ? 'bg-teal/5' : ''}`}>
+        <h3 className="min-w-0 truncate font-mono text-2xs uppercase tracking-wider font-semibold">
+          {label}
+        </h3>
+        <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 font-mono text-2xs tabular-nums">
+          {loading ? '…' : totalCount.toLocaleString()}
+        </span>
+        <div className="relative">
           <button
             type="button"
-            onClick={selectAllVisible}
-            className="btn-brutal-outline text-2xs py-1 px-2 min-h-[32px] hidden sm:inline-flex"
+            className="p-1 text-ink-400 hover:text-ink-900 dark:hover:text-white rounded transition-colors"
+            aria-label="Column options"
           >
-            All visible
+            <MoreHorizontal size={14} />
           </button>
-          <Select value="" onValueChange={(value: string) => { const n = Number(value); if (n) void selectFirstN(n); }}>
-            <SelectTrigger className="w-[140px] min-h-[32px]">
-              <SelectValue placeholder="Select first…" />
-            </SelectTrigger>
-            <SelectContent>
-              {SELECT_SIZES.map((n) => (
-                <SelectItem key={n} value={n}>
-                  First {n.toLocaleString()}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
-
-        {columnMsg && <p className="font-mono text-2xs text-teal">{columnMsg}</p>}
       </div>
 
       <div className="kanban-column-body flex-1 min-h-0 overflow-y-auto space-y-2 p-2">

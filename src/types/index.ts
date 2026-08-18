@@ -176,8 +176,6 @@ export type OutreachStatus =
 export const OUTREACH_KANBAN_STATUSES: OutreachStatus[] = [
   'not_contacted',
   'cold_email',
-  'no_website',
-  'website_issues',
   'contacted',
   'follow_up',
   'declined',
@@ -185,8 +183,8 @@ export const OUTREACH_KANBAN_STATUSES: OutreachStatus[] = [
 
 export const OUTREACH_EMAIL_BY_COLUMN: Partial<Record<OutreachStatus, OutreachEmailTemplate>> = {
   cold_email: 'outreach_cold_invite',
-  no_website: 'outreach_no_website',
-  website_issues: 'outreach_website_help',
+  contacted: 'outreach_cold_invite',
+  follow_up: 'outreach_cold_invite',
 };
 
 /** Inbound queue (left kanban, not customers yet) */
@@ -265,21 +263,17 @@ export const ORG_STATUS_LABELS: Record<OrgStatus, string> = {
 export const OUTREACH_STATUS_LABELS: Record<OutreachStatus, string> = {
   not_contacted: 'Lead — not contacted',
   cold_email: 'Cold email',
-  no_website: 'No website',
-  website_issues: 'Website issues',
   contacted: 'Contacted',
   follow_up: 'Follow-up',
+  declined: 'Declined',
   registered: 'Inbound — interested',
   responded: 'Inbound — interested',
-  declined: 'Declined',
   not_applicable: 'N/A',
 };
 
 export const OUTREACH_COLUMN_HINTS: Partial<Record<OutreachStatus, string>> = {
   not_contacted: 'Never emailed; still in registry leads',
   cold_email: 'Drag here to stage — send only when you press Send',
-  no_website: 'No public site — select cards, then Send',
-  website_issues: 'Site problems — select cards, then Send',
   contacted: 'Reached out; awaiting response',
   follow_up: 'Needs another touch',
   declined: 'Not pursuing',
