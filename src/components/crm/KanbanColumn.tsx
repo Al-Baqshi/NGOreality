@@ -166,14 +166,14 @@ export default function KanbanColumn({
             <Loader2 className="animate-spin inline mx-auto" size={20} />
             <p className="font-mono text-2xs text-ink-400 mt-2">Loading…</p>
           </div>
-        ) : organizations.length === 0 ? (
+        ) : (organizations ?? []).length === 0 ? (
           <div className="p-4 text-center text-xs text-ink-400">
             <p>No organizations in this stage</p>
             <p className="mt-1">Drag cards here or use "Select first…"</p>
           </div>
         ) : (
           <>
-            {organizations.map((org) => (
+            {(organizations ?? []).map((org) => (
               <OutreachKanbanCard
                 key={org.id}
                 org={org}
@@ -185,14 +185,14 @@ export default function KanbanColumn({
                 dragPayloadIds={dragPayloadFor(org)}
               />
             ))}
-            {organizations.length < totalCount && (
-              organizations.length < KANBAN_MAX_VISIBLE ? (
+            {(organizations ?? []).length < totalCount && (
+              (organizations ?? []).length < KANBAN_MAX_VISIBLE ? (
                 <button
                   type="button"
                   onClick={() => setLimit((l) => Math.min(l + KANBAN_LOAD_STEP, KANBAN_MAX_VISIBLE))}
                   className="w-full border-2 border-dashed border-ink-300 py-2 font-mono text-2xs uppercase tracking-wider text-ink-500 transition-colors hover:border-ink-950 hover:text-ink-950 dark:border-ink-700 dark:hover:border-ink-300 dark:hover:text-white"
                 >
-                  Load {KANBAN_LOAD_STEP} more · {organizations.length} of {totalCount.toLocaleString()}
+                  Load {KANBAN_LOAD_STEP} more · {(organizations ?? []).length} of {totalCount.toLocaleString()}
                 </button>
               ) : (
                 <p className="p-2 text-center font-mono text-2xs text-ink-400">

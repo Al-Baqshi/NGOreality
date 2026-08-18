@@ -33,11 +33,11 @@ export default function SendEmailModal({
   const [showDraft, setShowDraft] = useState(true);
 
   const withEmail = useMemo(
-    () => organizations.filter((o) => o.email?.trim()),
+    () => (organizations ?? []).filter((o) => o.email?.trim()),
     [organizations]
   );
   const withoutEmail = useMemo(
-    () => organizations.filter((o) => !o.email?.trim()),
+    () => (organizations ?? []).filter((o) => !o.email?.trim()),
     [organizations]
   );
 
