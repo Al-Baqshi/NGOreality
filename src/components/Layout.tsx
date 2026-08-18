@@ -152,7 +152,9 @@ export default function CRMLayout() {
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 lg:p-8">
               <div className="flex w-full min-w-0 flex-col gap-4 sm:gap-6">
-                <Outlet />
+                <main className="min-w-0 flex-1">
+                  <Outlet />
+                </main>
               </div>
             </div>
           </div>

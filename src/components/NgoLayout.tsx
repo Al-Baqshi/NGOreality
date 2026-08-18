@@ -198,7 +198,9 @@ function NgoPortalFrame() {
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
           <div className="p-3 sm:p-6 lg:p-8">
             <div className="mx-auto w-full min-w-0 max-w-3xl">
-              <Outlet />
+              <main className="min-w-0">
+                <Outlet />
+              </main>
             </div>
           </div>
         </div>
