@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 interface Props {
   open: boolean;
   onClose: () => void;
-  organizations: { id: string; name: string }[];
+  organizations: { id: string; name: string }[] | undefined;
   currentStatus: string;
   onChanged: () => void;
 }
@@ -23,6 +23,9 @@ export default function ChangeStatusModal({
   const [newStatus, setNewStatus] = useState<OutreachStatus>('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  const orgs = organizations ?? [];
+  const orgCount = orgs.length;
 
   useEffect(() => {
     if (open) {
@@ -45,15 +48,15 @@ export default function ChangeStatusModal({
     setMessage(null);
     try {
       if (newStatus === 'registered') {
-        for (const org of organizations) {
+        for (const org of orgs) {
           await markRegisteredInbound(org.id);
         }
       } else {
-        const ids = organizations.map((o) => o.id);
+        const ids = orgs.map((o) => o.id);
         await setOutreachStatus(ids, newStatus);
       }
       onChanged();
-      setMessage(`Moved ${organizations.length} to ${OUTREACH_STATUS_LABELS[newStatus]}`);
+      setMessage(`Moved ${orgCount} to ${OUTREACH_STATUS_LABELS[newStatus]}`);
       setTimeout(() => onClose(), 1500);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Change failed');
@@ -73,7 +76,7 @@ export default function ChangeStatusModal({
             <SheetClose />
           </SheetTitle>
           <SheetDescription>
-            {organizations.length} organization{organizations.length !== 1 ? 's' : ''} selected
+            {orgCount} organization{orgCount !== 1 ? 's' : ''} selected
           </SheetDescription>
         </SheetHeader>
 
