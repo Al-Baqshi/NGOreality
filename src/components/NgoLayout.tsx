@@ -158,10 +158,10 @@ function NgoPortalFrame() {
           </div>
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={handleSignOut}
-            className="mx-2 mb-2 h-9 w-[calc(100%-1rem)] border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent"
+            className="mx-2 mb-2 h-9 w-[calc(100%-1rem)] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
             <LogOut className="size-4" />
             Sign out
