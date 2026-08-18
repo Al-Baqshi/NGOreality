@@ -98,10 +98,17 @@ function NgoPortalFrame() {
                 isActive={activeId === 'overview'}
                 onClick={() => goToNavItem(navItems[0])}
               >
-                <img src="/logo-icon-dark.svg" alt="" className="size-8 shrink-0 rounded-md object-contain" />
+                <img
+                  src="/reality-badge.png"
+                  alt=""
+                  className="size-9 shrink-0 object-contain"
+                  decoding="async"
+                />
                 <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">{organization?.name ?? 'NGOreality'}</span>
-                  <span className="truncate text-xs opacity-70">
+                  <span className="truncate font-semibold text-sidebar-foreground">
+                    {organization?.name ?? 'NGOreality'}
+                  </span>
+                  <span className="truncate font-mono text-2xs uppercase tracking-[0.14em] text-sidebar-foreground/60">
                     {organization ? (isVerified ? 'Verified member ✓' : 'Member portal') : 'Member portal'}
                   </span>
                 </div>
@@ -112,13 +119,16 @@ function NgoPortalFrame() {
 
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>Your organisation</SidebarGroupLabel>
+            <SidebarGroupLabel className="font-mono text-2xs uppercase tracking-[0.14em] text-sidebar-foreground/50">
+              Your organisation
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {navItems.map((item) => (
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton
                       isActive={activeId === item.id}
+                      className="data-active:shadow-[inset_2px_0_0_#EBBB57]"
                       tooltip={item.label}
                       onClick={() => goToNavItem(item)}
                     >
@@ -147,9 +157,6 @@ function NgoPortalFrame() {
         </SidebarContent>
 
         <SidebarFooter className="border-t border-sidebar-border">
-          <div className="mb-2 px-1 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
-            <ThemeToggle />
-          </div>
           <div className="px-2 py-2 text-sm group-data-[collapsible=icon]:hidden">
             <p className="truncate font-medium text-sidebar-foreground">Signed in</p>
             <p className="truncate text-xs text-sidebar-foreground/60">
@@ -176,15 +183,16 @@ function NgoPortalFrame() {
             <PanelLeft className="size-4" />
           </SidebarTrigger>
           <Separator orientation="vertical" className="mx-1 hidden h-4 sm:block" />
-          <h1 className="min-w-0 flex-1 truncate text-base font-medium">{pageTitle}</h1>
+          <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight">{pageTitle}</h1>
           {organization && (
-            <span className="hidden min-w-0 items-center gap-1.5 truncate font-mono text-2xs uppercase tracking-wider text-ink-500 sm:flex">
+            <span className="hidden min-w-0 items-center gap-1.5 truncate font-mono text-2xs uppercase tracking-wider text-muted-foreground sm:flex">
               {isVerified && (
                 <img src="/reality-badge.png" alt="Reality Badge" className="size-5 shrink-0 object-contain" />
               )}
               <span className="truncate">{organization.name}</span>
             </span>
           )}
+          <ThemeToggle variant="ghost" />
           {!onboarding && <PortalNotificationBell audience="ngo" to="/ngo/notifications" />}
         </header>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">

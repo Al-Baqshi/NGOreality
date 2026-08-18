@@ -4,12 +4,14 @@ import { useState } from 'react';
 import BrandLogo from './BrandLogo';
 import ThemeToggle from './ThemeToggle';
 
+// "Home" is gone — the logo already links there, and every slot the menu
+// gives up makes the rest read less like a site map. "Verified" stays out for
+// the same reason it left before: it reads as a duplicate of Directory, and
+// the /public/verified route is still linked from the footer. NGO Portal is
+// not a page among pages — it is the sign-in, so it renders as the header's
+// single call-to-action instead of a tenth link.
 const navItems = [
-  { to: '/public', label: 'Home', end: true },
   { to: '/public/how-it-works', label: 'How It Works' },
-  // "Verified" and "Directory" read as near-duplicates to a visitor. The
-  // /public/verified route stays and is linked from the footer, so nothing is
-  // de-indexed — it just frees a header slot for a product that earns revenue.
   { to: '/public/directory', label: 'Directory' },
   { to: '/public/reality-badge', label: 'Reality Badge' },
   { to: '/public/workspace', label: 'Workspace' },
@@ -17,14 +19,15 @@ const navItems = [
   { to: '/public/blog', label: 'Blog' },
   { to: '/public/about', label: 'About' },
   { to: '/public/contact', label: 'Contact' },
-  { to: '/ngo/login', label: 'NGO Portal' },
 ];
 
+const portalItem = { to: '/ngo/login', label: 'NGO Portal' };
+
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `inline-flex items-center whitespace-nowrap px-2.5 xl:px-3 py-2 font-mono text-2xs xl:text-xs uppercase tracking-wider transition-colors shrink-0 min-h-[44px]
+  `inline-flex items-center whitespace-nowrap px-2.5 xl:px-3 py-2 min-h-[44px] text-[0.8125rem] xl:text-sm font-medium border-b-2 transition-colors shrink-0
   ${isActive
-    ? 'bg-ink-950 text-white dark:bg-ink-950 dark:text-white'
-    : 'text-ink-600 hover:bg-ink-50 hover:text-ink-950 dark:text-ink-300 dark:hover:bg-ink-800 dark:hover:text-white'
+    ? 'border-gold text-ink-950 dark:text-white'
+    : 'border-transparent text-ink-600 hover:text-ink-950 dark:text-ink-300 dark:hover:text-white'
   }`;
 
 export default function PublicLayout() {
@@ -32,7 +35,7 @@ export default function PublicLayout() {
 
   return (
     <div className="min-h-screen bg-surface overflow-x-hidden">
-      <header className="sticky top-0 z-40 border-b-3 border-ink-950 bg-surface-raised dark:bg-ink-900">
+      <header className="sticky top-0 z-40 border-b border-ink-200 bg-surface-raised dark:border-ink-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between gap-3 min-h-[56px] py-2 sm:py-2.5">
             <div className="shrink-0 min-w-0 max-w-[45%] sm:max-w-none">
@@ -44,24 +47,32 @@ export default function PublicLayout() {
               />
             </div>
 
-            {/* Desktop nav — lg+ only so links never crush the logo */}
+            {/* Desktop nav — xl+ only: at lg the eight links clip against the
+                logo and CTA, so lg keeps the hamburger instead */}
             <nav
-              className="hidden lg:flex flex-1 items-center justify-center gap-0.5 min-w-0 max-w-full overflow-x-auto px-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              className="hidden xl:flex flex-1 items-center justify-center gap-0.5 min-w-0 max-w-full overflow-x-auto px-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               aria-label="Main navigation"
             >
               {navItems.map((item) => (
-                <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
+                <NavLink key={item.to} to={item.to} className={navLinkClass}>
                   {item.label}
                 </NavLink>
               ))}
             </nav>
 
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-              <ThemeToggle />
+              <ThemeToggle variant="ghost" />
+              <Link
+                to={portalItem.to}
+                className="hidden sm:inline-flex items-center gap-1.5 bg-gold px-3.5 xl:px-4 py-2 text-xs xl:text-sm font-semibold text-ink-950 transition-colors hover:bg-gold-hover"
+              >
+                <LogIn size={14} aria-hidden />
+                {portalItem.label}
+              </Link>
               <button
                 type="button"
                 onClick={() => setMobileOpen(!mobileOpen)}
-                className="lg:hidden text-ink-950 dark:text-ink-50 min-h-[44px] min-w-[44px] flex items-center justify-center border-2 border-ink-950 dark:border-ink-200 bg-white dark:bg-ink-800 hover:bg-ink-50 dark:hover:bg-ink-700 transition-colors"
+                className="xl:hidden text-ink-950 dark:text-ink-50 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md hover:bg-ink-50 dark:hover:bg-ink-800 transition-colors"
                 aria-expanded={mobileOpen}
                 aria-controls="public-mobile-nav"
                 aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
@@ -75,26 +86,33 @@ export default function PublicLayout() {
         {mobileOpen && (
           <nav
             id="public-mobile-nav"
-            className="lg:hidden border-t-3 border-ink-950 bg-surface-raised dark:bg-ink-800 max-h-[min(70vh,480px)] overflow-y-auto"
+            className="xl:hidden border-t border-ink-200 dark:border-ink-800 bg-surface-raised max-h-[min(70vh,480px)] overflow-y-auto"
             aria-label="Mobile navigation"
           >
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
-                end={item.end}
                 onClick={() => setMobileOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center px-4 sm:px-6 py-3 border-b border-ink-100 dark:border-ink-800 font-mono text-xs uppercase tracking-wider min-h-[44px]
+                  `flex items-center px-4 sm:px-6 py-3 border-b border-ink-100 dark:border-ink-800 text-sm font-medium min-h-[44px] border-l-2 transition-colors
                   ${isActive
-                    ? 'bg-ink-950 text-white dark:bg-ink-950 dark:text-white'
-                    : 'text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-700'
+                    ? 'border-l-gold bg-ink-50 text-ink-950 dark:bg-ink-800 dark:text-white'
+                    : 'border-l-transparent text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800'
                   }`
                 }
               >
                 {item.label}
               </NavLink>
             ))}
+            <Link
+              to={portalItem.to}
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 px-4 sm:px-6 py-3 text-sm font-semibold text-ink-950 bg-gold min-h-[44px] hover:bg-gold-hover transition-colors"
+            >
+              <LogIn size={14} aria-hidden />
+              {portalItem.label}
+            </Link>
           </nav>
         )}
       </header>

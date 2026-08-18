@@ -26,20 +26,28 @@ export async function setOutreachStatus(orgId: string, outreach: OutreachStatus)
 
 export async function bulkSetOutreachStatus(orgIds: string[], outreach: OutreachStatus) {
   if (!orgIds.length) return { updated: 0 };
-  const { error } = await supabase
-    .from('organizations')
-    .update({ outreach_status: outreach, updated_at: new Date().toISOString() })
-    .in('id', orgIds);
-  if (error) throw error;
 
-  await supabase.from('activity_log').insert(
-    orgIds.map((organization_id) => ({
-      organization_id,
-      action: 'outreach_updated',
-      description: `Bulk outreach: ${OUTREACH_STATUS_LABELS[outreach]}`,
-      performed_by: 'staff',
-    })),
-  );
+  // .in() puts every id in the request URL. A thousand uuids is ~37KB of query
+  // string — past what proxies accept — so the set moves in slices the URL can
+  // carry. The activity rows ride in the body and merely follow the same rhythm.
+  const CHUNK = 200;
+  for (let i = 0; i < orgIds.length; i += CHUNK) {
+    const slice = orgIds.slice(i, i + CHUNK);
+    const { error } = await supabase
+      .from('organizations')
+      .update({ outreach_status: outreach, updated_at: new Date().toISOString() })
+      .in('id', slice);
+    if (error) throw error;
+
+    await supabase.from('activity_log').insert(
+      slice.map((organization_id) => ({
+        organization_id,
+        action: 'outreach_updated',
+        description: `Bulk outreach: ${OUTREACH_STATUS_LABELS[outreach]}`,
+        performed_by: 'staff',
+      })),
+    );
+  }
 
   return { updated: orgIds.length };
 }

@@ -43,6 +43,8 @@ const Contacts = lazy(() => import('./pages/crm/Contacts'));
 const Inquiries = lazy(() => import('./pages/crm/Inquiries'));
 const BlogManager = lazy(() => import('./pages/crm/BlogManager'));
 const OutreachBoard = lazy(() => import('./pages/crm/OutreachBoard'));
+const OutreachWorklist = lazy(() => import('./pages/crm/OutreachWorklist'));
+const ActivityFeed = lazy(() => import('./pages/crm/ActivityFeed'));
 const InboundQueue = lazy(() => import('./pages/crm/InboundQueue'));
 const CustomersList = lazy(() => import('./pages/crm/CustomersList'));
 const PaymentsList = lazy(() => import('./pages/crm/PaymentsList'));
@@ -115,7 +117,12 @@ export default function App() {
               <Route path="/organizations/:id" element={<OrganizationDetail />} />
               <Route path="/verification" element={<Verification />} />
               <Route path="/registrations" element={<Registrations />} />
-              <Route path="/outreach" element={<OutreachBoard />} />
+              {/* The worklist is the default: the backlog is 29k leads in one
+                  stage, which a kanban cannot represent. The board stays for
+                  moving the handful of live conversations between stages. */}
+              <Route path="/outreach" element={<OutreachWorklist />} />
+              <Route path="/outreach/board" element={<OutreachBoard />} />
+              <Route path="/activity" element={<ActivityFeed />} />
               <Route path="/inbound" element={<InboundQueue />} />
               <Route path="/customers" element={<CustomersList />} />
               <Route path="/payments" element={<PaymentsList />} />

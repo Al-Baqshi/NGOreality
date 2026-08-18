@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import CrmNavUser from './crm/CrmNavUser';
 import { CRM_NAV_GROUPS } from './crm/crm-nav';
+import { useCrmNavCounts } from '../hooks/useCrmNavCounts';
 import { getCrmPageTitle } from './crm/crm-page-title';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -36,6 +37,7 @@ export default function CRMLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const pageTitle = getCrmPageTitle(pathname);
+  const navCounts = useCrmNavCounts();
 
   const handleSignOut = async () => {
     await signOut();
@@ -61,14 +63,18 @@ export default function CRMLayout() {
                   }
                 >
                   <img
-                    src="/logo-icon-dark.svg"
+                    src="/reality-badge.png"
                     alt=""
-                    className="size-8 shrink-0 rounded-md object-contain"
+                    className="size-9 shrink-0 object-contain"
                     decoding="async"
                   />
                   <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold tracking-tight">NGOreality</span>
-                    <span className="truncate text-xs opacity-70">Staff CRM</span>
+                    <span className="truncate font-black uppercase tracking-[0.04em] text-sidebar-foreground">
+                      NGOreality
+                    </span>
+                    <span className="truncate font-mono text-2xs uppercase tracking-[0.14em] text-sidebar-foreground/60">
+                      Staff CRM
+                    </span>
                   </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -78,26 +84,46 @@ export default function CRMLayout() {
           <SidebarContent className="gap-0">
             {CRM_NAV_GROUPS.map((group) => (
               <SidebarGroup key={group.label}>
-                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                <SidebarGroupLabel className="font-mono text-2xs uppercase tracking-[0.14em] text-sidebar-foreground/50">
+                  {group.label}
+                </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    {group.items.map((item) => (
-                      <SidebarMenuItem key={item.to}>
-                        <SidebarMenuButton
-                          isActive={isNavActive(pathname, item.to)}
-                          tooltip={item.label}
-                          render={
-                            <NavLink
-                              to={item.to}
-                              className="flex w-full min-w-0 items-center gap-2"
-                            >
-                              <item.icon className="size-4 shrink-0" />
-                              <span>{item.label}</span>
-                            </NavLink>
-                          }
-                        />
-                      </SidebarMenuItem>
-                    ))}
+                    {group.items.map((item) => {
+                      const count = item.countKey ? navCounts[item.countKey] : 0;
+                      return (
+                        <SidebarMenuItem key={item.to}>
+                          <SidebarMenuButton
+                            isActive={isNavActive(pathname, item.to)}
+                            className="data-active:shadow-[inset_2px_0_0_#EBBB57]"
+                            tooltip={count > 0 ? `${item.label} — ${count} waiting` : item.label}
+                            render={
+                              <NavLink
+                                to={item.to}
+                                className="flex w-full min-w-0 items-center gap-2"
+                              >
+                                <item.icon className="size-4 shrink-0" />
+                                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                                {/* Answers "where is there work waiting?" without
+                                    opening five screens. Hidden when the rail is
+                                    collapsed to icons, where there is no room. */}
+                                {count > 0 && (
+                                  <span
+                                    className={`shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[10px] leading-none tabular-nums group-data-[collapsible=icon]:hidden ${
+                                      item.urgent
+                                        ? 'bg-gold font-semibold text-ink-950'
+                                        : 'bg-sidebar-accent text-sidebar-accent-foreground'
+                                    }`}
+                                  >
+                                    {count > 999 ? '999+' : count}
+                                  </span>
+                                )}
+                              </NavLink>
+                            }
+                          />
+                        </SidebarMenuItem>
+                      );
+                    })}
                   </SidebarMenu>
                 </SidebarGroupContent>
               </SidebarGroup>
@@ -105,9 +131,6 @@ export default function CRMLayout() {
           </SidebarContent>
 
           <SidebarFooter className="border-t border-sidebar-border">
-            <div className="mb-2 flex items-center justify-between gap-2 px-1 group-data-[collapsible=icon]:justify-center">
-              <ThemeToggle />
-            </div>
             <CrmNavUser onSignOut={handleSignOut} />
           </SidebarFooter>
           <SidebarRail />
@@ -119,9 +142,10 @@ export default function CRMLayout() {
               <PanelLeft className="size-4" />
             </SidebarTrigger>
             <Separator orientation="vertical" className="mx-1 hidden h-4 sm:block" />
-            <h1 className="min-w-0 flex-1 truncate text-base font-medium text-foreground">
+            <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight text-foreground">
               {pageTitle}
             </h1>
+            <ThemeToggle variant="ghost" />
             <PortalNotificationBell audience="staff" to="/notifications" />
           </header>
 
