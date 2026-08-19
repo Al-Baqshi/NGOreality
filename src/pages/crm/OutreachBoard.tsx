@@ -136,13 +136,15 @@ export default function OutreachBoard() {
 
   return (
     <div className="page-shell w-full min-w-0 max-w-none">
-      <OutreachHeader
-        onNewLead={() => setNewLeadOpen(true)}
-        onNavigateWorklist={() => window.location.href = '/outreach'}
-      />
+      <div className="flex flex-col gap-2">
+        <OutreachHeader
+          onNewLead={() => setNewLeadOpen(true)}
+          onNavigateWorklist={() => window.location.href = '/outreach'}
+        />
 
-      <OutreachToolbar
-        searchValue={searchValue}
+        <OutreachToolbar
+          className="mt-0 mb-0"
+          searchValue={searchValue}
         onSearchChange={setSearchValue}
         onSearchSubmit={() => {}}
         statusFilter={statusFilter}
@@ -154,7 +156,8 @@ export default function OutreachBoard() {
         sortBy={sortBy}
         onSortChange={setSortBy}
         totalCount={totalLeads}
-      />
+        />
+      </div>
 
       {busy && selectedIds.size === 0 && (
         <Loader2 size={15} className="animate-spin text-ink-500 mb-4" aria-label="Processing…" />

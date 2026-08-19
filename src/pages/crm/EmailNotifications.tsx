@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, Mail, RefreshCw, Send } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Mail, RefreshCw, Send, Trash2 } from 'lucide-react';
 import { SectionHeader, MetricCard } from '../../components/ui';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import {
   NOTIFICATION_STATUS_LABELS,
   NOTIFICATION_TEMPLATE_LABELS,
@@ -44,8 +45,9 @@ export default function EmailNotifications() {
       : 'all';
   const [filter, setFilter] = useState<StatusFilter>(initialFilter);
 
-  const { events, loading, error, summary, flushing, flushNow, requeue, apiConfigured, refetch } =
+  const { events, loading, error, summary, flushing, flushNow, requeue, removeFromQueue, apiConfigured, refetch } =
     useNotifications();
+  const confirm = useConfirm();
   const [actionMsg, setActionMsg] = useState<string | null>(null);
 
   const setFilterAndUrl = (next: StatusFilter) => {
@@ -61,6 +63,12 @@ export default function EmailNotifications() {
   }, [events, filter]);
 
   const handleFlush = async () => {
+    const ok = await confirm({
+      title: 'Send pending emails?',
+      description: `Deliver all ${summary.pending.toLocaleString()} pending email${summary.pending === 1 ? '' : 's'} in the queue now via the Monitor API or worker.`,
+      confirmLabel: 'Send now',
+    });
+    if (!ok) return;
     setActionMsg(null);
     const err = await flushNow();
     setActionMsg(err ?? 'Pending emails sent (or none in queue).');
@@ -71,6 +79,20 @@ export default function EmailNotifications() {
     const err = await requeue(id);
     if (err) setActionMsg(err);
     else setActionMsg('Requeued — click Send pending to retry.');
+  };
+
+  const handleRemoveFromQueue = async (id: string, subject: string) => {
+    const ok = await confirm({
+      title: 'Remove from queue?',
+      description: `This will cancel the pending send and mark it as skipped. The email will not be delivered.\n\n"${subject}"`,
+      confirmLabel: 'Remove',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    setActionMsg(null);
+    const err = await removeFromQueue(id);
+    if (err) setActionMsg(err);
+    else setActionMsg('Removed from queue — will not be sent.');
   };
 
   return (
@@ -242,6 +264,16 @@ export default function EmailNotifications() {
                 <div className="flex flex-wrap items-center gap-2 font-mono text-2xs text-ink-400">
                   <span>{new Date(e.created_at).toLocaleString()}</span>
                   {e.sent_at && <span>Sent {new Date(e.sent_at).toLocaleString()}</span>}
+                  {e.status === 'pending' && (
+                    <button
+                      type="button"
+                      onClick={() => void handleRemoveFromQueue(e.id, e.subject)}
+                      className="inline-flex min-h-[36px] items-center gap-1 text-accent underline hover:no-underline"
+                    >
+                      <Trash2 size={12} aria-hidden />
+                      Remove from queue
+                    </button>
+                  )}
                   {e.status === 'failed' && (
                     <button
                       type="button"

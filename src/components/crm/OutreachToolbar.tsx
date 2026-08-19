@@ -44,14 +44,14 @@ export default function OutreachToolbar({
   const [showFilters, setShowFilters] = useState(false);
 
   return (
-    <div className={`card-brutal p-4 mb-4 ${className}`}>
+    <div className={`w-full rounded-lg border-2 border-teal/20 bg-gradient-to-r from-sky-50/90 via-white to-teal-50/60 p-4 mb-2 shadow-sm dark:border-border dark:from-card dark:via-card dark:to-muted/30 ${className}`}>
       <div className="flex flex-wrap items-center gap-3 mb-3">
-        <span className="font-mono text-2xs uppercase tracking-wider text-ink-500">
+        <span className="font-mono text-2xs uppercase tracking-wider text-teal/80 shrink-0">
           {totalCount.toLocaleString()} organizations
         </span>
 
         <form
-          className="flex-1 min-w-[280px] max-w-md"
+          className="flex-1 min-w-[280px]"
           onSubmit={(e) => {
             e.preventDefault();
             onSearchSubmit(searchValue);

@@ -3,10 +3,12 @@ import { Link } from 'react-router-dom';
 import { useOrganizationsPage } from '../../hooks/useCrm';
 import { SectionHeader } from '../../components/ui';
 import { registerAsCustomer } from '../../lib/crmOutreach';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import PipelineGuide from '../../components/crm/PipelineGuide';
 import { ArrowLeft, UserPlus, Mail } from 'lucide-react';
 
 export default function InboundQueue() {
+  const confirm = useConfirm();
   const [page, setPage] = useState(1);
   const { organizations, totalCount, totalPages, loading, refetch } = useOrganizationsPage(
     { inboundOnly: true },
@@ -15,7 +17,12 @@ export default function InboundQueue() {
   );
 
   const handleCustomer = async (orgId: string, name: string) => {
-    if (!confirm(`Register "${name}" as a customer?`)) return;
+    const ok = await confirm({
+      title: 'Register as customer?',
+      description: `Register "${name}" as a customer?`,
+      confirmLabel: 'Register',
+    });
+    if (!ok) return;
     await registerAsCustomer(orgId);
     refetch();
   };

@@ -11,8 +11,8 @@ export default function OutreachHeader({ onNewLead, onNavigateWorklist }: Props)
   const { count: outreachFailedCount } = useOutreachFailedCount();
 
   return (
-    <div className="page-shell w-full min-w-0 max-w-none pb-24">
-      <div className="page-header">
+    <div className="flex flex-col gap-2">
+      <div className="page-header mb-0">
         <div>
           <h1 className="page-title">Outreach</h1>
           <p className="mt-1 text-sm text-ink-600 dark:text-muted-foreground">
@@ -37,7 +37,7 @@ export default function OutreachHeader({ onNewLead, onNavigateWorklist }: Props)
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 mb-4">
+      <div className="flex flex-wrap gap-3">
         <Link to="/inbound" className="card-brutal-hover px-4 py-3 flex items-center gap-2 text-sm min-h-[44px]">
           <Inbox size={16} className="text-teal" />
           <span>

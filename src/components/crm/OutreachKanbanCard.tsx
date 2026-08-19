@@ -3,6 +3,7 @@ import { ExternalLink, Globe, GripVertical, Mail } from 'lucide-react';
 import type { Organization, OutreachStatus } from '../../types';
 import { OUTREACH_KANBAN_STATUSES, OUTREACH_STATUS_LABELS } from '../../types';
 import { markRegisteredInbound, registerAsCustomer, setOutreachStatus } from '../../lib/crmOutreach';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import type { OrgEmailStatus } from '../../hooks/useOutreachEmail';
 
 type Props = {
@@ -51,6 +52,8 @@ export default function OutreachKanbanCard({
   emailStatus,
   dragPayloadIds,
 }: Props) {
+  const confirm = useConfirm();
+
   const move = async (next: OutreachStatus) => {
     await setOutreachStatus(org.id, next);
     onUpdated();
@@ -62,7 +65,12 @@ export default function OutreachKanbanCard({
   };
 
   const handleRegisterCustomer = async () => {
-    if (!confirm(`Register "${org.name}" as a customer? They will leave the lead pipeline.`)) return;
+    const ok = await confirm({
+      title: 'Register as customer?',
+      description: `Register "${org.name}" as a customer? They will leave the lead pipeline.`,
+      confirmLabel: 'Register',
+    });
+    if (!ok) return;
     await registerAsCustomer(org.id);
     onUpdated();
   };

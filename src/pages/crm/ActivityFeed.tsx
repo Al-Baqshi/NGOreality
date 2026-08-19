@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Loader2, ChevronLeft, ChevronRight, History, Search, X,
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { EmptyState } from '../../components/ui';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 /**
  * Cross-organisation history.
@@ -73,7 +74,42 @@ function dayLabel(iso: string): string {
   return d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
+/** Stable key for grouping — avoids "Today" collisions across pages. */
+function dayKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function DaySelectCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  onChange: () => void;
+  label: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      onChange={onChange}
+      onClick={(e) => e.stopPropagation()}
+      className="size-4 shrink-0 accent-teal cursor-pointer"
+      aria-label={label}
+    />
+  );
+}
+
 export default function ActivityFeed() {
+  const confirm = useConfirm();
   const [params, setParams] = useSearchParams();
   const filterKey = params.get('type') || '';
   const q = params.get('q') || '';
@@ -96,43 +132,66 @@ export default function ActivityFeed() {
     [filterKey],
   );
 
-  // Day headers are computed from the page we have
-  const grouped: { day: string; items: ActivityRow[] }[] = [];
-  rows.forEach((row) => {
-    const day = dayLabel(row.created_at);
-    const last = grouped[grouped.length - 1];
-    if (last && last.day === day) last.items.push(row);
-    else grouped.push({ day, items: [row] });
-  });
+  const grouped = useMemo(() => {
+    const groups: { key: string; day: string; items: ActivityRow[] }[] = [];
+    rows.forEach((row) => {
+      const key = dayKey(row.created_at);
+      const day = dayLabel(row.created_at);
+      const last = groups[groups.length - 1];
+      if (last && last.key === key) last.items.push(row);
+      else groups.push({ key, day, items: [row] });
+    });
+    return groups;
+  }, [rows]);
 
-  // Initialize all days as expanded by default
+  // Default new day sections to expanded — do not reset toggles the user already set.
   useEffect(() => {
-    const initial: Record<string, boolean> = {};
-    grouped.forEach((g) => { initial[g.day] = true; });
-    setDayExpanded(initial);
+    setDayExpanded((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      grouped.forEach((g) => {
+        if (!(g.key in next)) {
+          next[g.key] = true;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
   }, [grouped]);
 
-  const toggleDay = (day: string) => {
-    setDayExpanded((prev) => ({ ...prev, [day]: !prev[day] }));
+  const isDayExpanded = useCallback(
+    (key: string) => dayExpanded[key] !== false,
+    [dayExpanded],
+  );
+
+  const toggleDay = (key: string) => {
+    setDayExpanded((prev) => ({ ...prev, [key]: prev[key] === false }));
   };
 
   const expandAll = () => {
-    const expanded: Record<string, boolean> = {};
-    grouped.forEach((g) => { expanded[g.day] = true; });
-    setDayExpanded(expanded);
+    setDayExpanded((prev) => {
+      const next = { ...prev };
+      grouped.forEach((g) => { next[g.key] = true; });
+      return next;
+    });
   };
 
   const collapseAll = () => {
-    const collapsed: Record<string, boolean> = {};
-    grouped.forEach((g) => { collapsed[g.day] = false; });
-    setDayExpanded(collapsed);
+    setDayExpanded((prev) => {
+      const next = { ...prev };
+      grouped.forEach((g) => { next[g.key] = false; });
+      return next;
+    });
   };
 
+  const allDaysExpanded = grouped.length > 0 && grouped.every((g) => isDayExpanded(g.key));
+  const allDaysCollapsed = grouped.length > 0 && grouped.every((g) => !isDayExpanded(g.key));
+
   const toggleSelectionMode = () => {
-    setSelectionMode((prev) => !prev);
-    if (!selectionMode) {
-      setSelectedIds(new Set());
-    }
+    setSelectionMode((prev) => {
+      if (prev) setSelectedIds(new Set());
+      return !prev;
+    });
   };
 
   const toggleSelect = (id: string) => {
@@ -144,9 +203,35 @@ export default function ActivityFeed() {
     });
   };
 
+  const selectIds = (ids: string[], selected: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => {
+        if (selected) next.add(id);
+        else next.delete(id);
+      });
+      return next;
+    });
+  };
+
+  const toggleDaySelection = (items: ActivityRow[]) => {
+    const ids = items.map((r) => r.id);
+    const allSelected = ids.length > 0 && ids.every((id) => selectedIds.has(id));
+    selectIds(ids, !allSelected);
+  };
+
+  const daySelectionState = (items: ActivityRow[]) => {
+    const ids = items.map((r) => r.id);
+    const selectedCount = ids.filter((id) => selectedIds.has(id)).length;
+    return {
+      selectedCount,
+      allSelected: ids.length > 0 && selectedCount === ids.length,
+      someSelected: selectedCount > 0 && selectedCount < ids.length,
+    };
+  };
+
   const selectAllVisible = () => {
-    const ids = rows.map((r) => r.id);
-    setSelectedIds(new Set(ids));
+    setSelectedIds(new Set(rows.map((r) => r.id)));
   };
 
   const clearSelection = () => {
@@ -155,15 +240,24 @@ export default function ActivityFeed() {
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Delete ${selectedIds.size} selected activity entr${selectedIds.size === 1 ? 'y' : 'ies'}? This cannot be undone.`)) return;
+    const idsToDelete = Array.from(selectedIds);
+    const ok = await confirm({
+      title: 'Delete activity entries?',
+      description: `Delete ${idsToDelete.length} selected activity entr${idsToDelete.length === 1 ? 'y' : 'ies'}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     setDeleteBusy(true);
     try {
-      const { error } = await supabase.from('activity_log').delete().in('id', Array.from(selectedIds));
-      if (error) throw error;
+      const { error: deleteError } = await supabase.from('activity_log').delete().in('id', idsToDelete);
+      if (deleteError) throw deleteError;
+      const deleted = new Set(idsToDelete);
+      setRows((prev) => prev.filter((r) => !deleted.has(r.id)));
+      setTotal((t) => Math.max(0, t - idsToDelete.length));
       clearSelection();
       setSelectionMode(false);
-      setRows((prev) => prev.filter((r) => !selectedIds.has(r.id)));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed');
     } finally {
@@ -276,77 +370,95 @@ export default function ActivityFeed() {
 
       {error && <div className="card-brutal p-3 mb-4 text-sm border-accent text-accent">{error}</div>}
 
-      {/* Selection mode bar */}
-      {selectionMode && (
-        <div className="card-brutal p-3 mb-4 bg-amber-50 border-amber-200 flex flex-wrap items-center gap-3">
-          <span className="text-sm font-semibold">
-            {selectedIds.size} of {rows.length} selected
-          </span>
-          <button
-            type="button"
-            onClick={selectAllVisible}
-            disabled={selectedIds.size === rows.length}
-            className="btn-brutal-outline text-sm min-h-[44px]"
-          >
-            <CheckSquare size={14} className="mr-1" /> Select all on page
-          </button>
-          <button
-            type="button"
-            onClick={clearSelection}
-            className="btn-brutal-outline text-sm min-h-[44px]"
-          >
-            <Square size={14} className="mr-1" /> Clear
-          </button>
-          <button
-            type="button"
-            onClick={handleBulkDelete}
-            disabled={selectedIds.size === 0 || deleteBusy}
-            className="btn-brutal-accent text-sm min-h-[44px] ml-auto flex items-center gap-1"
-          >
-            {deleteBusy && <Loader2 size={14} className="animate-spin" />}
-            <Trash2 size={14} /> Delete selected
-          </button>
-          <button
-            type="button"
-            onClick={toggleSelectionMode}
-            className="btn-brutal-outline text-sm min-h-[44px]"
-          >
-            Exit selection
-          </button>
-        </div>
-      )}
-
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="flex flex-wrap gap-2">
-          {ACTION_FILTERS.map((f) => (
+        <p className="font-mono text-2xs uppercase tracking-wider text-ink-500">
+          {!loading && total > 0
+            ? `${total.toLocaleString()} entr${total === 1 ? 'y' : 'ies'}`
+            : loading
+              ? 'Loading…'
+              : 'No entries'}
+        </p>
+        {!loading && grouped.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              key={f.key}
               type="button"
-              onClick={() => update({ type: f.key })}
-              className={`border-3 px-3 py-2 min-h-[44px] text-sm font-semibold transition-colors ${
-                filterKey === f.key
-                  ? 'border-ink-950 bg-ink-950 text-white dark:border-border'
-                  : 'border-ink-950 dark:border-border bg-white dark:bg-card hover:bg-paper dark:hover:bg-muted'
+              onClick={expandAll}
+              disabled={allDaysExpanded}
+              className="btn-brutal-outline text-sm min-h-[40px] inline-flex items-center gap-1 disabled:opacity-40"
+            >
+              <ChevronDown size={14} aria-hidden />
+              Expand all days
+            </button>
+            <button
+              type="button"
+              onClick={collapseAll}
+              disabled={allDaysCollapsed}
+              className="btn-brutal-outline text-sm min-h-[40px] inline-flex items-center gap-1 disabled:opacity-40"
+            >
+              <ChevronUp size={14} aria-hidden />
+              Collapse all days
+            </button>
+            <button
+              type="button"
+              onClick={toggleSelectionMode}
+              className={`text-sm min-h-[40px] inline-flex items-center gap-1 ${
+                selectionMode ? 'btn-brutal-outline' : 'btn-brutal-teal'
               }`}
             >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        {!selectionMode && grouped.length > 0 && (
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={expandAll} className="btn-brutal-outline text-sm min-h-[44px]">
-              <ChevronDown size={14} className="mr-1" /> Expand all
-            </button>
-            <button type="button" onClick={collapseAll} className="btn-brutal-outline text-sm min-h-[44px]">
-              <ChevronUp size={14} className="mr-1" /> Collapse all
-            </button>
-            <button type="button" onClick={toggleSelectionMode} className="btn-brutal-teal text-sm min-h-[44px]">
-              <CheckSquare size={14} className="mr-1" /> Select
+              <CheckSquare size={14} aria-hidden />
+              {selectionMode ? 'Exit selection' : 'Select to delete'}
             </button>
           </div>
         )}
       </div>
+
+      {selectionMode && (
+        <section
+          className="mb-4 w-full overflow-hidden rounded-lg border-2 border-amber-200/80 bg-gradient-to-r from-amber-50/90 via-white to-amber-50/60 p-3 shadow-sm dark:border-amber-900/40 dark:from-amber-950/30 dark:via-card dark:to-card"
+          aria-label="Selection actions"
+        >
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className="rounded-md bg-amber-500 px-2 py-1 font-mono text-2xs font-bold tabular-nums text-white">
+              {selectedIds.size}
+            </span>
+            <span className="text-sm font-semibold text-ink-800 dark:text-foreground">
+              selected on this page
+            </span>
+            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+              <button
+                type="button"
+                onClick={selectAllVisible}
+                disabled={selectedIds.size === rows.length || rows.length === 0}
+                className="btn-brutal-outline text-xs min-h-[36px] inline-flex items-center gap-1 disabled:opacity-40"
+              >
+                <CheckSquare size={13} aria-hidden />
+                Select all on page
+              </button>
+              <button
+                type="button"
+                onClick={clearSelection}
+                disabled={selectedIds.size === 0}
+                className="btn-brutal-outline text-xs min-h-[36px] inline-flex items-center gap-1 disabled:opacity-40"
+              >
+                <Square size={13} aria-hidden />
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleBulkDelete()}
+                disabled={selectedIds.size === 0 || deleteBusy}
+                className="btn-brutal-accent text-xs min-h-[36px] inline-flex items-center gap-1 disabled:opacity-40"
+              >
+                {deleteBusy ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} aria-hidden />}
+                Delete selected
+              </button>
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-ink-500 dark:text-muted-foreground">
+            Tip: use the checkbox on each day header to select or clear that whole day.
+          </p>
+        </section>
+      )}
 
       {loading && (
         <div className="card-brutal p-8 text-center text-ink-500">
@@ -359,26 +471,51 @@ export default function ActivityFeed() {
       )}
 
       {!loading && grouped.map((group) => {
-        const isExpanded = dayExpanded[group.day] !== false;
+        const expanded = isDayExpanded(group.key);
+        const { allSelected, someSelected, selectedCount } = daySelectionState(group.items);
         return (
-          <section key={group.day} className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="label-brutal">{group.day}</h2>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => toggleDay(group.day)}
-                  className="btn-brutal-outline text-2xs py-1 px-2 min-h-[36px]"
-                  title={isExpanded ? 'Collapse' : 'Expand'}
-                >
-                  {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                </button>
+          <section key={group.key} className="mb-6">
+            <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-ink-200/80 bg-paper/60 px-3 py-2 dark:border-border dark:bg-muted/20">
+              {selectionMode && (
+                <DaySelectCheckbox
+                  checked={allSelected}
+                  indeterminate={someSelected}
+                  onChange={() => toggleDaySelection(group.items)}
+                  label={`Select all activity for ${group.day}`}
+                />
+              )}
+              <button
+                type="button"
+                onClick={() => toggleDay(group.key)}
+                className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                aria-expanded={expanded}
+              >
+                {expanded ? (
+                  <ChevronUp size={16} className="shrink-0 text-ink-500" aria-hidden />
+                ) : (
+                  <ChevronDown size={16} className="shrink-0 text-ink-500" aria-hidden />
+                )}
+                <h2 className="label-brutal mb-0">{group.day}</h2>
+              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                {selectionMode && selectedCount > 0 && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 font-mono text-[10px] tabular-nums text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+                    {selectedCount} selected
+                  </span>
+                )}
                 <span className="font-mono text-2xs text-ink-400">
                   {group.items.length} item{group.items.length !== 1 ? 's' : ''}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => toggleDay(group.key)}
+                  className="btn-brutal-outline text-2xs min-h-[32px] px-2 py-1"
+                >
+                  {expanded ? 'Collapse' : 'Expand'}
+                </button>
               </div>
             </div>
-            {isExpanded && (
+            {expanded && (
               <div className="card-brutal divide-y-2 divide-ink-200 dark:divide-border">
                 {group.items.map((row) => {
                   const { Icon, tone } = iconFor(row.action);
@@ -387,16 +524,29 @@ export default function ActivityFeed() {
                   return (
                     <div
                       key={row.id}
-                      className={`flex items-start gap-3 p-3 ${selectionMode ? 'cursor-pointer hover:bg-ink-50' : ''} ${isSelected && selectionMode ? 'bg-amber-50 border-l-4 border-amber-400' : ''}`}
+                      role={selectionMode ? 'button' : undefined}
+                      tabIndex={selectionMode ? 0 : undefined}
+                      onKeyDown={
+                        selectionMode
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                toggleSelect(row.id);
+                              }
+                            }
+                          : undefined
+                      }
+                      className={`flex items-start gap-3 p-3 transition-colors ${
+                        selectionMode ? 'cursor-pointer hover:bg-ink-50/80 dark:hover:bg-muted/40' : ''
+                      } ${isSelected && selectionMode ? 'bg-amber-50/90 ring-2 ring-inset ring-amber-300/80 dark:bg-amber-950/20 dark:ring-amber-700/50' : ''}`}
                       onClick={selectionMode ? () => toggleSelect(row.id) : undefined}
                     >
                       {selectionMode && (
-                        <input
-                          type="checkbox"
+                        <DaySelectCheckbox
                           checked={isSelected}
+                          indeterminate={false}
                           onChange={() => toggleSelect(row.id)}
-                          className="mt-1 shrink-0 accent-teal"
-                          aria-label="Select activity"
+                          label={`Select activity: ${row.description || row.action}`}
                         />
                       )}
                       <Icon size={16} className={`${tone} shrink-0 mt-0.5`} />
@@ -409,7 +559,11 @@ export default function ActivityFeed() {
                         </p>
                         <p className="font-mono text-2xs text-ink-500 dark:text-muted-foreground mt-0.5">
                           {row.organizations?.name ? (
-                            <Link to={`/organizations/${row.organization_id}`} className="hover:text-teal inline-flex items-center gap-1">
+                            <Link
+                              to={`/organizations/${row.organization_id}`}
+                              className="hover:text-teal inline-flex items-center gap-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               {row.organizations.name} <ArrowUpRight size={11} />
                             </Link>
                           ) : (

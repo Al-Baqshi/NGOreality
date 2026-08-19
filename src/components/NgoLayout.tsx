@@ -88,13 +88,13 @@ function NgoPortalFrame() {
 
   return (
     <>
-      <Sidebar collapsible="icon" variant="sidebar" className="border-sidebar-border">
-        <SidebarHeader className="border-b border-sidebar-border">
+      <Sidebar collapsible="icon" variant="sidebar" className="border-sidebar-border shadow-[2px_0_12px_-4px_rgba(4,28,60,0.08)]">
+        <SidebarHeader className="border-b border-sidebar-border/80 bg-white/40 dark:bg-white/5">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
                 size="lg"
-                className="data-[slot=sidebar-menu-button]:!p-2"
+                className="data-[slot=sidebar-menu-button]:!p-2 hover:bg-sidebar-accent/80"
                 isActive={activeId === 'overview'}
                 onClick={() => goToNavItem(navItems[0])}
               >
@@ -117,9 +117,9 @@ function NgoPortalFrame() {
           </SidebarMenu>
         </SidebarHeader>
 
-        <SidebarContent>
+        <SidebarContent className="px-1">
           <SidebarGroup>
-            <SidebarGroupLabel className="font-mono text-2xs uppercase tracking-[0.14em] text-sidebar-foreground/50">
+            <SidebarGroupLabel className="font-mono text-2xs uppercase tracking-[0.14em] text-sidebar-foreground/45 px-3">
               Your organisation
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -128,7 +128,7 @@ function NgoPortalFrame() {
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton
                       isActive={activeId === item.id}
-                      className="data-active:shadow-[inset_2px_0_0_#EBBB57]"
+                      className="mx-1 rounded-lg transition-colors data-active:bg-white data-active:font-semibold data-active:text-sidebar-accent-foreground data-active:shadow-[inset_3px_0_0_0_var(--sidebar-ring),0_1px_2px_rgba(4,28,60,0.06)] hover:bg-sidebar-accent/70 dark:data-active:bg-sidebar-accent"
                       tooltip={item.label}
                       onClick={() => goToNavItem(item)}
                     >
@@ -156,8 +156,8 @@ function NgoPortalFrame() {
           </SidebarGroup>
         </SidebarContent>
 
-        <SidebarFooter className="border-t border-sidebar-border">
-          <div className="px-2 py-2 text-sm group-data-[collapsible=icon]:hidden">
+        <SidebarFooter className="border-t border-sidebar-border/80 bg-white/30 dark:bg-white/5">
+          <div className="mx-2 rounded-lg border border-sidebar-border/60 bg-white/50 px-2 py-2 text-sm group-data-[collapsible=icon]:hidden dark:bg-sidebar-accent/30">
             <p className="truncate font-medium text-sidebar-foreground">Signed in</p>
             <p className="truncate text-xs text-sidebar-foreground/60">
               {user?.email ?? centralUser?.email ?? centralUser?.username}
@@ -168,7 +168,7 @@ function NgoPortalFrame() {
             variant="ghost"
             size="sm"
             onClick={handleSignOut}
-            className="mx-2 mb-2 h-9 w-[calc(100%-1rem)] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            className="mx-2 mb-2 h-9 w-[calc(100%-1rem)] rounded-lg text-sidebar-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
           >
             <LogOut className="size-4" />
             Sign out

@@ -3,6 +3,7 @@ import { Globe, Mail, UserPlus, MoreHorizontal, ExternalLink, Loader2 } from 'lu
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Organization, OutreachStatus } from '../../types';
 import { setOutreachStatus, markRegisteredInbound, registerAsCustomer } from '../../lib/crmOutreach';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import type { OrgEmailStatus } from '../../hooks/useOutreachEmail';
 
 function emailBadge(status?: OrgEmailStatus) {
@@ -51,6 +52,7 @@ export default function OrganizationCard({
   emailStatus,
   dragPayloadIds,
 }: Props) {
+  const confirm = useConfirm();
   const [menuOpen, setMenuOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
@@ -75,7 +77,12 @@ export default function OrganizationCard({
   };
 
   const handleRegisterCustomer = async () => {
-    if (!confirm(`Register "${org.name}" as a customer? They will leave the lead pipeline.`)) return;
+    const ok = await confirm({
+      title: 'Register as customer?',
+      description: `Register "${org.name}" as a customer? They will leave the lead pipeline.`,
+      confirmLabel: 'Register',
+    });
+    if (!ok) return;
     setBusyAction('register-customer');
     try {
       await registerAsCustomer(org.id);

@@ -3,6 +3,7 @@ import { KeyRound, ShieldCheck, ShieldOff, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { captureError } from '../../lib/errorReporting';
 import { formatMembershipDate } from '../../lib/membership';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 type PortalMember = {
   user_id: string;
@@ -26,6 +27,7 @@ type PortalMember = {
  * this is where you see who, and revoke them.
  */
 export default function OrganizationPortalMembers({ organizationId }: { organizationId: string }) {
+  const confirm = useConfirm();
   const [members, setMembers] = useState<PortalMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,12 +61,17 @@ export default function OrganizationPortalMembers({ organizationId }: { organiza
   async function setStewardship(userId: string, verified: boolean) {
     const who = members.find((m) => m.user_id === userId);
     const verb = verified ? 'Grant stewardship to' : 'Revoke stewardship from';
-    if (!window.confirm(
-      `${verb} ${who?.email ?? 'this account'}?\n\n` +
-      (verified
-        ? 'They will be able to edit this organisation’s public listing and apply for a Reality Badge.'
-        : 'They keep monitoring and alerts, but can no longer edit the public listing or apply for a badge.'),
-    )) return;
+    const ok = await confirm({
+      title: verified ? 'Grant stewardship?' : 'Revoke stewardship?',
+      description:
+        `${verb} ${who?.email ?? 'this account'}?\n\n` +
+        (verified
+          ? 'They will be able to edit this organisation’s public listing and apply for a Reality Badge.'
+          : 'They keep monitoring and alerts, but can no longer edit the public listing or apply for a badge.'),
+      confirmLabel: verified ? 'Grant' : 'Revoke',
+      variant: verified ? 'default' : 'danger',
+    });
+    if (!ok) return;
 
     setBusyUser(userId);
     const { error: rpcError } = await supabase.rpc('set_org_stewardship', {

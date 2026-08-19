@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import type { Organization, OutreachEmailTemplate, OutreachStatus } from '../../types';
 import { draftOutreachEmailForOrg, sendOutreachForColumn, sendOutreachNow } from '../../lib/crmOutreach';
 import { isMonitorApiConfigured } from '../../lib/monitorApi';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 interface Props {
   open: boolean;
@@ -31,6 +32,7 @@ export default function SendEmailModal({
   template,
   onSent,
 }: Props) {
+  const confirm = useConfirm();
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
@@ -83,13 +85,12 @@ export default function SendEmailModal({
       setMessage('Select cards that have an email on file.');
       return;
     }
-    if (
-      !confirm(
-        `Queue ${withEmail.length} email(s) for ${columnLabel}?\n\nRecipients use the address on each card. Delivery happens from Email notifications — not when you drag cards.`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Queue emails?',
+      description: `Queue ${withEmail.length} email(s) for ${columnLabel}?\n\nRecipients use the address on each card. Delivery happens from Email notifications — not when you drag cards.`,
+      confirmLabel: 'Queue',
+    });
+    if (!ok) return;
     setBusy(true);
     setMessage(null);
     try {
@@ -116,13 +117,12 @@ export default function SendEmailModal({
       setMessage('Select cards that have an email on file.');
       return;
     }
-    if (
-      !confirm(
-        `Send ${withEmail.length} email(s) NOW for ${columnLabel}?\n\nThis will queue AND immediately deliver via the Monitor API. Requires VITE_MONITOR_API_URL and VITE_MONITOR_API_KEY to be configured.`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Send emails now?',
+      description: `Send ${withEmail.length} email(s) NOW for ${columnLabel}?\n\nThis will queue AND immediately deliver via the Monitor API. Requires VITE_MONITOR_API_URL and VITE_MONITOR_API_KEY to be configured.`,
+      confirmLabel: 'Send now',
+    });
+    if (!ok) return;
     setBusy(true);
     setMessage(null);
     try {

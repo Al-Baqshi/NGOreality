@@ -98,7 +98,7 @@
   box-shadow: 6px 6px 0 0 #000000;
 }
 
-/* CRM sidebar stays dark; main chrome uses inverted borders on hover */
+/* Main chrome uses inverted borders on hover in dark mode */
 .dark .hover\:bg-ink-950:hover {
   background-color: #e5e8ea;
 }

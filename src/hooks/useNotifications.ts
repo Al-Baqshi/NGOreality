@@ -100,6 +100,22 @@ export function useNotifications(limit = 100) {
     return null;
   };
 
+  const removeFromQueue = async (id: string): Promise<string | null> => {
+    const { error: uError } = await supabase
+      .from('notification_events')
+      .update({
+        status: 'skipped',
+        error_message: 'Removed from queue by staff',
+        sent_at: null,
+      })
+      .eq('id', id)
+      .eq('status', 'pending');
+
+    if (uError) return uError.message;
+    await refetch();
+    return null;
+  };
+
   return {
     events,
     loading,
@@ -109,6 +125,7 @@ export function useNotifications(limit = 100) {
     refetch,
     flushNow,
     requeue,
+    removeFromQueue,
     apiConfigured: isMonitorApiConfigured(),
   };
 }

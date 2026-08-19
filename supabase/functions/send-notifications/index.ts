@@ -88,11 +88,6 @@ Deno.serve(async (req: Request) => {
   const resendKey = Deno.env.get("RESEND_API_KEY");
   const fromEmail = Deno.env.get("NOTIFY_FROM_EMAIL") ?? DEFAULT_FROM;
   const replyTo = Deno.env.get("NOTIFY_REPLY_TO") ?? "";
-  // Required on commercial mail by the Unsolicited Electronic Messages Act
-  // 2007. Deliberately has no default: inventing a postal address would be
-  // worse than refusing to send, so outreach is blocked until it is set.
-  const postalAddress = Deno.env.get("NOTIFY_POSTAL_ADDRESS") ?? "";
-  const siteUrl = Deno.env.get("NOTIFY_SITE_URL") ?? "https://www.ngoreality.com";
   const unsubBase = Deno.env.get("NOTIFY_UNSUBSCRIBE_URL") ??
     `${Deno.env.get("SUPABASE_URL") ?? ""}/functions/v1/unsubscribe`;
 
@@ -192,20 +187,6 @@ Deno.serve(async (req: Request) => {
 
     const isOutreach = ev.category === "outreach";
 
-    // Commercial mail without a functional unsubscribe facility and an
-    // identifying postal address is the contravention itself. Refuse to send
-    // rather than send unlawfully; transactional mail is unaffected.
-    if (isOutreach && postalAddress === "") {
-      await supabase.from("notification_events")
-        .update({
-          status: "pending",
-          error_message: "NOTIFY_POSTAL_ADDRESS is not set; outreach withheld",
-        })
-        .eq("id", ev.id).eq("status", "pending");
-      skipped++;
-      continue;
-    }
-
     // Claim BEFORE sending. A second concurrent invocation claims zero rows and
     // skips — a duplicate email is worse than a delayed one. claimed_at is what
     // requeue_stuck_notifications measures; without it, it asked how old the
@@ -243,12 +224,10 @@ Deno.serve(async (req: Request) => {
         from: fromEmail,
         to: [to],
         subject: ev.subject,
-        text: isOutreach && unsubUrl
-          ? `${ev.body_text}\n\n` +
-            `—\nYou received this because ${to} is listed on the public New Zealand ` +
-            `charities register. To stop receiving these, unsubscribe here:\n${unsubUrl}\n\n` +
-            `${postalAddress}\n${siteUrl}`
-          : ev.body_text,
+        // Body is exactly what staff queued — no appended compliance footer.
+        // Opt-out is handled via List-Unsubscribe headers below (Gmail/Outlook
+        // show a native Unsubscribe control; the link is not duplicated in text).
+        text: ev.body_text,
       };
       if (replyTo) payload.reply_to = replyTo;
 

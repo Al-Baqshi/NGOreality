@@ -25,6 +25,7 @@ import { hasRegistryProvenance, OUTREACH_KANBAN_STATUSES } from '../../types';
 import OrgOriginChip from '../../components/crm/OrgOriginChip';
 import RegistryMatchCheck from '../../components/crm/RegistryMatchCheck';
 import { markRegisteredInbound, registerAsCustomer, setOutreachStatus } from '../../lib/crmOutreach';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { FINANCIAL_VERIFICATION_ENABLED } from '../../config/features';
 import FinancialComingSoon from '../../components/FinancialComingSoon';
 import OrganizationEngagements from '../../components/crm/OrganizationEngagements';
@@ -35,6 +36,7 @@ import { publicCriteriaScore } from '../../lib/criteria';
 import { ArrowLeft, Globe, Mail, Phone, MapPin, CreditCard as Edit3, Save, X, Shield, Clock, User, Plus, Trash2, Award, CheckCheck } from 'lucide-react';
 
 export default function OrganizationDetail() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const { organization, loading, refetch: refetchOrganization } = useOrganization(id);
   const { contacts, loading: contactsLoading } = useContacts(id);
@@ -99,14 +101,25 @@ export default function OrganizationDetail() {
 
   const handleRegisterAsCustomer = async () => {
     if (!id || !organization) return;
-    if (!confirm(`Register "${organization.name}" as a customer?`)) return;
+    const ok = await confirm({
+      title: 'Register as customer?',
+      description: `Register "${organization.name}" as a customer?`,
+      confirmLabel: 'Register',
+    });
+    if (!ok) return;
     await registerAsCustomer(id);
     window.location.reload();
   };
 
   const handleDeleteOrganization = async () => {
     if (!id || !organization) return;
-    if (!confirm(`DELETE "${organization.name}"?\n\nThis will permanently remove the organization and all its data (contacts, criteria, badges, activity log, payments, engagements).\n\nThis cannot be undone.`)) return;
+    const ok = await confirm({
+      title: 'Delete organization?',
+      description: `DELETE "${organization.name}"?\n\nThis will permanently remove the organization and all its data (contacts, criteria, badges, activity log, payments, engagements).\n\nThis cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     await supabase.from('organizations').delete().eq('id', id);
     window.location.href = '/organizations';
   };
@@ -224,7 +237,13 @@ export default function OrganizationDetail() {
 
   const handleRevokeBadge = async (badgeId: string, verificationId: string) => {
     if (!id || !organization) return;
-    if (!window.confirm(`Revoke badge ${verificationId}? This removes public verified status if no other active badge remains.`)) return;
+    const ok = await confirm({
+      title: 'Revoke badge?',
+      description: `Revoke badge ${verificationId}? This removes public verified status if no other active badge remains.`,
+      confirmLabel: 'Revoke',
+      variant: 'danger',
+    });
+    if (!ok) return;
     await supabase.from('verification_badges').update({ is_active: false }).eq('id', badgeId);
     const { count: activeCount } = await supabase
       .from('verification_badges')

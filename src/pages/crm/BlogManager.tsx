@@ -3,8 +3,10 @@ import { supabase } from '../../lib/supabase';
 import { captureError } from '../../lib/errorReporting';
 import type { BlogPost } from '../../types';
 import { FileText, Plus, Pencil, Trash2, Eye, EyeOff, Search, Calendar, User } from 'lucide-react';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 export default function BlogManager() {
+  const confirm = useConfirm();
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -37,7 +39,13 @@ export default function BlogManager() {
   const publishedCount = posts.filter(p => p.status === 'published').length;
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this post?')) return;
+    const ok = await confirm({
+      title: 'Delete post?',
+      description: 'Delete this post? This cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     await supabase.from('blog_posts').delete().eq('id', id);
     fetchPosts();
   };

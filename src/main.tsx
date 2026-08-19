@@ -5,6 +5,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import App from './App.tsx';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider } from './contexts/AuthContext';
+import { ConfirmProvider } from './contexts/ConfirmContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { installGlobalErrorHandlers } from './lib/errorReporting';
 import './index.css';
@@ -19,7 +20,9 @@ createRoot(document.getElementById('root')!).render(
       <HelmetProvider>
         <ThemeProvider>
           <AuthProvider>
-            <App />
+            <ConfirmProvider>
+              <App />
+            </ConfirmProvider>
           </AuthProvider>
         </ThemeProvider>
       </HelmetProvider>
