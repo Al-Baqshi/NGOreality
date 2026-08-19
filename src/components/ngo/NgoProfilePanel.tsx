@@ -249,7 +249,7 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
             <input
               id="ngo-email"
               type="email"
-              className={`input-brutal w-full text-base ${emailError ? 'border-accent' : ''}`}
+              className={`input-brutal w-full text-base ${emailError ? 'border-red-500' : ''}`}
               value={profileForm.email}
               onChange={(e) => {
                 setProfileForm((f) => ({ ...f, email: e.target.value }));
@@ -257,7 +257,7 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
               }}
             />
             {emailError && (
-              <p className="text-accent text-xs font-mono mt-1" role="alert">
+              <p className="text-red-600 text-xs font-mono mt-1" role="alert">
                 <AlertCircle size={12} className="inline mr-1" /> {emailError}
               </p>
             )}
@@ -285,7 +285,7 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
               <input
                 id="ngo-phone"
                 type="tel"
-                className={`input-brutal flex-1 text-base min-h-[48px] ${phoneError ? 'border-accent' : ''}`}
+                className={`input-brutal flex-1 text-base min-h-[48px] ${phoneError ? 'border-red-500' : ''}`}
                 value={profileForm.phone_number}
                 onChange={(e) => {
                   setProfileForm((f) => ({ ...f, phone_number: e.target.value }));
@@ -295,7 +295,7 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
               />
             </div>
             {phoneError && (
-              <p className="text-accent text-xs font-mono mt-1" role="alert">
+              <p className="text-red-600 text-xs font-mono mt-1" role="alert">
                 <AlertCircle size={12} className="inline mr-1" /> {phoneError}
               </p>
             )}
@@ -309,7 +309,7 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
             <input
               id="ngo-website"
               type="url"
-              className={`input-brutal w-full text-base ${websiteError ? 'border-accent' : ''}`}
+              className={`input-brutal w-full text-base ${websiteError ? 'border-red-500' : ''}`}
               value={profileForm.website_url}
               onChange={(e) => {
                 setProfileForm((f) => ({ ...f, website_url: e.target.value }));
@@ -318,7 +318,7 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
               placeholder="https://example.com"
             />
             {websiteError && (
-              <p className="text-accent text-xs font-mono mt-1" role="alert">{websiteError}</p>
+              <p className="text-red-600 text-xs font-mono mt-1" role="alert">{websiteError}</p>
             )}
           </div>
           <div>

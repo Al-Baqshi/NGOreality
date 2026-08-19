@@ -452,7 +452,7 @@ export default function NgoOrganizationRegistrationForm({
             </label>
             <input
               id="full-name"
-              className={`input-brutal w-full text-base ${fieldErrors.fullName ? 'border-accent' : ''}`}
+              className={`input-brutal w-full text-base ${fieldErrors.fullName ? 'border-red-500' : ''}`}
               value={form.fullName}
               onChange={(e) => {
                 setForm({ ...form, fullName: e.target.value });
@@ -461,7 +461,7 @@ export default function NgoOrganizationRegistrationForm({
               required
             />
             {fieldErrors.fullName && (
-              <p className="text-accent text-xs font-mono mt-1" role="alert">
+              <p className="text-red-600 text-xs font-mono mt-1" role="alert">
                 <AlertCircle size={12} className="inline mr-1" /> {fieldErrors.fullName}
               </p>
             )}
@@ -474,7 +474,7 @@ export default function NgoOrganizationRegistrationForm({
               id="signup-email"
               type="email"
               autoComplete="email"
-              className={`input-brutal w-full text-base ${fieldErrors.email ? 'border-accent' : ''}`}
+              className={`input-brutal w-full text-base ${fieldErrors.email ? 'border-red-500' : ''}`}
               value={form.email}
               onChange={(e) => {
                 setForm({ ...form, email: e.target.value });
@@ -483,7 +483,7 @@ export default function NgoOrganizationRegistrationForm({
               required
             />
             {fieldErrors.email && (
-              <p className="text-accent text-xs font-mono mt-1" role="alert">
+              <p className="text-red-600 text-xs font-mono mt-1" role="alert">
                 <AlertCircle size={12} className="inline mr-1" /> {fieldErrors.email}
               </p>
             )}
@@ -496,7 +496,7 @@ export default function NgoOrganizationRegistrationForm({
               id="signup-password"
               type="password"
               autoComplete="new-password"
-              className={`input-brutal w-full text-base ${fieldErrors.password ? 'border-accent' : ''}`}
+              className={`input-brutal w-full text-base ${fieldErrors.password ? 'border-red-500' : ''}`}
               value={form.password}
               onChange={(e) => {
                 setForm({ ...form, password: e.target.value });
@@ -506,7 +506,7 @@ export default function NgoOrganizationRegistrationForm({
               required
             />
             {fieldErrors.password && (
-              <p className="text-accent text-xs font-mono mt-1" role="alert">
+              <p className="text-red-600 text-xs font-mono mt-1" role="alert">
                 <AlertCircle size={12} className="inline mr-1" /> {fieldErrors.password}
               </p>
             )}
@@ -536,7 +536,7 @@ export default function NgoOrganizationRegistrationForm({
             </label>
             <input
               id="org-name"
-              className={`input-brutal w-full text-base ${fieldErrors.organizationName ? 'border-accent' : ''}`}
+              className={`input-brutal w-full text-base ${fieldErrors.organizationName ? 'border-red-500' : ''}`}
               value={form.organizationName}
               onChange={(e) => {
                 setForm({ ...form, organizationName: e.target.value });
@@ -545,7 +545,7 @@ export default function NgoOrganizationRegistrationForm({
               required
             />
             {fieldErrors.organizationName && (
-              <p className="text-accent text-xs font-mono mt-1" role="alert">
+              <p className="text-red-600 text-xs font-mono mt-1" role="alert">
                 <AlertCircle size={12} className="inline mr-1" /> {fieldErrors.organizationName}
               </p>
             )}
@@ -587,7 +587,7 @@ export default function NgoOrganizationRegistrationForm({
             <input
               id="website"
               type="url"
-              className={`input-brutal w-full text-base ${fieldErrors.websiteUrl ? 'border-accent' : ''}`}
+              className={`input-brutal w-full text-base ${fieldErrors.websiteUrl ? 'border-red-500' : ''}`}
               value={form.websiteUrl}
               onChange={(e) => {
                 setForm({ ...form, websiteUrl: e.target.value });
@@ -596,7 +596,7 @@ export default function NgoOrganizationRegistrationForm({
               placeholder="https://"
             />
             {fieldErrors.websiteUrl && (
-              <p className="text-accent text-xs font-mono mt-1" role="alert">
+              <p className="text-red-600 text-xs font-mono mt-1" role="alert">
                 <AlertCircle size={12} className="inline mr-1" /> {fieldErrors.websiteUrl}
               </p>
             )}
