@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Send, Mail, User, Loader2 } from 'lucide-react';
 import type { Organization, OutreachEmailTemplate, OutreachStatus } from '../../types';
-import { draftOutreachEmailForOrg, sendOutreachForColumn } from '../../lib/crmOutreach';
+import { draftOutreachEmailForOrg, sendOutreachForColumn, sendOutreachNow } from '../../lib/crmOutreach';
+import { isMonitorApiConfigured } from '../../lib/monitorApi';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetClose } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +32,8 @@ export default function SendEmailModal({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [showDraft, setShowDraft] = useState(true);
+
+  const monitorApiReady = isMonitorApiConfigured();
 
   const withEmail = useMemo(
     () => (organizations ?? []).filter((o) => o.email?.trim()),
@@ -63,7 +66,7 @@ export default function SendEmailModal({
     }
     if (
       !confirm(
-        `Send (queue) ${withEmail.length} email(s) for ${columnLabel}?\n\nRecipients use the address on each card. Delivery happens from Email notifications — not when you drag cards.`
+        `Queue ${withEmail.length} email(s) for ${columnLabel}?\n\nRecipients use the address on each card. Delivery happens from Email notifications — not when you drag cards.`
       )
     ) {
       return;
@@ -79,6 +82,40 @@ export default function SendEmailModal({
       const parts = [`Queued ${result.queued} — open Email notifications to deliver`];
       if (result.skippedNoEmail) parts.push(`${result.skippedNoEmail} skipped (no email)`);
       if (result.errors.length) parts.push(result.errors.slice(0, 2).join('; '));
+      setMessage(parts.join(' · '));
+      onSent();
+      setTimeout(() => onClose(), 2000);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Send failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSendNow = async () => {
+    if (!withEmail.length) {
+      setMessage('Select cards that have an email on file.');
+      return;
+    }
+    if (
+      !confirm(
+        `Send ${withEmail.length} email(s) NOW for ${columnLabel}?\n\nThis will queue AND immediately deliver via the Monitor API. Requires VITE_MONITOR_API_URL and VITE_MONITOR_API_KEY to be configured.`
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await sendOutreachNow(withEmail, column as OutreachStatus, {
+        subjectDraft: subject,
+        bodyDraft: body,
+      });
+
+      const parts = [`Sent ${result.queued}`];
+      if (result.skippedNoEmail) parts.push(`${result.skippedNoEmail} skipped (no email)`);
+      if (result.errors.length) parts.push(result.errors.slice(0, 2).join('; '));
+      if (result.flushError) parts.push(`Flush: ${result.flushError}`);
       setMessage(parts.join(' · '));
       onSent();
       setTimeout(() => onClose(), 2000);
@@ -180,13 +217,24 @@ export default function SendEmailModal({
               Cancel
             </Button>
             <Button
+              variant="outline"
               onClick={handleSend}
               disabled={busy || withEmail.length === 0}
               className="min-h-[44px] flex-1"
             >
-              {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-              Send to {withEmail.length}
+              <Send size={16} />
+              Queue to {withEmail.length}
             </Button>
+            {monitorApiReady && (
+              <Button
+                onClick={handleSendNow}
+                disabled={busy || withEmail.length === 0}
+                className="min-h-[44px] flex-1 bg-teal hover:bg-teal/90"
+              >
+                <Send size={16} />
+                Send now to {withEmail.length}
+              </Button>
+            )}
           </div>
         </div>
       </SheetContent>

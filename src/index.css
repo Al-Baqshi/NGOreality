@@ -219,7 +219,7 @@
   /* Columns share the full board width; the min-width floor is what pushes
      the board into horizontal scroll on screens too narrow for all of them. */
   .kanban-column {
-    @apply flex h-full min-h-0 w-auto min-w-[min(88vw,17.5rem)] flex-1 shrink-0 flex-col border-r-3 border-ink-950 bg-[var(--card-bg)] last:border-r-0;
+    @apply flex h-full min-h-0 w-auto min-w-[min(90vw,18rem)] flex-1 shrink-0 flex-col border-r-3 border-ink-950 bg-[var(--card-bg)] last:border-r-0;
   }
 
   .kanban-column-header {

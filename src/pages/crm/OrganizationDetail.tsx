@@ -77,6 +77,13 @@ export default function OrganizationDetail() {
       description: `Trust stage set to ${label}`,
       performed_by: 'admin',
     });
+    // Create staff notification for trust stage change
+    await supabase.rpc('notify_staff_system', {
+      p_organization_id: id,
+      p_action: 'trust_stage_change',
+      p_description: `Trust stage changed to ${label}`,
+      p_link_path: `/organizations/${id}`,
+    });
     window.location.reload();
   };
 
@@ -95,6 +102,13 @@ export default function OrganizationDetail() {
     if (!confirm(`Register "${organization.name}" as a customer?`)) return;
     await registerAsCustomer(id);
     window.location.reload();
+  };
+
+  const handleDeleteOrganization = async () => {
+    if (!id || !organization) return;
+    if (!confirm(`DELETE "${organization.name}"?\n\nThis will permanently remove the organization and all its data (contacts, criteria, badges, activity log, payments, engagements).\n\nThis cannot be undone.`)) return;
+    await supabase.from('organizations').delete().eq('id', id);
+    window.location.href = '/organizations';
   };
 
   const handleAddContact = async () => {
@@ -271,9 +285,18 @@ export default function OrganizationDetail() {
           </div>
           <div className="flex flex-wrap gap-2 w-full md:w-auto shrink-0">
             {!editing ? (
-              <button onClick={() => setEditing(true)} className="btn-brutal-outline text-sm flex items-center justify-center gap-2 min-h-[44px] flex-1 sm:flex-none">
-                <Edit3 size={14} /> Edit
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleDeleteOrganization}
+                  className="btn-brutal-outline text-sm flex items-center justify-center gap-2 min-h-[44px] flex-1 sm:flex-none border-accent text-accent hover:bg-accent/5"
+                >
+                  <Trash2 size={14} /> Delete
+                </button>
+                <button onClick={() => setEditing(true)} className="btn-brutal-outline text-sm flex items-center justify-center gap-2 min-h-[44px] flex-1 sm:flex-none">
+                  <Edit3 size={14} /> Edit
+                </button>
+              </>
             ) : (
               <>
                 <button onClick={handleSave} className="btn-brutal-teal text-sm flex items-center gap-2">

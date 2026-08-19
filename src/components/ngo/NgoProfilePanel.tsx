@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, Globe, Phone } from 'lucide-react';
+import { CheckCircle, Globe, Phone, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import {
@@ -41,6 +41,19 @@ function isValidDomain(url: string): boolean {
   }
 }
 
+function isValidEmail(email: string): boolean {
+  if (!email.trim()) return true; // Email is optional
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isValidPhone(phone: string, countryCode: string): boolean {
+  if (!phone.trim()) return true; // Phone is optional
+  // Basic validation: digits, spaces, dashes, parentheses
+  const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+  // Must have at least 6 digits after country code
+  return /^\d{6,}$/.test(cleanPhone);
+}
+
 function extractPhoneParts(phone: string): { countryCode: string; number: string } {
   const match = phone.match(/^(\+\d{1,4})?\s*(.+)$/);
   if (!match) return { countryCode: '+64', number: phone };
@@ -61,32 +74,34 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
 
   const phoneParts = useMemo(() => extractPhoneParts(organization.phone ?? ''), [organization.phone]);
 
-type ProfileForm = {
-  mission_statement: string;
-  description: string;
-  website_url: string;
-  logo_url: string;
-  phone_country_code: string;
-  phone_number: string;
-  email: string;
-  country: string;
-  city: string;
-};
+  type ProfileForm = {
+    mission_statement: string;
+    description: string;
+    website_url: string;
+    logo_url: string;
+    phone_country_code: string;
+    phone_number: string;
+    email: string;
+    country: string;
+    city: string;
+  };
 
-const [profileForm, setProfileForm] = useState<ProfileForm>({
-  mission_statement: organization.mission_statement ?? '',
-  description: organization.description ?? '',
-  website_url: organization.website_url ?? '',
-  logo_url: organization.logo_url ?? '',
-  phone_country_code: phoneParts.countryCode,
-  phone_number: phoneParts.number,
-  email: organization.email ?? '',
-  country: organization.country ?? 'NZ',
-  city: '',
-});
+  const [profileForm, setProfileForm] = useState<ProfileForm>({
+    mission_statement: organization.mission_statement ?? '',
+    description: organization.description ?? '',
+    website_url: organization.website_url ?? '',
+    logo_url: organization.logo_url ?? '',
+    phone_country_code: phoneParts.countryCode,
+    phone_number: phoneParts.number,
+    email: organization.email ?? '',
+    country: organization.country ?? 'NZ',
+    city: '',
+  });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState('');
   const [websiteError, setWebsiteError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
   useEffect(() => {
     const cityFromLocation = organization.location?.split(',')[0]?.trim() || '';
@@ -104,12 +119,30 @@ const [profileForm, setProfileForm] = useState<ProfileForm>({
   }, [organization.id, organization.updated_at, phoneParts.countryCode, phoneParts.number]);
 
   const validateForm = (): boolean => {
+    let valid = true;
+
     if (profileForm.website_url.trim() && !isValidDomain(profileForm.website_url)) {
       setWebsiteError('Please enter a valid domain (e.g., example.com or https://example.com)');
-      return false;
+      valid = false;
+    } else {
+      setWebsiteError('');
     }
-    setWebsiteError('');
-    return true;
+
+    if (!isValidEmail(profileForm.email)) {
+      setEmailError('Please enter a valid email address');
+      valid = false;
+    } else {
+      setEmailError('');
+    }
+
+    if (!isValidPhone(profileForm.phone_number, profileForm.phone_country_code)) {
+      setPhoneError('Please enter a valid phone number (at least 6 digits)');
+      valid = false;
+    } else {
+      setPhoneError('');
+    }
+
+    return valid;
   };
 
   const saveProfile = async (e: React.FormEvent) => {
@@ -216,10 +249,18 @@ const [profileForm, setProfileForm] = useState<ProfileForm>({
             <input
               id="ngo-email"
               type="email"
-              className="input-brutal w-full text-base"
+              className={`input-brutal w-full text-base ${emailError ? 'border-red-500' : ''}`}
               value={profileForm.email}
-              onChange={(e) => setProfileForm((f) => ({ ...f, email: e.target.value }))}
+              onChange={(e) => {
+                setProfileForm((f) => ({ ...f, email: e.target.value }));
+                if (emailError) setEmailError('');
+              }}
             />
+            {emailError && (
+              <p className="text-red-600 text-xs font-mono mt-1" role="alert">
+                <AlertCircle size={12} className="inline mr-1" /> {emailError}
+              </p>
+            )}
           </div>
           <div>
             <label className="label-brutal flex items-center gap-1" htmlFor="ngo-phone">
@@ -244,12 +285,20 @@ const [profileForm, setProfileForm] = useState<ProfileForm>({
               <input
                 id="ngo-phone"
                 type="tel"
-                className="input-brutal flex-1 text-base min-h-[48px]"
+                className={`input-brutal flex-1 text-base min-h-[48px] ${phoneError ? 'border-red-500' : ''}`}
                 value={profileForm.phone_number}
-                onChange={(e) => setProfileForm((f) => ({ ...f, phone_number: e.target.value }))}
+                onChange={(e) => {
+                  setProfileForm((f) => ({ ...f, phone_number: e.target.value }));
+                  if (phoneError) setPhoneError('');
+                }}
                 placeholder="Phone number"
               />
             </div>
+            {phoneError && (
+              <p className="text-red-600 text-xs font-mono mt-1" role="alert">
+                <AlertCircle size={12} className="inline mr-1" /> {phoneError}
+              </p>
+            )}
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -260,7 +309,7 @@ const [profileForm, setProfileForm] = useState<ProfileForm>({
             <input
               id="ngo-website"
               type="url"
-              className={`input-brutal w-full text-base ${websiteError ? 'border-accent' : ''}`}
+              className={`input-brutal w-full text-base ${websiteError ? 'border-red-500' : ''}`}
               value={profileForm.website_url}
               onChange={(e) => {
                 setProfileForm((f) => ({ ...f, website_url: e.target.value }));
@@ -269,7 +318,7 @@ const [profileForm, setProfileForm] = useState<ProfileForm>({
               placeholder="https://example.com"
             />
             {websiteError && (
-              <p className="text-accent text-xs font-mono mt-1" role="alert">{websiteError}</p>
+              <p className="text-red-600 text-xs font-mono mt-1" role="alert">{websiteError}</p>
             )}
           </div>
           <div>
