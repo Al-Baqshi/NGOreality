@@ -29,6 +29,7 @@ const TermsOfService = lazy(() => import('./pages/public/TermsOfService'));
 const DataProcessingAddendum = lazy(() => import('./pages/public/DataProcessingAddendum'));
 const OrganizationProfile = lazy(() => import('./pages/public/OrganizationProfile'));
 const NotFound = lazy(() => import('./pages/public/NotFound'));
+const Unsubscribe = lazy(() => import('./pages/public/Unsubscribe'));
 
 // Staff CRM
 const CRMLayout = lazy(() => import('./components/Layout'));
@@ -167,6 +168,11 @@ export default function App() {
               </Route>
             </Route>
           </Route>
+
+          {/* Outreach opt-out. Standalone so Mail → Safari is a confirm page,
+              not the marketing chrome. Linked from List-Unsubscribe (the edge
+              function 302s GET here; HTML from the function is downloaded on iOS). */}
+          <Route path="/unsubscribe" element={<Unsubscribe />} />
 
           {/* Public Routes */}
           <Route path="/public" element={<PublicLayout />}>

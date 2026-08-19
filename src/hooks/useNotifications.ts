@@ -161,22 +161,32 @@ export function useNotifications(limit = 100) {
     return row?.reason ? row : null;
   };
 
-  const allowEmailAgain = async (email: string, eventId?: string): Promise<string | null> => {
-    const { data: removed, error: rpcError } = await supabase.rpc('unsuppress_email', { p_email: email });
+  const allowEmailAgain = async (
+    email: string,
+    eventId?: string,
+    requeue = false,
+  ): Promise<string | null> => {
+    const { error: rpcError } = await supabase.rpc('unsuppress_email', { p_email: email });
     if (rpcError) return rpcError.message;
-    if (!removed) return 'Address was not on the suppression list (may already be allowed).';
 
+    // A 0/false/null return means the address is already allowed — still
+    // update this queue row so it does not stay labelled unsubscribed.
     if (eventId) {
-      await supabase
+      const { error: uError } = await supabase
         .from('notification_events')
-        .update({
-          status: 'pending',
-          error_message: '',
-          sent_at: null,
-          claimed_at: null,
-        })
+        .update(
+          requeue
+            ? { status: 'pending', error_message: '', sent_at: null, claimed_at: null }
+            : {
+                status: 'skipped',
+                error_message: 'Address allowed again — send was not requeued',
+                sent_at: null,
+                claimed_at: null,
+              },
+        )
         .eq('id', eventId)
         .eq('status', 'suppressed');
+      if (uError) return uError.message;
     }
 
     await refetch();

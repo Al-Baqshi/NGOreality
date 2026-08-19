@@ -58,6 +58,11 @@ export default function EmailNotifications() {
     useNotifications();
   const confirm = useConfirm();
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [actionIsError, setActionIsError] = useState(false);
+  const showAction = (msg: string | null, isError = false) => {
+    setActionIsError(Boolean(msg) && isError);
+    setActionMsg(msg);
+  };
 
   const setFilterAndUrl = (next: StatusFilter) => {
     setFilter(next);
@@ -79,16 +84,15 @@ export default function EmailNotifications() {
       confirmLabel: 'Send now',
     });
     if (!ok) return;
-    setActionMsg(null);
+    showAction(null);
     const err = await flushNow();
-    setActionMsg(err ?? 'Pending emails sent (or none in queue).');
+    showAction(err ?? 'Pending emails sent (or none in queue).', Boolean(err));
   };
 
   const handleRequeue = async (id: string) => {
-    setActionMsg(null);
+    showAction(null);
     const err = await requeue(id);
-    if (err) setActionMsg(err);
-    else setActionMsg('Requeued — click Send pending to retry.');
+    showAction(err ?? 'Requeued — click Send pending to retry.', Boolean(err));
   };
 
   const handleRemoveFromQueue = async (id: string, subject: string) => {
@@ -99,10 +103,9 @@ export default function EmailNotifications() {
       variant: 'danger',
     });
     if (!ok) return;
-    setActionMsg(null);
+    showAction(null);
     const err = await removeFromQueue(id);
-    if (err) setActionMsg(err);
-    else setActionMsg('Removed from queue — marked as cancelled.');
+    showAction(err ?? 'Removed from queue — marked as cancelled.', Boolean(err));
   };
 
   const handleRestoreToQueue = async (id: string, subject: string) => {
@@ -112,13 +115,12 @@ export default function EmailNotifications() {
       confirmLabel: 'Restore',
     });
     if (!ok) return;
-    setActionMsg(null);
+    showAction(null);
     const err = await restoreToQueue(id);
-    if (err) setActionMsg(err);
-    else setActionMsg('Restored to pending queue.');
+    showAction(err ?? 'Restored to pending queue.', Boolean(err));
   };
 
-  const handleAllowEmailAgain = async (email: string, subject: string) => {
+  const handleAllowEmailAgain = async (email: string, subject: string, eventId: string) => {
     const info = await getSuppressionInfo(email);
     const reason = info?.reason ?? 'unknown';
     const isRisky = reason === 'bounce' || reason === 'complaint';
@@ -131,7 +133,9 @@ export default function EmailNotifications() {
             ? 'This address filed a spam complaint — re-enabling is risky.'
             : reason === 'manual'
               ? 'This address was blocked manually.'
-              : 'This address is on the suppression list.';
+              : info
+                ? 'This address is on the suppression list.'
+                : 'This address is not currently on the suppression list — this queued send is still marked unsubscribed.';
 
     const ok = await confirm({
       title: 'Allow email again?',
@@ -140,10 +144,9 @@ export default function EmailNotifications() {
       variant: isRisky ? 'danger' : 'default',
     });
     if (!ok) return;
-    setActionMsg(null);
-    const err = await allowEmailAgain(email);
-    if (err) setActionMsg(err);
-    else setActionMsg(`${email} can receive email again — queue new outreach when ready.`);
+    showAction(null);
+    const err = await allowEmailAgain(email, eventId, false);
+    showAction(err ?? `${email} can receive email again — this send was not requeued.`, Boolean(err));
   };
 
   const handleAllowAndRequeue = async (email: string, subject: string, eventId: string) => {
@@ -158,10 +161,9 @@ export default function EmailNotifications() {
       variant: isRisky ? 'danger' : 'default',
     });
     if (!ok) return;
-    setActionMsg(null);
-    const err = await allowEmailAgain(email, eventId);
-    if (err) setActionMsg(err);
-    else setActionMsg('Address allowed and email requeued — click Send pending when ready.');
+    showAction(null);
+    const err = await allowEmailAgain(email, eventId, true);
+    showAction(err ?? 'Address allowed and email requeued — click Send pending when ready.', Boolean(err));
   };
 
   return (
@@ -345,7 +347,10 @@ export default function EmailNotifications() {
       )}
 
       {actionMsg && (
-        <p className="font-mono text-2xs text-teal mb-4" role="status">
+        <p
+          className={`font-mono text-2xs mb-4 ${actionIsError ? 'text-accent' : 'text-teal'}`}
+          role="status"
+        >
           {actionMsg}
         </p>
       )}
@@ -442,7 +447,7 @@ export default function EmailNotifications() {
                     <>
                       <button
                         type="button"
-                        onClick={() => void handleAllowEmailAgain(e.recipient_email, e.subject)}
+                        onClick={() => void handleAllowEmailAgain(e.recipient_email, e.subject, e.id)}
                         className="inline-flex min-h-[36px] items-center gap-1 rounded-md border border-teal/40 bg-teal/5 px-2 text-teal font-semibold hover:bg-teal/10"
                       >
                         <UserCheck size={12} aria-hidden />
