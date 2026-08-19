@@ -77,6 +77,13 @@ export default function OrganizationDetail() {
       description: `Trust stage set to ${label}`,
       performed_by: 'admin',
     });
+    // Create staff notification for trust stage change
+    await supabase.rpc('notify_staff_system', {
+      p_organization_id: id,
+      p_action: 'trust_stage_change',
+      p_description: `Trust stage changed to ${label}`,
+      p_link_path: `/organizations/${id}`,
+    });
     window.location.reload();
   };
 
