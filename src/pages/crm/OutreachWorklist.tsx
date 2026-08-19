@@ -392,28 +392,30 @@ export default function OutreachWorklist() {
 
       {/* Bulk toolbar */}
       {selected > 0 && (
-        <div className="sticky bottom-0 z-40 border-t-2 border-ink-950 bg-white/95 dark:bg-ink-950/95 backdrop-blur-sm shadow-[0_-4px_12px_rgba(0,0,0,0.15)]">
-          <div className="page-shell flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
-            <span className="font-mono text-xs text-ink-500 dark:text-ink-400 shrink-0">
-              {selected.toLocaleString()} selected
-            </span>
-            <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0 justify-end">
-              <label className="flex items-center gap-2 shrink-0">
-                <span className="label-brutal hidden sm:inline-block">Move to</span>
-                <select className="input-brutal min-h-[40px] text-sm w-auto min-w-[160px]" value={moveTo}
+        <div className="sticky bottom-0 z-40 bg-white/98 dark:bg-ink-950/98 backdrop-blur-md border-t border-ink-200 dark:border-ink-800 shadow-xl">
+          <div className="page-shell flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="font-mono text-xs text-ink-500 dark:text-ink-400">
+                {selected.toLocaleString()} selected
+              </span>
+              <span className="w-px h-6 bg-ink-200 dark:bg-ink-700" aria-hidden="true" />
+              <label className="flex items-center gap-2">
+                <select className="input-brutal min-h-[38px] text-sm w-auto min-w-[150px]" value={moveTo}
                   onChange={(e) => setMoveTo(e.target.value as OutreachStatus)}>
                   {OUTREACH_KANBAN_STATUSES.map((s) => (
                     <option key={s} value={s}>{OUTREACH_STATUS_LABELS[s]}</option>
                   ))}
                 </select>
               </label>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
               <button type="button" onClick={applyBulk} disabled={busy}
-                className="btn-brutal-teal text-sm min-h-[40px] px-4 inline-flex items-center gap-2 shrink-0 disabled:opacity-50">
-                {busy && <Loader2 size={14} className="animate-spin" />}
-                Apply to {selected.toLocaleString()}
+                className="btn-brutal-gold text-sm min-h-[38px] px-4 inline-flex items-center gap-2 shrink-0 disabled:opacity-50">
+                {busy && <Loader2 size={13} className="animate-spin" />}
+                Apply
               </button>
-              <button type="button" onClick={clear} className="btn-brutal-outline text-sm min-h-[40px] px-4 shrink-0">
-                Cancel
+              <button type="button" onClick={clear} className="btn-brutal-ghost text-sm min-h-[38px] px-4 shrink-0">
+                Clear
               </button>
             </div>
           </div>
