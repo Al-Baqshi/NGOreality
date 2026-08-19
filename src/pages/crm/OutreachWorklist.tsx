@@ -13,6 +13,7 @@ import {
 } from '../../hooks/useOutreachWorklist';
 import { OUTREACH_KANBAN_STATUSES, OUTREACH_STATUS_LABELS, type OutreachStatus } from '../../types';
 import { EmptyState } from '../../components/ui';
+import OutreachSelectionPanel from '../../components/crm/OutreachSelectionPanel';
 
 /**
  * The outreach worklist.
@@ -144,7 +145,7 @@ export default function OutreachWorklist() {
   }
 
   return (
-    <div className="page-shell pb-32">
+    <div className="page-shell pb-16">
       <div className="page-header">
         <div>
           <h1 className="page-title">Outreach</h1>
@@ -253,25 +254,21 @@ export default function OutreachWorklist() {
         <div className="card-brutal p-3 mb-4 text-sm border-accent text-accent">{error}</div>
       )}
 
-      {/* Select-all banner: the whole point of this screen */}
-      {selected > 0 && (
-        <div className="card-brutal p-3 mb-4 bg-ink-950 text-white flex flex-wrap items-center gap-3">
-          <span className="text-sm font-semibold">
-            {selected.toLocaleString()} selected
+      {/* Select-all context — actions live in the floating panel below */}
+      {selected > 0 && selection.mode === 'ids' && pageAllSelected && total > leads.length && (
+        <div className="card-brutal p-3 mb-4 text-sm flex flex-wrap items-center gap-3 bg-paper dark:bg-muted/20">
+          <span>
+            All {leads.length} on this page are selected ({total.toLocaleString()} match this filter).
           </span>
-          {selection.mode === 'ids' && pageAllSelected && total > leads.length && (
-            <button type="button" onClick={selectAllMatching} className="text-sm underline underline-offset-4 hover:text-teal">
-              Select all {total.toLocaleString()} matching this filter
-            </button>
-          )}
-          {selection.mode === 'all' && (
-            <span className="font-mono text-2xs text-ink-300">
-              Every organisation matching the current filter{selection.excluded.size > 0 && `, minus ${selection.excluded.size} you unticked`}
-            </span>
-          )}
-          <button type="button" onClick={clear} className="text-sm underline underline-offset-4 hover:text-teal ml-auto">
-            Clear
+          <button type="button" onClick={selectAllMatching} className="text-sm font-semibold text-teal hover:underline">
+            Select all {total.toLocaleString()} matching
           </button>
+        </div>
+      )}
+      {selected > 0 && selection.mode === 'all' && (
+        <div className="card-brutal p-3 mb-4 text-sm bg-paper dark:bg-muted/20 font-mono text-2xs text-ink-500 dark:text-muted-foreground">
+          Every organisation matching the current filter
+          {selection.excluded.size > 0 && `, minus ${selection.excluded.size} you unticked`}.
         </div>
       )}
 
@@ -390,33 +387,15 @@ export default function OutreachWorklist() {
         </div>
       )}
 
-      {/* Bulk bar */}
-      {selected > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t-3 border-ink-950 bg-white dark:bg-card dark:border-border shadow-brutal">
-          <div className="page-shell !py-3 flex flex-wrap items-center gap-3">
-            <span className="text-sm font-semibold">
-              {selected.toLocaleString()} selected
-            </span>
-            <label className="flex items-center gap-2">
-              <span className="label-brutal">Move to</span>
-              <select className="input-brutal min-h-[44px]" value={moveTo}
-                onChange={(e) => setMoveTo(e.target.value as OutreachStatus)}>
-                {OUTREACH_KANBAN_STATUSES.map((s) => (
-                  <option key={s} value={s}>{OUTREACH_STATUS_LABELS[s]}</option>
-                ))}
-              </select>
-            </label>
-            <button type="button" onClick={applyBulk} disabled={busy}
-              className="btn-brutal-teal text-sm min-h-[44px] inline-flex items-center gap-2 disabled:opacity-50">
-              {busy && <Loader2 size={15} className="animate-spin" />}
-              Apply to {selected.toLocaleString()}
-            </button>
-            <button type="button" onClick={clear} className="btn-brutal-outline text-sm min-h-[44px] ml-auto">
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+      <OutreachSelectionPanel
+        selectedCount={selected}
+        moveTo={moveTo}
+        onMoveToChange={setMoveTo}
+        onApply={() => void applyBulk()}
+        onClear={clear}
+        busy={busy}
+        applyLabel={`Apply to ${selected.toLocaleString()}`}
+      />
     </div>
   );
 }

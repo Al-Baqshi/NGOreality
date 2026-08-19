@@ -9,10 +9,10 @@ import { useCrmDashboardStats } from '../../hooks/useCrm';
 import { fetchColumnLeadIds } from '../../components/crm/KanbanColumn';
 import OutreachHeader from '../../components/crm/OutreachHeader';
 import OutreachToolbar from '../../components/crm/OutreachToolbar';
-import BulkActionBar from '../../components/crm/BulkActionBar';
+import OutreachSelectionPanel from '../../components/crm/OutreachSelectionPanel';
 import KanbanColumn from '../../components/crm/KanbanColumn';
 import SendEmailModal from '../../components/crm/SendEmailModal';
-import ChangeStatusModal from '../../components/crm/ChangeStatusModal';
+import { bulkSetOutreachStatus } from '../../lib/crmOutreach';
 import NewLeadDialog from '../../components/crm/NewLeadDialog';
 import { OutreachBatchManager } from '../../components/crm/OutreachBulkToolbar';
 import RegistryInsights from '../../components/crm/RegistryInsights';
@@ -60,8 +60,7 @@ export default function OutreachBoard() {
   const [sortBy, setSortBy] = useState('');
   const [sendEmailOpen, setSendEmailOpen] = useState(false);
   const [sendEmailOrganizations, setSendEmailOrganizations] = useState<{ id: string; name: string; email: string }[]>([]);
-  const [changeStatusOpen, setChangeStatusOpen] = useState(false);
-  const [changeStatusOrgs, setChangeStatusOrgs] = useState<{ id: string; name: string }[]>([]);
+  const [moveTo, setMoveTo] = useState<(typeof OUTREACH_KANBAN_STATUSES)[number]>('cold_email');
   const [busy, setBusy] = useState(false);
   const [globalRefreshTick, setGlobalRefreshTick] = useState(0);
 
@@ -121,21 +120,24 @@ export default function OutreachBoard() {
     }
   };
 
-  const handleChangeStatus = async () => {
+  const applyBulkMove = async () => {
     if (selectedIds.size === 0) return;
+    const label = OUTREACH_STATUS_LABELS[moveTo];
+    if (
+      !window.confirm(
+        `Move ${selectedIds.size.toLocaleString()} organization${selectedIds.size === 1 ? '' : 's'} to "${label}"?`,
+      )
+    ) {
+      return;
+    }
+
     setBusy(true);
     try {
-      const { supabase } = await import('../../lib/supabase');
-      const { data } = await supabase
-        .from('organizations')
-        .select('id, name')
-        .in('id', Array.from(selectedIds));
-      if (data) {
-        setChangeStatusOrgs(data as { id: string; name: string }[]);
-        setChangeStatusOpen(true);
-      }
+      await bulkSetOutreachStatus(Array.from(selectedIds), moveTo);
+      bump();
+      clearSelection();
     } catch (err) {
-      console.error('Failed to fetch organizations:', err);
+      console.error('Failed to move organizations:', err);
     } finally {
       setBusy(false);
     }
@@ -146,18 +148,13 @@ export default function OutreachBoard() {
     clearSelection();
   }, [bump, clearSelection]);
 
-  const handleChangeStatusComplete = useCallback(() => {
-    bump();
-    clearSelection();
-  }, [bump, clearSelection]);
-
   const totalLeads = useMemo(
     () => stats?.outreach_due ?? 0,
     [stats?.outreach_due]
   );
 
   return (
-    <div className="page-shell w-full min-w-0 max-w-none pb-24">
+    <div className="page-shell w-full min-w-0 max-w-none pb-16">
       <OutreachHeader
         onNewLead={() => setNewLeadOpen(true)}
         onNavigateWorklist={() => window.location.href = '/outreach'}
@@ -225,11 +222,13 @@ export default function OutreachBoard() {
         </div>
       </div>
 
-      <BulkActionBar
+      <OutreachSelectionPanel
         selectedCount={selectedIds.size}
+        moveTo={moveTo}
+        onMoveToChange={setMoveTo}
+        onApply={() => void applyBulkMove()}
         onClear={clearSelection}
-        onSendEmail={handleSendEmail}
-        onChangeStatus={handleChangeStatus}
+        onSendEmail={() => void handleSendEmail()}
         busy={busy}
       />
 
@@ -242,16 +241,6 @@ export default function OutreachBoard() {
         columnLabel={statusFilter ? OUTREACH_STATUS_LABELS[statusFilter as 'cold_email' | 'no_website' | 'website_issues'] : 'Selected'}
         template={statusFilter ? OUTREACH_EMAIL_BY_COLUMN[statusFilter as 'cold_email' | 'no_website' | 'website_issues'] : 'outreach_cold_invite'}
         onSent={handleSendEmailComplete}
-      />
-    )}
-
-    {changeStatusOpen && (
-      <ChangeStatusModal
-        open={changeStatusOpen}
-        onClose={() => setChangeStatusOpen(false)}
-        organizations={changeStatusOrgs}
-        currentStatus={statusFilter || ''}
-        onChanged={handleChangeStatusComplete}
       />
     )}
 

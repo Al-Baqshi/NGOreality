@@ -30,18 +30,18 @@ export interface StaffingMonthPlan {
 
 export const STAFFING_TIMELINE: StaffingMonthPlan[] = [
   {
-    monthNumber: 7,
-    headcount: 1,
-    wagesMonthlyNzd: STAFF_MONTHLY_WAGE_MID_NZD,
+    monthNumber: 6,
+    headcount: 0,
+    wagesMonthlyNzd: 0,
     summary:
-      'First employee (outreach / delivery support) after 6 months of founder-led pipeline building. Flexi-Wage has funded the founder through month 6.',
+      'Flexi-Wage ends; founder continues outreach, delivery, and support solo with AI-powered automation.',
   },
   {
-    monthNumber: 11,
-    headcount: 1,
-    wagesMonthlyNzd: STAFF_MONTHLY_WAGE_MID_NZD,
+    monthNumber: 12,
+    headcount: 0,
+    wagesMonthlyNzd: 0,
     summary:
-      'Review point: assess whether workspace MRR and badge volume justify a second hire. Year-1 forecast holds at one employee; second is conditional on revenue.',
+      'Year-end review: assess workspace MRR and badge volume before the first hire in year 2 (premises + AU expansion).',
   },
 ];
 
