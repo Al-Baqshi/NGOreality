@@ -96,6 +96,15 @@ export default function ActivityFeed() {
     [filterKey],
   );
 
+  // Day headers are computed from the page we have
+  const grouped: { day: string; items: ActivityRow[] }[] = [];
+  rows.forEach((row) => {
+    const day = dayLabel(row.created_at);
+    const last = grouped[grouped.length - 1];
+    if (last && last.day === day) last.items.push(row);
+    else grouped.push({ day, items: [row] });
+  });
+
   // Initialize all days as expanded by default
   useEffect(() => {
     const initial: Record<string, boolean> = {};
@@ -154,7 +163,6 @@ export default function ActivityFeed() {
       if (error) throw error;
       clearSelection();
       setSelectionMode(false);
-      // Refetch by updating a dummy state
       setRows((prev) => prev.filter((r) => !selectedIds.has(r.id)));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed');
@@ -209,16 +217,6 @@ export default function ActivityFeed() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  // Day headers are computed from the page we have; a day that straddles a page
-  // boundary simply gets its header again on the next page, which is correct.
-  const grouped: { day: string; items: ActivityRow[] }[] = [];
-  rows.forEach((row) => {
-    const day = dayLabel(row.created_at);
-    const last = grouped[grouped.length - 1];
-    if (last && last.day === day) last.items.push(row);
-    else grouped.push({ day, items: [row] });
-  });
 
   return (
     <div className="page-shell">
