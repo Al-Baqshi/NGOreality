@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, Mail, RefreshCw, RotateCcw, Send, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Ban, Mail, RefreshCw, RotateCcw, Send, Trash2, UserCheck } from 'lucide-react';
 import { SectionHeader, MetricCard } from '../../components/ui';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -54,7 +54,7 @@ export default function EmailNotifications() {
       : 'all';
   const [filter, setFilter] = useState<StatusFilter>(initialFilter);
 
-  const { events, loading, error, summary, flushing, flushNow, requeue, removeFromQueue, restoreToQueue, apiConfigured, refetch } =
+  const { events, loading, error, summary, flushing, flushNow, requeue, removeFromQueue, restoreToQueue, getSuppressionInfo, allowEmailAgain, apiConfigured, refetch } =
     useNotifications();
   const confirm = useConfirm();
   const [actionMsg, setActionMsg] = useState<string | null>(null);
@@ -118,6 +118,52 @@ export default function EmailNotifications() {
     else setActionMsg('Restored to pending queue.');
   };
 
+  const handleAllowEmailAgain = async (email: string, subject: string) => {
+    const info = await getSuppressionInfo(email);
+    const reason = info?.reason ?? 'unknown';
+    const isRisky = reason === 'bounce' || reason === 'complaint';
+    const reasonLine =
+      reason === 'unsubscribe'
+        ? 'They previously unsubscribed via the email link.'
+        : reason === 'bounce'
+          ? 'This address bounced — re-enabling may hurt deliverability.'
+          : reason === 'complaint'
+            ? 'This address filed a spam complaint — re-enabling is risky.'
+            : reason === 'manual'
+              ? 'This address was blocked manually.'
+              : 'This address is on the suppression list.';
+
+    const ok = await confirm({
+      title: 'Allow email again?',
+      description: `${reasonLine}\n\nRemove ${email} from the suppression list? They can receive outreach again. This blocked send will not auto-resend — queue a new email from Outreach, or requeue below after allowing.\n\n"${subject}"`,
+      confirmLabel: 'Allow email again',
+      variant: isRisky ? 'danger' : 'default',
+    });
+    if (!ok) return;
+    setActionMsg(null);
+    const err = await allowEmailAgain(email);
+    if (err) setActionMsg(err);
+    else setActionMsg(`${email} can receive email again — queue new outreach when ready.`);
+  };
+
+  const handleAllowAndRequeue = async (email: string, subject: string, eventId: string) => {
+    const info = await getSuppressionInfo(email);
+    const reason = info?.reason ?? 'unknown';
+    const isRisky = reason === 'bounce' || reason === 'complaint';
+
+    const ok = await confirm({
+      title: 'Allow and requeue?',
+      description: `Remove ${email} from the suppression list and put this email back in the pending queue?\n\n"${subject}"`,
+      confirmLabel: 'Allow and requeue',
+      variant: isRisky ? 'danger' : 'default',
+    });
+    if (!ok) return;
+    setActionMsg(null);
+    const err = await allowEmailAgain(email, eventId);
+    if (err) setActionMsg(err);
+    else setActionMsg('Address allowed and email requeued — click Send pending when ready.');
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       <Link
@@ -139,7 +185,9 @@ export default function EmailNotifications() {
         .{' '}
         <strong className="text-ink-800 dark:text-foreground">Cancelled</strong> means staff removed a pending send;{' '}
         <strong className="text-ink-800 dark:text-foreground">Unsubscribed</strong> means the recipient opted out and mail
-        will not be sent to that address.
+        will not be sent to that address. Use the status filters below the summary cards — click{' '}
+        <strong className="text-ink-800 dark:text-foreground">Unsubscribed</strong> or{' '}
+        <strong className="text-ink-800 dark:text-foreground">Cancelled</strong> — to see reasons on each row.
       </p>
 
       {error && (
@@ -171,6 +219,26 @@ export default function EmailNotifications() {
         </div>
       )}
 
+      {(summary.suppressed ?? 0) > 0 && filter !== 'suppressed' && (
+        <div
+          className="mb-4 flex flex-wrap items-start gap-2 border-2 border-ink-300 bg-ink-100/60 px-3 py-2 dark:border-border dark:bg-muted/30"
+          role="status"
+        >
+          <Ban size={16} className="text-ink-600 shrink-0 mt-0.5" aria-hidden />
+          <p className="text-sm text-ink-800 dark:text-foreground flex-1 min-w-0">
+            <strong>{summary.suppressed}</strong> address{summary.suppressed === 1 ? '' : 'es'} unsubscribed or
+            suppressed — open the list to read why each one was blocked.
+          </p>
+          <button
+            type="button"
+            onClick={() => setFilterAndUrl('suppressed')}
+            className="btn-brutal-outline text-2xs min-h-[36px] px-3 shrink-0"
+          >
+            View unsubscribed
+          </button>
+        </div>
+      )}
+
       {summary.failed > 0 && (
         <div
           className="mb-4 border-2 border-accent bg-accent-light/40 dark:bg-accent/10 px-3 py-2 flex flex-wrap items-start gap-2"
@@ -191,7 +259,7 @@ export default function EmailNotifications() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
         <button type="button" onClick={() => setFilterAndUrl('pending')} className="text-left min-h-[44px]">
           <MetricCard label="Pending" value={summary.pending ?? 0} />
         </button>
@@ -199,12 +267,24 @@ export default function EmailNotifications() {
           <MetricCard label="Sent (30d)" value={summary.sent ?? 0} accent />
         </button>
         <button type="button" onClick={() => setFilterAndUrl('failed')} className="text-left min-h-[44px]">
-          <MetricCard label="Failed to send (30d)" value={summary.failed ?? 0} />
+          <MetricCard label="Failed (30d)" value={summary.failed ?? 0} />
         </button>
         <button type="button" onClick={() => setFilterAndUrl('skipped')} className="text-left min-h-[44px]">
           <MetricCard label="Cancelled (30d)" value={summary.skipped ?? 0} />
         </button>
+        <button type="button" onClick={() => setFilterAndUrl('suppressed')} className="text-left min-h-[44px]">
+          <MetricCard label="Unsubscribed (30d)" value={summary.suppressed ?? 0} />
+        </button>
       </div>
+
+      {filter === 'suppressed' && (
+        <p className="mb-4 text-sm text-ink-600 dark:text-muted-foreground">
+          Each row shows why sending was blocked. When a recipient asks to hear from you again, click{' '}
+          <strong className="text-ink-800 dark:text-foreground">Allow email again</strong> on their row,
+          then queue new outreach from the CRM — or use <strong className="text-ink-800 dark:text-foreground">Allow and requeue</strong>{' '}
+          to retry that specific email.
+        </p>
+      )}
 
       {filter === 'skipped' && (summary.skipped ?? 0) > 0 && (
         <p className="mb-4 text-sm text-ink-600 dark:text-muted-foreground">
@@ -228,8 +308,10 @@ export default function EmailNotifications() {
             }`}
           >
             {opt.label}
-            {opt.id === 'pending' && summary.pending > 0 ? ` (${summary.pending})` : ''}
-            {opt.id === 'failed' && summary.failed > 0 ? ` (${summary.failed})` : ''}
+            {opt.id === 'pending' && (summary.pending ?? 0) > 0 ? ` (${summary.pending})` : ''}
+            {opt.id === 'failed' && (summary.failed ?? 0) > 0 ? ` (${summary.failed})` : ''}
+            {opt.id === 'skipped' && (summary.skipped ?? 0) > 0 ? ` (${summary.skipped})` : ''}
+            {opt.id === 'suppressed' && (summary.suppressed ?? 0) > 0 ? ` (${summary.suppressed})` : ''}
           </button>
         ))}
       </div>
@@ -284,16 +366,26 @@ export default function EmailNotifications() {
           <p className="p-6 text-sm text-ink-400">
             {filter === 'failed'
               ? 'No failed sends in the latest queue rows — good. Failed items from the last 30 days may still appear in the count above after you send more mail.'
-              : filter === 'all'
-                ? 'No queued emails yet.'
-                : `No ${NOTIFICATION_STATUS_LABELS[filter].toLowerCase()} emails in the latest queue rows.`}
+              : filter === 'suppressed'
+                ? 'No unsubscribed or suppressed emails in the last 30 days.'
+                : filter === 'skipped'
+                  ? 'No cancelled emails in the last 30 days.'
+                  : filter === 'all'
+                    ? 'No queued emails yet.'
+                    : `No ${NOTIFICATION_STATUS_LABELS[filter].toLowerCase()} emails in the latest queue rows.`}
           </p>
         ) : (
           <div className="divide-y divide-ink-100 max-h-[60vh] overflow-y-auto">
             {filteredEvents.map((e) => (
               <div
                 key={e.id}
-                className={`p-4 space-y-2 ${e.status === 'failed' ? 'bg-accent-light/20 dark:bg-accent/5' : ''}`}
+                className={`p-4 space-y-2 ${
+                  e.status === 'failed'
+                    ? 'bg-accent-light/20 dark:bg-accent/5'
+                    : e.status === 'suppressed'
+                      ? 'bg-ink-100/50 dark:bg-muted/20'
+                      : ''
+                }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -345,6 +437,25 @@ export default function EmailNotifications() {
                       <RotateCcw size={12} aria-hidden />
                       Restore to queue
                     </button>
+                  )}
+                  {e.status === 'suppressed' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void handleAllowEmailAgain(e.recipient_email, e.subject)}
+                        className="inline-flex min-h-[36px] items-center gap-1 rounded-md border border-teal/40 bg-teal/5 px-2 text-teal font-semibold hover:bg-teal/10"
+                      >
+                        <UserCheck size={12} aria-hidden />
+                        Allow email again
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleAllowAndRequeue(e.recipient_email, e.subject, e.id)}
+                        className="inline-flex min-h-[36px] items-center gap-1 text-accent underline hover:no-underline"
+                      >
+                        Allow and requeue
+                      </button>
+                    </>
                   )}
                   {e.status === 'failed' && (
                     <button

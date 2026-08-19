@@ -8,7 +8,7 @@ export function useNotifications(limit = 100) {
   const [events, setEvents] = useState<NotificationEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [summary, setSummary] = useState({ pending: 0, sent: 0, failed: 0, skipped: 0 });
+  const [summary, setSummary] = useState({ pending: 0, sent: 0, failed: 0, skipped: 0, suppressed: 0 });
   const [flushing, setFlushing] = useState(false);
 
   const refetch = useCallback(async () => {
@@ -18,7 +18,7 @@ export function useNotifications(limit = 100) {
     const since = new Date();
     since.setDate(since.getDate() - 30);
 
-    const [recentRes, failedRes] = await Promise.all([
+    const [recentRes, failedRes, skippedRes, suppressedRes] = await Promise.all([
       supabase
         .from('notification_events')
         .select('*, organizations(name)')
@@ -31,9 +31,23 @@ export function useNotifications(limit = 100) {
         .gte('created_at', since.toISOString())
         .order('created_at', { ascending: false })
         .limit(50),
+      supabase
+        .from('notification_events')
+        .select('*, organizations(name)')
+        .eq('status', 'skipped')
+        .gte('created_at', since.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(50),
+      supabase
+        .from('notification_events')
+        .select('*, organizations(name)')
+        .eq('status', 'suppressed')
+        .gte('created_at', since.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(50),
     ]);
 
-    const qError = recentRes.error ?? failedRes.error;
+    const qError = recentRes.error ?? failedRes.error ?? skippedRes.error ?? suppressedRes.error;
     const data = recentRes.data;
 
     if (qError) {
@@ -41,6 +55,8 @@ export function useNotifications(limit = 100) {
     } else {
       const merged = new Map<string, NotificationEvent>();
       for (const row of failedRes.data ?? []) merged.set(row.id, row as NotificationEvent);
+      for (const row of skippedRes.data ?? []) merged.set(row.id, row as NotificationEvent);
+      for (const row of suppressedRes.data ?? []) merged.set(row.id, row as NotificationEvent);
       for (const row of data ?? []) merged.set(row.id, row as NotificationEvent);
       const list = [...merged.values()].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
@@ -52,7 +68,7 @@ export function useNotifications(limit = 100) {
       if (isMonitorApiConfigured()) {
         const apiSum = await fetchNotificationSummary();
         const dbSum = await fetchNotificationSummaryFromDb();
-        if (apiSum) setSummary({ ...apiSum, skipped: dbSum.skipped });
+        if (apiSum) setSummary({ ...apiSum, skipped: dbSum.skipped, suppressed: dbSum.suppressed });
         else setSummary(dbSum);
       } else {
         setSummary(await fetchNotificationSummaryFromDb());
@@ -64,6 +80,7 @@ export function useNotifications(limit = 100) {
         sent: rows.filter((e) => e.status === 'sent').length,
         failed: rows.filter((e) => e.status === 'failed').length,
         skipped: rows.filter((e) => e.status === 'skipped').length,
+        suppressed: rows.filter((e) => e.status === 'suppressed').length,
       });
     }
 
@@ -135,6 +152,37 @@ export function useNotifications(limit = 100) {
     return null;
   };
 
+  type SuppressionInfo = { reason: string; detail: string; suppressed_at: string };
+
+  const getSuppressionInfo = async (email: string): Promise<SuppressionInfo | null> => {
+    const { data, error: rpcError } = await supabase.rpc('email_suppression_info', { p_email: email });
+    if (rpcError) return null;
+    const row = (Array.isArray(data) ? data[0] : data) as SuppressionInfo | undefined;
+    return row?.reason ? row : null;
+  };
+
+  const allowEmailAgain = async (email: string, eventId?: string): Promise<string | null> => {
+    const { data: removed, error: rpcError } = await supabase.rpc('unsuppress_email', { p_email: email });
+    if (rpcError) return rpcError.message;
+    if (!removed) return 'Address was not on the suppression list (may already be allowed).';
+
+    if (eventId) {
+      await supabase
+        .from('notification_events')
+        .update({
+          status: 'pending',
+          error_message: '',
+          sent_at: null,
+          claimed_at: null,
+        })
+        .eq('id', eventId)
+        .eq('status', 'suppressed');
+    }
+
+    await refetch();
+    return null;
+  };
+
   return {
     events,
     loading,
@@ -146,6 +194,8 @@ export function useNotifications(limit = 100) {
     requeue,
     removeFromQueue,
     restoreToQueue,
+    getSuppressionInfo,
+    allowEmailAgain,
     apiConfigured: isMonitorApiConfigured(),
   };
 }
