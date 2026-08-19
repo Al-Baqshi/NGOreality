@@ -156,14 +156,6 @@ export default function OutreachBoard() {
         totalCount={totalLeads}
       />
 
-      <OutreachBatchCommand
-        selectedCount={selectedIds.size}
-        onClear={clearSelection}
-        onMove={handleBulkMove}
-        onSendEmail={() => void handleSendEmail()}
-        busy={busy}
-      />
-
       {busy && selectedIds.size === 0 && (
         <Loader2 size={15} className="animate-spin text-ink-500 mb-4" aria-label="Processing…" />
       )}
@@ -178,6 +170,14 @@ export default function OutreachBoard() {
       >
         <RegistryInsights country="NZ" />
       </CollapsibleSection>
+
+      <OutreachBatchCommand
+        selectedCount={selectedIds.size}
+        onClear={clearSelection}
+        onMove={handleBulkMove}
+        onSendEmail={() => void handleSendEmail()}
+        busy={busy}
+      />
 
       <div className="kanban-shell" key={globalRefreshTick}>
         <div className="kanban-board kanban-board-tall">

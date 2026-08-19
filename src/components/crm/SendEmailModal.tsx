@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Send, Mail, User, Loader2 } from 'lucide-react';
+import { Send, Mail, Loader2, X, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import type { Organization, OutreachEmailTemplate, OutreachStatus } from '../../types';
 import { draftOutreachEmailForOrg, sendOutreachForColumn, sendOutreachNow } from '../../lib/crmOutreach';
 import { isMonitorApiConfigured } from '../../lib/monitorApi';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetClose } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 interface Props {
   open: boolean;
@@ -16,6 +13,13 @@ interface Props {
   columnLabel: string;
   template: OutreachEmailTemplate;
   onSent: () => void;
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 export default function SendEmailModal({
@@ -32,6 +36,7 @@ export default function SendEmailModal({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [showDraft, setShowDraft] = useState(true);
+  const [showAllRecipients, setShowAllRecipients] = useState(false);
 
   const monitorApiReady = isMonitorApiConfigured();
 
@@ -50,14 +55,28 @@ export default function SendEmailModal({
     [template, previewName]
   );
 
+  const visibleRecipients = showAllRecipients ? withEmail : withEmail.slice(0, 6);
+  const hiddenRecipientCount = withEmail.length - visibleRecipients.length;
+  const messageFailed = Boolean(message && /fail/i.test(message));
+
   useEffect(() => {
     if (open) {
       setSubject(defaultDraft.subject);
       setBody(defaultDraft.body);
       setShowDraft(true);
+      setShowAllRecipients(false);
       setMessage(null);
     }
   }, [open, defaultDraft.subject, defaultDraft.body]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !busy) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, busy, onClose]);
 
   const handleSend = async () => {
     if (!withEmail.length) {
@@ -129,115 +148,187 @@ export default function SendEmailModal({
   if (!open) return null;
 
   return (
-    <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent side="right" className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center justify-between">
-            <span>Send email</span>
-            <SheetClose />
-          </SheetTitle>
-          <SheetDescription>
-            {withEmail.length} recipient{withEmail.length !== 1 ? 's' : ''} · {columnLabel}
-          </SheetDescription>
-        </SheetHeader>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/60 p-4 backdrop-blur-sm"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="send-email-title"
+        className="card-brutal flex w-full max-w-xl max-h-[90vh] flex-col overflow-hidden bg-white dark:bg-card"
+      >
+        <div className="flex items-start justify-between gap-3 border-b-3 border-ink-950 px-5 py-4 dark:border-border">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center bg-gold text-ink-950">
+              <Mail size={18} aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <h2 id="send-email-title" className="text-lg font-bold tracking-tight">
+                Send email
+              </h2>
+              <p className="mt-0.5 text-sm text-ink-500 dark:text-muted-foreground">
+                {withEmail.length} recipient{withEmail.length !== 1 ? 's' : ''} · {columnLabel}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            aria-label="Close"
+            className="flex size-9 shrink-0 items-center justify-center text-ink-500 transition-colors hover:bg-ink-50 hover:text-ink-950 disabled:opacity-40 dark:hover:bg-muted dark:hover:text-foreground"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-        <div className="space-y-4 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {message && (
-            <div className={`p-3 text-sm font-mono ${message.includes('failed') ? 'text-red-600' : 'text-teal'}`}>
+            <div
+              className={`border-3 px-3 py-2 text-sm ${
+                messageFailed
+                  ? 'border-accent bg-accent-light text-accent'
+                  : 'border-teal bg-teal/10 text-teal'
+              }`}
+            >
               {message}
             </div>
           )}
 
-          <div className="flex items-center gap-2 text-sm font-mono text-ink-400">
-            <Mail size={14} />
-            <span>{withEmail.length} ready</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 border-2 border-teal bg-teal/10 px-2.5 py-1 text-xs font-semibold text-teal">
+              <CheckCircle2 size={13} aria-hidden />
+              {withEmail.length} ready
+            </span>
             {withoutEmail.length > 0 && (
-              <>
-                <span className="text-amber-500">·</span>
-                <span className="text-amber-500">{withoutEmail.length} missing email</span>
-              </>
+              <span className="inline-flex items-center gap-1.5 border-2 border-amber-400 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-100">
+                <AlertTriangle size={13} aria-hidden />
+                {withoutEmail.length} missing email
+              </span>
             )}
           </div>
 
           {withEmail.length > 0 && (
-            <div className="max-h-32 overflow-y-auto border border-ink-200 dark:border-ink-700 rounded p-2 text-xs font-mono">
-              {withEmail.slice(0, 10).map((o) => (
-                <div key={o.id} className="truncate flex items-center gap-2">
-                  <User size={12} />
-                  <span>{o.name} → {o.email}</span>
-                </div>
-              ))}
-              {withEmail.length > 10 && (
-                <div className="text-ink-500">+{withEmail.length - 10} more</div>
+            <section>
+              <p className="label-brutal mb-2">Recipients</p>
+              <ul className="divide-y-2 divide-ink-100 overflow-hidden border-3 border-ink-200 dark:divide-border dark:border-border">
+                {visibleRecipients.map((o) => (
+                  <li key={o.id} className="flex items-center gap-3 bg-white px-3 py-2.5 dark:bg-card">
+                    <span className="flex size-8 shrink-0 items-center justify-center bg-ink-950 text-2xs font-bold tracking-wide text-white">
+                      {initials(o.name)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold leading-tight">{o.name}</p>
+                      <p className="truncate text-xs text-ink-500 dark:text-muted-foreground">{o.email}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {hiddenRecipientCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllRecipients(true)}
+                  className="mt-2 text-sm font-semibold text-teal hover:underline"
+                >
+                  Show {hiddenRecipientCount} more
+                </button>
               )}
-            </div>
+            </section>
           )}
 
+          {withoutEmail.length > 0 && (
+            <p className="text-xs text-ink-500 dark:text-muted-foreground">
+              {withoutEmail.length === 1
+                ? `${withoutEmail[0].name} has no email on file and will be skipped.`
+                : `${withoutEmail.length} organisations have no email on file and will be skipped.`}
+            </p>
+          )}
+
+          <section>
+            <button
+              type="button"
+              onClick={() => setShowDraft((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 py-1 text-left"
+            >
+              <span className="label-brutal mb-0">Message</span>
+              {showDraft ? <ChevronDown size={16} className="text-ink-400" /> : <ChevronRight size={16} className="text-ink-400" />}
+            </button>
+
+            {showDraft && (
+              <div className="mt-3 space-y-3">
+                <label className="block">
+                  <span className="label-brutal">Subject</span>
+                  <input
+                    className="input-brutal w-full min-h-[44px] font-sans text-sm"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    placeholder="Subject"
+                  />
+                </label>
+                <label className="block">
+                  <span className="label-brutal flex flex-wrap items-center gap-2">
+                    Body
+                    <span className="normal-case tracking-normal font-sans font-medium text-ink-400">
+                      Inserts {'{name}'} for each organisation
+                    </span>
+                  </span>
+                  <textarea
+                    className="input-brutal mt-0 w-full min-h-[160px] resize-y font-sans text-sm leading-relaxed"
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    placeholder="Message body…"
+                    rows={8}
+                  />
+                </label>
+              </div>
+            )}
+          </section>
+
+          <Link
+            to="/email-notifications"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-500 hover:text-teal"
+          >
+            <Mail size={13} aria-hidden />
+            Open email queue
+          </Link>
+        </div>
+
+        <div className="flex flex-col-reverse gap-2 border-t-3 border-ink-950 px-5 py-4 sm:flex-row sm:items-center dark:border-border">
           <button
             type="button"
-            onClick={() => setShowDraft((v) => !v)}
-            className="text-sm underline text-ink-600 dark:text-ink-300 hover:text-teal"
+            onClick={onClose}
+            disabled={busy}
+            className="btn-brutal-outline min-h-[44px] flex-1 text-sm disabled:opacity-50 sm:flex-none"
           >
-            {showDraft ? 'Hide message' : 'Edit message'}
+            Cancel
           </button>
-
-          {showDraft && (
-            <div className="space-y-3">
-              <div>
-                <Label className="font-mono text-2xs uppercase tracking-wider">Subject</Label>
-                <Input
-                  className="mt-1 min-h-[44px]"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder="Subject"
-                />
-              </div>
-              <div>
-                <Label className="font-mono text-2xs uppercase tracking-wider">
-                  Body <span className="normal-case text-ink-500 text-xs">(use {'{name}'} per org)</span>
-                </Label>
-                <textarea
-                  className="input-brutal w-full mt-1 min-h-[120px] font-mono text-sm"
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder="Message body..."
-                  rows={6}
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              disabled={busy}
-              className="min-h-[44px] flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleSend}
+          <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => void handleSend()}
               disabled={busy || withEmail.length === 0}
-              className="min-h-[44px] flex-1"
+              className="btn-brutal-outline min-h-[44px] inline-flex items-center justify-center gap-2 text-sm disabled:opacity-50"
             >
-              <Send size={16} />
+              {busy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
               Queue to {withEmail.length}
-            </Button>
+            </button>
             {monitorApiReady && (
-              <Button
-                onClick={handleSendNow}
+              <button
+                type="button"
+                onClick={() => void handleSendNow()}
                 disabled={busy || withEmail.length === 0}
-                className="min-h-[44px] flex-1 bg-teal hover:bg-teal/90"
+                className="btn-brutal-gold min-h-[44px] inline-flex items-center justify-center gap-2 text-sm disabled:opacity-50"
               >
-                <Send size={16} />
+                {busy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
                 Send now to {withEmail.length}
-              </Button>
+              </button>
             )}
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </div>
   );
 }

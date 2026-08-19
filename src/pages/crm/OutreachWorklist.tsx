@@ -253,7 +253,7 @@ export default function OutreachWorklist() {
       )}
 
       {selected > 0 && selection.mode === 'ids' && pageAllSelected && total > leads.length && (
-        <div className="card-brutal p-3 mb-4 text-sm flex flex-wrap items-center gap-3 bg-paper dark:bg-muted/20">
+        <div className="mb-2 flex flex-wrap items-center gap-2 border-3 border-ink-200 bg-paper px-3 py-1.5 text-sm dark:border-border dark:bg-muted/20">
           <span>
             All {leads.length} on this page are selected ({total.toLocaleString()} match this filter).
           </span>

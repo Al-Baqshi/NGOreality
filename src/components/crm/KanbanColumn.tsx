@@ -16,7 +16,7 @@ interface Props {
   onSelectMany: (ids: string[]) => void;
 }
 
-const KANBAN_PAGE_SIZE = 30;
+const KANBAN_PAGE_SIZE = 50;
 const KANBAN_LOAD_STEP = 50;
 const KANBAN_MAX_VISIBLE = 500;
 const SELECT_SIZES = [50, 100, 1000] as const;

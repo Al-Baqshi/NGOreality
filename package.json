@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "api": "go run -C backend ./cmd/api",
-    "worker": "go run -C backend ./cmd/worker",
-    "dev:all": "bash scripts/dev.sh",
+    "api": "node scripts/go-run.mjs run ./cmd/api",
+    "worker": "node scripts/go-run.mjs run ./cmd/worker",
+    "dev:all": "node scripts/dev-all.mjs",
     "dev:backend": "make -C backend dev",
     "build": "vite build",
     "lint": "eslint .",
