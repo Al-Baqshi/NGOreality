@@ -186,13 +186,39 @@ func verifyTurnstileToken(secretKey, token string) (bool, error) {
 func corsMiddleware(next http.Handler, allowedOrigins []string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
+		acrm := r.Header.Get("Access-Control-Request-Method")
+		acrh := r.Header.Get("Access-Control-Request-Headers")
+		host := r.Header.Get("Host")
+		ua := r.Header.Get("User-Agent")
+
+		slog.Info("CORS preflight diagnostic",
+			"method", r.Method,
+			"origin", origin,
+			"origin_empty", origin == "",
+			"access_control_request_method", acrm,
+			"access_control_request_headers", acrh,
+			"host", host,
+			"user_agent", ua,
+			"allowed_origins", allowedOrigins,
+		)
+
+		allowed := false
 		if origin != "" && isAllowedOrigin(origin, allowedOrigins) {
+			allowed = true
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization")
 			w.Header().Set("Access-Control-Max-Age", "86400")
 		}
+
+		slog.Info("CORS decision",
+			"origin", origin,
+			"allowed", allowed,
+			"headers_written", allowed,
+		)
+
 		if strings.EqualFold(r.Method, http.MethodOptions) {
+			slog.Info("CORS OPTIONS response", "status", http.StatusNoContent, "headers_written", allowed)
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
