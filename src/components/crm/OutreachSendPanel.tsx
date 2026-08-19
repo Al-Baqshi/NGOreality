@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Send } from 'lucide-react';
 import type { Organization, OutreachEmailTemplate, OutreachStatus } from '../../types';
-import { draftOutreachEmailForOrg, sendOutreachForColumn } from '../../lib/crmOutreach';
+import { draftOutreachEmailForOrg, sendOutreachForColumn, sendOutreachNow } from '../../lib/crmOutreach';
+import { isMonitorApiConfigured } from '../../lib/monitorApi';
 
 type Props = {
   column: OutreachStatus;
@@ -16,6 +17,7 @@ type Props = {
 };
 
 const orgs = selectedOrgs ?? [];
+const monitorApiReady = isMonitorApiConfigured();
 
 export default function OutreachSendPanel({
   column,
@@ -69,6 +71,39 @@ export default function OutreachSendPanel({
       const parts = [`Queued ${result.queued} — open Email notifications to deliver`];
       if (result.skippedNoEmail) parts.push(`${result.skippedNoEmail} skipped (no email)`);
       if (result.errors.length) parts.push(result.errors.slice(0, 2).join('; '));
+      onMessage(parts.join(' · '));
+      onSent();
+    } catch (err) {
+      onMessage(err instanceof Error ? err.message : 'Send failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSendNow = async () => {
+    if (!withEmail.length) {
+      onMessage('Select cards that have an email on file.');
+      return;
+    }
+    if (
+      !confirm(
+        `Send ${withEmail.length} email(s) NOW for ${columnLabel}?\n\nThis will queue AND immediately deliver via the Monitor API. Requires VITE_MONITOR_API_URL and VITE_MONITOR_API_KEY to be configured.`
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    onMessage(null);
+    try {
+      const result = await sendOutreachNow(withEmail, column, {
+        subjectDraft: subject,
+        bodyDraft: body,
+      });
+
+      const parts = [`Sent ${result.queued}`];
+      if (result.skippedNoEmail) parts.push(`${result.skippedNoEmail} skipped (no email)`);
+      if (result.errors.length) parts.push(result.errors.slice(0, 2).join('; '));
+      if (result.flushError) parts.push(`Flush: ${result.flushError}`);
       onMessage(parts.join(' · '));
       onSent();
     } catch (err) {
@@ -141,8 +176,19 @@ export default function OutreachSendPanel({
             className="btn-brutal-accent w-full text-2xs py-2 min-h-[44px] flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
             <Send size={14} />
-            Send to {withEmail.length} selected
+            Queue to {withEmail.length} selected
           </button>
+          {monitorApiReady && (
+            <button
+              type="button"
+              disabled={busy || withEmail.length === 0}
+              onClick={handleSendNow}
+              className="btn-brutal-teal w-full text-2xs py-2 min-h-[44px] flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              <Send size={14} />
+              Send now to {withEmail.length} selected
+            </button>
+          )}
         </>
       )}
 

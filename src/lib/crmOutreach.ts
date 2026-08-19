@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { ensurePaymentReference } from './payments';
 import { previewOutreachEmail, queueNotification } from './notifications';
+import { flushPendingNotifications } from './monitorApi';
 import {
   DEFAULT_CRITERIA,
   OUTREACH_EMAIL_BY_COLUMN,
@@ -174,6 +175,36 @@ export async function sendOutreachForColumn(
     return { queued: 0, skippedNoEmail: 0, errors: ['No email template for this column'], flushError: null };
   }
   return queueOutreachBulkEmail(orgs, template, options);
+}
+
+/** Queue AND immediately send outreach emails via Monitor API (requires VITE_MONITOR_API_URL + VITE_MONITOR_API_KEY). */
+export async function sendOutreachNow(
+  orgs: Pick<Organization, 'id' | 'name' | 'email' | 'outreach_status'>[],
+  column: OutreachStatus,
+  options?: {
+    incidentIdByOrg?: Record<string, string>;
+    errorDetailByOrg?: Record<string, string>;
+    subjectDraft?: string;
+    bodyDraft?: string;
+  },
+): Promise<BulkEmailResult & { flushError: string | null }> {
+  const template = OUTREACH_EMAIL_BY_COLUMN[column];
+  if (!template) {
+    return { queued: 0, skippedNoEmail: 0, errors: ['No email template for this column'], flushError: null };
+  }
+
+  const result = await queueOutreachBulkEmail(orgs, template, options);
+
+  if (result.queued > 0) {
+    try {
+      const flush = await flushPendingNotifications();
+      return { ...result, flushError: flush ? null : 'No notifications to flush' };
+    } catch (e) {
+      return { ...result, flushError: e instanceof Error ? e.message : 'Flush failed' };
+    }
+  }
+
+  return { ...result, flushError: null };
 }
 
 export function draftOutreachEmailForOrg(
