@@ -5,30 +5,18 @@ import type { Organization, OutreachStatus } from '../../types';
 import { setOutreachStatus, markRegisteredInbound, registerAsCustomer } from '../../lib/crmOutreach';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import type { OrgEmailStatus } from '../../hooks/useOutreachEmail';
+import { outreachEmailBadge } from '../../lib/outreachEmailBadge';
 
 function emailBadge(status?: OrgEmailStatus) {
-  if (!status) return null;
-  const label =
-    status.status === 'sent'
-      ? 'Emailed'
-      : status.status === 'pending'
-        ? 'Queued'
-        : status.status === 'failed'
-          ? 'Send failed'
-          : 'Skipped';
-  const tone =
-    status.status === 'sent'
-      ? 'text-teal border-teal/40 bg-teal/10'
-      : status.status === 'pending'
-        ? 'text-amber-700 border-amber-400 bg-amber/10'
-        : 'text-red-600 border-red-300 bg-red/10';
+  const badge = outreachEmailBadge(status);
+  if (!badge) return null;
   return (
     <span
-      className={`inline-flex items-center gap-0.5 font-mono text-2xs border px-1.5 py-0.5 ${tone}`}
-      title={status.status === 'failed' && status.errorMessage ? status.errorMessage : undefined}
+      className={`inline-flex items-center gap-0.5 font-mono text-2xs border px-1.5 py-0.5 ${badge.className}`}
+      title={badge.title}
     >
       <Mail size={10} aria-hidden />
-      {label}
+      {badge.label}
     </span>
   );
 }

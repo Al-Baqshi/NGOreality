@@ -56,10 +56,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             aria-modal="true"
             aria-labelledby="confirm-title"
             aria-describedby="confirm-desc"
-            className="card-brutal w-full max-w-md bg-white p-5 shadow-brutal-lg dark:bg-card"
+            className="w-full max-w-md rounded-xl border border-ink-200/90 bg-white p-6 shadow-xl dark:border-border dark:bg-card"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="confirm-title" className="text-lg font-bold text-ink-950 dark:text-foreground">
+            <h2 id="confirm-title" className="text-lg font-semibold text-ink-950 dark:text-foreground">
               {state.title}
             </h2>
             <p
@@ -68,11 +68,11 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             >
               {state.description}
             </p>
-            <div className="mt-5 flex flex-wrap justify-end gap-2">
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
                 onClick={() => close(false)}
-                className="btn-brutal-outline min-h-[40px] px-4 text-sm"
+                className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-ink-200 bg-white px-4 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-50 dark:border-border dark:bg-card dark:text-foreground dark:hover:bg-muted"
               >
                 {state.cancelLabel ?? 'Cancel'}
               </button>
@@ -81,8 +81,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 onClick={() => close(true)}
                 className={
                   state.variant === 'danger'
-                    ? 'btn-brutal-accent min-h-[40px] px-4 text-sm'
-                    : 'btn-brutal-teal min-h-[40px] px-4 text-sm'
+                    ? 'inline-flex min-h-[40px] items-center justify-center rounded-lg bg-accent px-4 text-sm font-semibold text-white transition-colors hover:bg-accent/90'
+                    : 'inline-flex min-h-[40px] items-center justify-center rounded-lg bg-teal px-4 text-sm font-semibold text-white transition-colors hover:bg-teal/90'
                 }
               >
                 {state.confirmLabel ?? 'Confirm'}

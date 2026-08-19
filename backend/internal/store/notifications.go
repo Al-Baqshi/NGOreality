@@ -192,9 +192,9 @@ func (s *Store) RequeueNotification(ctx context.Context, id string) error {
 
 // NotificationSummary counts by status for CRM dashboard.
 type NotificationSummary struct {
-	Pending int
-	Sent    int
-	Failed  int
+	Pending int `json:"pending"`
+	Sent    int `json:"sent"`
+	Failed  int `json:"failed"`
 }
 
 func (s *Store) NotificationSummary(ctx context.Context) (NotificationSummary, error) {

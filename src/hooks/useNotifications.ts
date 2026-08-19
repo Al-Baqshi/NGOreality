@@ -8,7 +8,7 @@ export function useNotifications(limit = 100) {
   const [events, setEvents] = useState<NotificationEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [summary, setSummary] = useState({ pending: 0, sent: 0, failed: 0 });
+  const [summary, setSummary] = useState({ pending: 0, sent: 0, failed: 0, skipped: 0 });
   const [flushing, setFlushing] = useState(false);
 
   const refetch = useCallback(async () => {
@@ -51,8 +51,9 @@ export function useNotifications(limit = 100) {
     try {
       if (isMonitorApiConfigured()) {
         const apiSum = await fetchNotificationSummary();
-        if (apiSum) setSummary(apiSum);
-        else setSummary(await fetchNotificationSummaryFromDb());
+        const dbSum = await fetchNotificationSummaryFromDb();
+        if (apiSum) setSummary({ ...apiSum, skipped: dbSum.skipped });
+        else setSummary(dbSum);
       } else {
         setSummary(await fetchNotificationSummaryFromDb());
       }
@@ -62,6 +63,7 @@ export function useNotifications(limit = 100) {
         pending: rows.filter((e) => e.status === 'pending').length,
         sent: rows.filter((e) => e.status === 'sent').length,
         failed: rows.filter((e) => e.status === 'failed').length,
+        skipped: rows.filter((e) => e.status === 'skipped').length,
       });
     }
 
@@ -116,6 +118,23 @@ export function useNotifications(limit = 100) {
     return null;
   };
 
+  const restoreToQueue = async (id: string): Promise<string | null> => {
+    const { error: uError } = await supabase
+      .from('notification_events')
+      .update({
+        status: 'pending',
+        error_message: '',
+        sent_at: null,
+        claimed_at: null,
+      })
+      .eq('id', id)
+      .eq('status', 'skipped');
+
+    if (uError) return uError.message;
+    await refetch();
+    return null;
+  };
+
   return {
     events,
     loading,
@@ -126,6 +145,7 @@ export function useNotifications(limit = 100) {
     flushNow,
     requeue,
     removeFromQueue,
+    restoreToQueue,
     apiConfigured: isMonitorApiConfigured(),
   };
 }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, Mail, RefreshCw, Send, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Mail, RefreshCw, RotateCcw, Send, Trash2 } from 'lucide-react';
 import { SectionHeader, MetricCard } from '../../components/ui';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -14,11 +14,13 @@ import {
 type StatusFilter = 'all' | NotificationStatus;
 
 function StatusBadge({ status }: { status: NotificationEvent['status'] }) {
-  const styles = {
+  const styles: Record<NotificationEvent['status'], string> = {
     pending: 'border-amber-400 bg-amber-50 text-amber-800',
+    sending: 'border-sky-300 bg-sky-50 text-sky-800',
     sent: 'border-teal bg-teal-light text-teal',
     failed: 'border-accent bg-accent-light text-accent',
     skipped: 'border-ink-200 bg-ink-50 text-ink-500',
+    suppressed: 'border-ink-300 bg-ink-100 text-ink-600',
   };
   return (
     <span
@@ -34,18 +36,25 @@ const FILTER_OPTIONS: { id: StatusFilter; label: string }[] = [
   { id: 'pending', label: 'Pending' },
   { id: 'failed', label: 'Failed to send' },
   { id: 'sent', label: 'Sent' },
+  { id: 'skipped', label: 'Cancelled' },
+  { id: 'suppressed', label: 'Unsubscribed' },
 ];
 
 export default function EmailNotifications() {
   const [searchParams, setSearchParams] = useSearchParams();
   const statusParam = searchParams.get('status');
   const initialFilter: StatusFilter =
-    statusParam === 'pending' || statusParam === 'sent' || statusParam === 'failed' || statusParam === 'skipped'
+    statusParam === 'pending' ||
+    statusParam === 'sent' ||
+    statusParam === 'failed' ||
+    statusParam === 'skipped' ||
+    statusParam === 'suppressed' ||
+    statusParam === 'sending'
       ? statusParam
       : 'all';
   const [filter, setFilter] = useState<StatusFilter>(initialFilter);
 
-  const { events, loading, error, summary, flushing, flushNow, requeue, removeFromQueue, apiConfigured, refetch } =
+  const { events, loading, error, summary, flushing, flushNow, requeue, removeFromQueue, restoreToQueue, apiConfigured, refetch } =
     useNotifications();
   const confirm = useConfirm();
   const [actionMsg, setActionMsg] = useState<string | null>(null);
@@ -63,9 +72,10 @@ export default function EmailNotifications() {
   }, [events, filter]);
 
   const handleFlush = async () => {
+    const pendingCount = summary.pending ?? 0;
     const ok = await confirm({
       title: 'Send pending emails?',
-      description: `Deliver all ${summary.pending.toLocaleString()} pending email${summary.pending === 1 ? '' : 's'} in the queue now via the Monitor API or worker.`,
+      description: `Deliver ${pendingCount.toLocaleString()} pending email${pendingCount === 1 ? '' : 's'} in the queue now?`,
       confirmLabel: 'Send now',
     });
     if (!ok) return;
@@ -84,7 +94,7 @@ export default function EmailNotifications() {
   const handleRemoveFromQueue = async (id: string, subject: string) => {
     const ok = await confirm({
       title: 'Remove from queue?',
-      description: `This will cancel the pending send and mark it as skipped. The email will not be delivered.\n\n"${subject}"`,
+      description: `Cancel this pending send? The email will not be delivered.\n\n"${subject}"`,
       confirmLabel: 'Remove',
       variant: 'danger',
     });
@@ -92,7 +102,20 @@ export default function EmailNotifications() {
     setActionMsg(null);
     const err = await removeFromQueue(id);
     if (err) setActionMsg(err);
-    else setActionMsg('Removed from queue — will not be sent.');
+    else setActionMsg('Removed from queue — marked as cancelled.');
+  };
+
+  const handleRestoreToQueue = async (id: string, subject: string) => {
+    const ok = await confirm({
+      title: 'Restore to queue?',
+      description: `Put this email back in the pending queue?\n\n"${subject}"`,
+      confirmLabel: 'Restore',
+    });
+    if (!ok) return;
+    setActionMsg(null);
+    const err = await restoreToQueue(id);
+    if (err) setActionMsg(err);
+    else setActionMsg('Restored to pending queue.');
   };
 
   return (
@@ -113,7 +136,10 @@ export default function EmailNotifications() {
         <Link to="/notifications" className="underline font-semibold text-ink-800 dark:text-foreground">
           Notifications
         </Link>
-        .
+        .{' '}
+        <strong className="text-ink-800 dark:text-foreground">Cancelled</strong> means staff removed a pending send;{' '}
+        <strong className="text-ink-800 dark:text-foreground">Unsubscribed</strong> means the recipient opted out and mail
+        will not be sent to that address.
       </p>
 
       {error && (
@@ -123,6 +149,26 @@ export default function EmailNotifications() {
             <span className="block font-mono text-2xs mt-1">Apply migration 018 on Supabase.</span>
           )}
         </p>
+      )}
+
+      {(summary.skipped ?? 0) > 0 && filter !== 'skipped' && (
+        <div
+          className="mb-4 flex flex-wrap items-start gap-2 border-2 border-ink-200 bg-ink-50/80 px-3 py-2 dark:border-border dark:bg-muted/30"
+          role="status"
+        >
+          <RotateCcw size={16} className="text-ink-500 shrink-0 mt-0.5" aria-hidden />
+          <p className="text-sm text-ink-800 dark:text-foreground flex-1 min-w-0">
+            <strong>{summary.skipped}</strong> cancelled email{summary.skipped === 1 ? '' : 's'} can be restored to
+            the pending queue.
+          </p>
+          <button
+            type="button"
+            onClick={() => setFilterAndUrl('skipped')}
+            className="btn-brutal-outline text-2xs min-h-[36px] px-3 shrink-0"
+          >
+            View cancelled
+          </button>
+        </div>
       )}
 
       {summary.failed > 0 && (
@@ -145,17 +191,27 @@ export default function EmailNotifications() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <button type="button" onClick={() => setFilterAndUrl('pending')} className="text-left min-h-[44px]">
-          <MetricCard label="Pending" value={summary.pending} />
+          <MetricCard label="Pending" value={summary.pending ?? 0} />
         </button>
         <button type="button" onClick={() => setFilterAndUrl('sent')} className="text-left min-h-[44px]">
-          <MetricCard label="Sent (30d)" value={summary.sent} accent />
+          <MetricCard label="Sent (30d)" value={summary.sent ?? 0} accent />
         </button>
         <button type="button" onClick={() => setFilterAndUrl('failed')} className="text-left min-h-[44px]">
-          <MetricCard label="Failed to send (30d)" value={summary.failed} />
+          <MetricCard label="Failed to send (30d)" value={summary.failed ?? 0} />
+        </button>
+        <button type="button" onClick={() => setFilterAndUrl('skipped')} className="text-left min-h-[44px]">
+          <MetricCard label="Cancelled (30d)" value={summary.skipped ?? 0} />
         </button>
       </div>
+
+      {filter === 'skipped' && (summary.skipped ?? 0) > 0 && (
+        <p className="mb-4 text-sm text-ink-600 dark:text-muted-foreground">
+          These were removed from the queue and will not send until you click{' '}
+          <strong className="text-ink-800 dark:text-foreground">Restore to queue</strong> on each row.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Filter email queue">
         {FILTER_OPTIONS.map((opt) => (
@@ -258,8 +314,14 @@ export default function EmailNotifications() {
                   <StatusBadge status={e.status} />
                 </div>
                 <p className="font-mono text-2xs text-ink-400 truncate">{e.subject}</p>
-                {e.status === 'failed' && e.error_message && (
-                  <p className="text-xs text-accent font-mono leading-snug break-words">{e.error_message}</p>
+                {(e.status === 'failed' || e.status === 'skipped' || e.status === 'suppressed') && e.error_message && (
+                  <p
+                    className={`text-xs font-mono leading-snug break-words ${
+                      e.status === 'failed' ? 'text-accent' : 'text-ink-600 dark:text-muted-foreground'
+                    }`}
+                  >
+                    {e.error_message}
+                  </p>
                 )}
                 <div className="flex flex-wrap items-center gap-2 font-mono text-2xs text-ink-400">
                   <span>{new Date(e.created_at).toLocaleString()}</span>
@@ -272,6 +334,16 @@ export default function EmailNotifications() {
                     >
                       <Trash2 size={12} aria-hidden />
                       Remove from queue
+                    </button>
+                  )}
+                  {e.status === 'skipped' && (
+                    <button
+                      type="button"
+                      onClick={() => void handleRestoreToQueue(e.id, e.subject)}
+                      className="inline-flex min-h-[36px] items-center gap-1 rounded-md border border-teal/40 bg-teal/5 px-2 text-teal font-semibold hover:bg-teal/10"
+                    >
+                      <RotateCcw size={12} aria-hidden />
+                      Restore to queue
                     </button>
                   )}
                   {e.status === 'failed' && (

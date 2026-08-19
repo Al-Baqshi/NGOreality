@@ -6,7 +6,7 @@ import { OUTREACH_EMAIL_TEMPLATES } from '../types';
 export type OrgEmailStatus = {
   organizationId: string;
   template: string;
-  status: 'pending' | 'sent' | 'failed' | 'skipped';
+  status: 'pending' | 'sending' | 'sent' | 'failed' | 'skipped' | 'suppressed';
   sentAt: string | null;
   createdAt: string;
   errorMessage: string | null;

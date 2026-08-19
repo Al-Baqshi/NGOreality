@@ -5,6 +5,7 @@ import { OUTREACH_KANBAN_STATUSES, OUTREACH_STATUS_LABELS } from '../../types';
 import { markRegisteredInbound, registerAsCustomer, setOutreachStatus } from '../../lib/crmOutreach';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import type { OrgEmailStatus } from '../../hooks/useOutreachEmail';
+import { outreachEmailBadge } from '../../lib/outreachEmailBadge';
 
 type Props = {
   org: Organization;
@@ -17,28 +18,15 @@ type Props = {
 };
 
 function emailBadge(status?: OrgEmailStatus) {
-  if (!status) return null;
-  const label =
-    status.status === 'sent'
-      ? 'Emailed'
-      : status.status === 'pending'
-        ? 'Queued'
-        : status.status === 'failed'
-          ? 'Failed'
-          : 'Skipped';
-  const tone =
-    status.status === 'sent'
-      ? 'bg-teal/10 text-teal border-teal/30'
-      : status.status === 'pending'
-        ? 'bg-amber-50 text-amber-800 border-amber-200'
-        : 'bg-red-50 text-red-700 border-red-200';
+  const badge = outreachEmailBadge(status);
+  if (!badge) return null;
   return (
     <span
-      className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 font-mono text-2xs ${tone}`}
-      title={status.status === 'failed' && status.errorMessage ? status.errorMessage : undefined}
+      className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 font-mono text-2xs ${badge.className}`}
+      title={badge.title}
     >
       <Mail size={9} aria-hidden />
-      {label}
+      {badge.label}
     </span>
   );
 }

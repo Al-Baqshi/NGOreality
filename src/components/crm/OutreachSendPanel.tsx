@@ -88,7 +88,7 @@ export default function OutreachSendPanel({
     }
     const ok = await confirm({
       title: 'Send emails now?',
-      description: `Send ${withEmail.length} email(s) NOW for ${columnLabel}?\n\nThis will queue AND immediately deliver via the Monitor API.`,
+      description: `Send ${withEmail.length} email${withEmail.length === 1 ? '' : 's'} now for ${columnLabel}?\n\nThey will be queued and delivered immediately.`,
       confirmLabel: 'Send now',
     });
     if (!ok) return;

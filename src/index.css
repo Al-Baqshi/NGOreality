@@ -171,22 +171,22 @@
            font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1;
   }
 
-  /* CRM sidebar — soft gradient surface, same structure as shadcn sidebar */
+  /* CRM sidebar — muted blue-gray between old dark navy and pale white */
   [data-sidebar='sidebar'] {
     background: linear-gradient(
       180deg,
-      #ffffff 0%,
-      var(--sidebar) 28%,
-      color-mix(in srgb, var(--sidebar) 88%, #d4e8ee) 100%
+      color-mix(in srgb, var(--sidebar) 88%, #ffffff) 0%,
+      var(--sidebar) 35%,
+      color-mix(in srgb, var(--sidebar) 92%, #041C3C) 100%
     );
   }
 
   .dark [data-sidebar='sidebar'] {
     background: linear-gradient(
       180deg,
-      color-mix(in srgb, var(--sidebar) 92%, #263545) 0%,
-      var(--sidebar) 45%,
-      color-mix(in srgb, var(--sidebar) 85%, #0f1419) 100%
+      color-mix(in srgb, var(--sidebar) 95%, #364656) 0%,
+      var(--sidebar) 50%,
+      color-mix(in srgb, var(--sidebar) 90%, #0f1419) 100%
     );
   }
 }
@@ -466,13 +466,13 @@
   --input: oklch(0.9 0 0);
   --ring: oklch(0.425 0.070 219);
   --radius: 0.5rem;
-  --sidebar: #F4F9FA;
-  --sidebar-foreground: #2A3F47;
+  --sidebar: #D4E0E8;
+  --sidebar-foreground: #1E3344;
   --sidebar-primary: #28464F;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #E2EEF2;
+  --sidebar-accent: #B8CDD9;
   --sidebar-accent-foreground: #041C3C;
-  --sidebar-border: #C5D8DE;
+  --sidebar-border: #9FB8C7;
   --sidebar-ring: #EBBB57;
 }
 
@@ -493,12 +493,12 @@
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.525 0.100 219);
-  --sidebar: #1e2a35;
-  --sidebar-foreground: #e3eaef;
+  --sidebar: #243442;
+  --sidebar-foreground: #E2E9EE;
   --sidebar-primary: #EBBB57;
   --sidebar-primary-foreground: #041C3C;
-  --sidebar-accent: #2a3a48;
-  --sidebar-accent-foreground: #f3f6f8;
-  --sidebar-border: #3a4f60;
+  --sidebar-accent: #324758;
+  --sidebar-accent-foreground: #F3F6F8;
+  --sidebar-border: #3D5566;
   --sidebar-ring: #EBBB57;
 }

@@ -25,7 +25,7 @@ export default function CrmNavUser({ onSignOut }: CrmNavUserProps) {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <div className="flex w-full min-w-0 items-center gap-2 rounded-lg border border-sidebar-border/60 bg-white/50 px-2 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:px-0 dark:bg-sidebar-accent/30">
+        <div className="flex w-full min-w-0 items-center gap-2 rounded-md border border-sidebar-border/70 bg-white/60 px-2 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:px-0 dark:bg-sidebar-accent/40">
           <Avatar className="size-8 shrink-0 rounded-lg ring-2 ring-sidebar-primary/20">
             <AvatarFallback className="rounded-lg bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">
               {staffInitials(profile?.full_name)}

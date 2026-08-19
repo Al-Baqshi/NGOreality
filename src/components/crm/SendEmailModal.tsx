@@ -87,7 +87,7 @@ export default function SendEmailModal({
     }
     const ok = await confirm({
       title: 'Queue emails?',
-      description: `Queue ${withEmail.length} email(s) for ${columnLabel}?\n\nRecipients use the address on each card. Delivery happens from Email notifications — not when you drag cards.`,
+      description: `Queue ${withEmail.length} email${withEmail.length === 1 ? '' : 's'} for ${columnLabel}?\n\nRecipients use the address on each card. Delivery happens from Email notifications.`,
       confirmLabel: 'Queue',
     });
     if (!ok) return;
@@ -119,7 +119,7 @@ export default function SendEmailModal({
     }
     const ok = await confirm({
       title: 'Send emails now?',
-      description: `Send ${withEmail.length} email(s) NOW for ${columnLabel}?\n\nThis will queue AND immediately deliver via the Monitor API. Requires VITE_MONITOR_API_URL and VITE_MONITOR_API_KEY to be configured.`,
+      description: `Send ${withEmail.length} email${withEmail.length === 1 ? '' : 's'} now for ${columnLabel}?\n\nThey will be queued and delivered immediately.`,
       confirmLabel: 'Send now',
     });
     if (!ok) return;

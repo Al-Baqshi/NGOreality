@@ -11,9 +11,11 @@ import {
   OUTREACH_PAGE_SIZE,
   type OutreachSegment, type OutreachFilters, type OutreachLead,
 } from '../../hooks/useOutreachWorklist';
-import { OUTREACH_KANBAN_STATUSES, OUTREACH_STATUS_LABELS, type OutreachStatus } from '../../types';
+import { OUTREACH_KANBAN_STATUSES, OUTREACH_STATUS_LABELS, OUTREACH_EMAIL_BY_COLUMN, type Organization, type OutreachStatus } from '../../types';
 import { EmptyState } from '../../components/ui';
 import OutreachBatchCommand from '../../components/crm/OutreachBatchCommand';
+import SendEmailModal from '../../components/crm/SendEmailModal';
+import { supabase } from '../../lib/supabase';
 
 /**
  * The outreach worklist.
@@ -87,6 +89,8 @@ export default function OutreachWorklist() {
   const [searchDraft, setSearchDraft] = useState(filters.q);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [sendEmailOpen, setSendEmailOpen] = useState(false);
+  const [sendEmailOrganizations, setSendEmailOrganizations] = useState<Pick<Organization, 'id' | 'name' | 'email'>[]>([]);
 
   const { counts } = useOutreachSegmentCounts(refreshKey);
   const { leads, total, loading, error } = useOutreachLeads(filters, page, refreshKey);
@@ -141,6 +145,42 @@ export default function OutreachWorklist() {
       setBusy(false);
     }
   }
+
+  async function handleSendEmail() {
+    if (!selected) return;
+    if (selection.mode === 'all') {
+      setNotice('To send email, select specific rows with the checkboxes (not “select all matching”).');
+      return;
+    }
+    const ids = Array.from(selection.ids);
+    if (!ids.length) return;
+
+    setBusy(true);
+    setNotice(null);
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('organizations')
+        .select('id, name, email')
+        .in('id', ids);
+      if (fetchError) throw fetchError;
+      if (!data?.length) {
+        setNotice('Could not load selected organisations.');
+        return;
+      }
+      setSendEmailOrganizations(data as Pick<Organization, 'id' | 'name' | 'email'>[]);
+      setSendEmailOpen(true);
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'Could not open email composer.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const emailColumn = (filters.outreach || 'cold_email') as OutreachStatus;
+  const emailTemplate = OUTREACH_EMAIL_BY_COLUMN[emailColumn] ?? 'outreach_cold_invite';
+  const emailColumnLabel = filters.outreach
+    ? OUTREACH_STATUS_LABELS[filters.outreach as OutreachStatus]
+    : 'Selected';
 
   return (
     <div className="page-shell">
@@ -267,12 +307,29 @@ export default function OutreachWorklist() {
         selectedCount={selected}
         onClear={clear}
         onMove={applyBulk}
+        onSendEmail={() => void handleSendEmail()}
         busy={busy}
         hint={
           selection.mode === 'all'
             ? `All matching this filter${selection.excluded.size > 0 ? `, minus ${selection.excluded.size} unticked` : ''}`
             : undefined
         }
+      />
+
+      <SendEmailModal
+        open={sendEmailOpen}
+        onClose={() => {
+          setSendEmailOpen(false);
+          setSendEmailOrganizations([]);
+        }}
+        organizations={sendEmailOrganizations as Organization[]}
+        column={emailColumn}
+        columnLabel={emailColumnLabel}
+        template={emailTemplate}
+        onSent={() => {
+          clear();
+          setRefreshKey((k) => k + 1);
+        }}
       />
 
       {/* Table */}

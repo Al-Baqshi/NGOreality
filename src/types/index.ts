@@ -88,7 +88,7 @@ export type NotificationTemplate =
   | 'badge_issued'
   | 'membership_welcome'
   | OutreachEmailTemplate;
-export type NotificationStatus = 'pending' | 'sent' | 'failed' | 'skipped';
+export type NotificationStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'skipped' | 'suppressed';
 
 export interface NotificationEvent {
   id: string;
@@ -147,9 +147,11 @@ export const PORTAL_NOTIFICATION_EVENT_LABELS: Record<string, string> = {
 
 export const NOTIFICATION_STATUS_LABELS: Record<NotificationStatus, string> = {
   pending: 'Pending',
+  sending: 'Sending',
   sent: 'Sent',
   failed: 'Failed',
-  skipped: 'Skipped',
+  skipped: 'Cancelled',
+  suppressed: 'Unsubscribed',
 };
 
 export type OrgStatus =
