@@ -13,7 +13,7 @@ import {
 } from '../../hooks/useOutreachWorklist';
 import { OUTREACH_KANBAN_STATUSES, OUTREACH_STATUS_LABELS, type OutreachStatus } from '../../types';
 import { EmptyState } from '../../components/ui';
-import OutreachSelectionPanel from '../../components/crm/OutreachSelectionPanel';
+import OutreachBatchCommand from '../../components/crm/OutreachBatchCommand';
 
 /**
  * The outreach worklist.
@@ -85,7 +85,6 @@ export default function OutreachWorklist() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [searchDraft, setSearchDraft] = useState(filters.q);
-  const [moveTo, setMoveTo] = useState<OutreachStatus>('cold_email');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -109,10 +108,8 @@ export default function OutreachWorklist() {
     clear();
   }
 
-  async function applyBulk() {
+  async function applyBulk(status: OutreachStatus) {
     if (!selected) return;
-    const label = OUTREACH_STATUS_LABELS[moveTo];
-    if (!window.confirm(`Move ${selected.toLocaleString()} organisation${selected === 1 ? '' : 's'} to "${label}"?`)) return;
 
     setBusy(true);
     setNotice(null);
@@ -127,8 +124,8 @@ export default function OutreachWorklist() {
       //          would update every other match in the segment.
       const result =
         selection.mode === 'all'
-          ? await bulkSetOutreachByFilter(filters, moveTo, Array.from(selection.excluded))
-          : await bulkSetOutreachByIds(Array.from(selection.ids), moveTo);
+          ? await bulkSetOutreachByFilter(filters, status, Array.from(selection.excluded))
+          : await bulkSetOutreachByIds(Array.from(selection.ids), status);
 
       setNotice(
         result.capped
@@ -139,13 +136,14 @@ export default function OutreachWorklist() {
       setRefreshKey((k) => k + 1);
     } catch (e) {
       setNotice(e instanceof Error ? e.message : 'Could not apply the change.');
+      throw e;
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="page-shell pb-16">
+    <div className="page-shell">
       <div className="page-header">
         <div>
           <h1 className="page-title">Outreach</h1>
@@ -254,7 +252,6 @@ export default function OutreachWorklist() {
         <div className="card-brutal p-3 mb-4 text-sm border-accent text-accent">{error}</div>
       )}
 
-      {/* Select-all context — actions live in the floating panel below */}
       {selected > 0 && selection.mode === 'ids' && pageAllSelected && total > leads.length && (
         <div className="card-brutal p-3 mb-4 text-sm flex flex-wrap items-center gap-3 bg-paper dark:bg-muted/20">
           <span>
@@ -265,14 +262,20 @@ export default function OutreachWorklist() {
           </button>
         </div>
       )}
-      {selected > 0 && selection.mode === 'all' && (
-        <div className="card-brutal p-3 mb-4 text-sm bg-paper dark:bg-muted/20 font-mono text-2xs text-ink-500 dark:text-muted-foreground">
-          Every organisation matching the current filter
-          {selection.excluded.size > 0 && `, minus ${selection.excluded.size} you unticked`}.
-        </div>
-      )}
 
-{/* Table */}
+      <OutreachBatchCommand
+        selectedCount={selected}
+        onClear={clear}
+        onMove={applyBulk}
+        busy={busy}
+        hint={
+          selection.mode === 'all'
+            ? `All matching this filter${selection.excluded.size > 0 ? `, minus ${selection.excluded.size} unticked` : ''}`
+            : undefined
+        }
+      />
+
+      {/* Table */}
       <div className="card-brutal overflow-hidden">
         <div className="table-scroll">
           <table className="w-full text-sm">
@@ -387,33 +390,6 @@ export default function OutreachWorklist() {
         </div>
       )}
 
-      {/* Bulk bar */}
-      {selected > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t-3 border-ink-950 bg-white dark:bg-card dark:border-border shadow-brutal">
-          <div className="page-shell !py-3 flex flex-wrap items-center gap-3">
-            <span className="text-sm font-semibold">
-              {selected.toLocaleString()} selected
-            </span>
-            <label className="flex items-center gap-2">
-              <span className="label-brutal">Move to</span>
-              <select className="input-brutal min-h-[44px]" value={moveTo}
-                onChange={(e) => setMoveTo(e.target.value as OutreachStatus)}>
-                {OUTREACH_KANBAN_STATUSES.map((s) => (
-                  <option key={s} value={s}>{OUTREACH_STATUS_LABELS[s]}</option>
-                ))}
-              </select>
-            </label>
-            <button type="button" onClick={applyBulk} disabled={busy}
-              className="btn-brutal-teal text-sm min-h-[44px] inline-flex items-center gap-2 disabled:opacity-50">
-              {busy && <Loader2 size={15} className="animate-spin" />}
-              Apply to {selected.toLocaleString()}
-            </button>
-            <button type="button" onClick={clear} className="btn-brutal-outline text-sm min-h-[44px] ml-auto">
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

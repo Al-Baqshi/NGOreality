@@ -4,15 +4,15 @@ import {
   OUTREACH_KANBAN_STATUSES,
   OUTREACH_STATUS_LABELS,
   OUTREACH_EMAIL_BY_COLUMN,
+  type Organization,
+  type OutreachStatus,
 } from '../../types';
 import { useCrmDashboardStats } from '../../hooks/useCrm';
-import { fetchColumnLeadIds } from '../../components/crm/KanbanColumn';
 import OutreachHeader from '../../components/crm/OutreachHeader';
 import OutreachToolbar from '../../components/crm/OutreachToolbar';
-import BulkActionBar from '../../components/crm/BulkActionBar';
+import OutreachBatchCommand from '../../components/crm/OutreachBatchCommand';
 import KanbanColumn from '../../components/crm/KanbanColumn';
 import SendEmailModal from '../../components/crm/SendEmailModal';
-import ChangeStatusModal from '../../components/crm/ChangeStatusModal';
 import NewLeadDialog from '../../components/crm/NewLeadDialog';
 import { OutreachBatchManager } from '../../components/crm/OutreachBulkToolbar';
 import RegistryInsights from '../../components/crm/RegistryInsights';
@@ -59,11 +59,8 @@ export default function OutreachBoard() {
   const [sortBy, setSortBy] = useState('');
   const [sendEmailOpen, setSendEmailOpen] = useState(false);
   const [sendEmailOrganizations, setSendEmailOrganizations] = useState<{ id: string; name: string; email: string }[]>([]);
-  const [changeStatusOpen, setChangeStatusOpen] = useState(false);
-  const [changeStatusOrgs, setChangeStatusOrgs] = useState<{ id: string; name: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [globalRefreshTick, setGlobalRefreshTick] = useState(0);
-  const [moveTo, setMoveTo] = useState<OutreachStatus>('contacted');
 
   const bump = useCallback(() => {
     setGlobalRefreshTick((t) => t + 1);
@@ -108,30 +105,16 @@ export default function OutreachBoard() {
     }
   };
 
-  const handleChangeStatus = async () => {
+  const handleBulkMove = async (status: OutreachStatus) => {
     if (selectedIds.size === 0) return;
-    const label = OUTREACH_STATUS_LABELS[moveTo];
-    if (
-      !window.confirm(
-        `Move ${selectedIds.size.toLocaleString()} organization${selectedIds.size === 1 ? '' : 's'} to "${label}"?`,
-      )
-    ) {
-      return;
-    }
-
     setBusy(true);
     try {
-      const { supabase } = await import('../../lib/supabase');
-      const { data } = await supabase
-        .from('organizations')
-        .select('id, name')
-        .in('id', Array.from(selectedIds));
-      if (data) {
-        setChangeStatusOrgs(data as { id: string; name: string }[]);
-        setChangeStatusOpen(true);
-      }
+      await bulkSetOutreachStatus(Array.from(selectedIds), status);
+      bump();
+      clearSelection();
     } catch (err) {
-      console.error('Failed to fetch organizations:', err);
+      console.error('Failed to move organizations:', err);
+      throw err;
     } finally {
       setBusy(false);
     }
@@ -147,8 +130,12 @@ export default function OutreachBoard() {
     [stats?.outreach_due]
   );
 
+  const emailTemplate = statusFilter
+    ? OUTREACH_EMAIL_BY_COLUMN[statusFilter as OutreachStatus]
+    : 'outreach_cold_invite';
+
   return (
-    <div className="page-shell w-full min-w-0 max-w-none pb-16">
+    <div className="page-shell w-full min-w-0 max-w-none">
       <OutreachHeader
         onNewLead={() => setNewLeadOpen(true)}
         onNavigateWorklist={() => window.location.href = '/outreach'}
@@ -169,15 +156,18 @@ export default function OutreachBoard() {
         totalCount={totalLeads}
       />
 
-      <div className="flex flex-wrap gap-2 mb-4 items-center">
-        <button type="button" onClick={clearSelection} className="btn-brutal-outline text-xs min-h-[44px] px-3">
-          Clear selection
-        </button>
-        {busy && <Loader2 size={15} className="animate-spin text-ink-500" aria-label="Selecting…" />}
-        {selectedIds.size > 0 && (
-          <span className="font-mono text-2xs text-ink-500">{selectedIds.size.toLocaleString()} selected globally</span>
-        )}
-      </div>
+      <OutreachBatchCommand
+        selectedCount={selectedIds.size}
+        onClear={clearSelection}
+        onMove={handleBulkMove}
+        onSendEmail={() => void handleSendEmail()}
+        busy={busy}
+      />
+
+      {busy && selectedIds.size === 0 && (
+        <Loader2 size={15} className="animate-spin text-ink-500 mb-4" aria-label="Processing…" />
+      )}
+
       <OutreachBatchManager />
 
       <CollapsibleSection
@@ -205,25 +195,17 @@ export default function OutreachBoard() {
         </div>
       </div>
 
-      <BulkActionBar
-        selectedCount={selectedIds.size}
-        onClear={clearSelection}
-        onSendEmail={handleSendEmail}
-        onChangeStatus={handleChangeStatus}
-        busy={busy}
-      />
-
       {sendEmailOpen && (
-      <SendEmailModal
-        open={sendEmailOpen}
-        onClose={() => { setSendEmailOpen(false); setSendEmailOrganizations([]); }}
-        organizations={sendEmailOrganizations}
-        column={statusFilter || 'cold_email'}
-        columnLabel={statusFilter ? OUTREACH_STATUS_LABELS[statusFilter as 'cold_email' | 'no_website' | 'website_issues'] : 'Selected'}
-        template={statusFilter ? OUTREACH_EMAIL_BY_COLUMN[statusFilter as 'cold_email' | 'no_website' | 'website_issues'] : 'outreach_cold_invite'}
-        onSent={handleSendEmailComplete}
-      />
-    )}
+        <SendEmailModal
+          open={sendEmailOpen}
+          onClose={() => { setSendEmailOpen(false); setSendEmailOrganizations([]); }}
+          organizations={sendEmailOrganizations as Organization[]}
+          column={statusFilter || 'cold_email'}
+          columnLabel={statusFilter ? OUTREACH_STATUS_LABELS[statusFilter as OutreachStatus] : 'Selected'}
+          template={emailTemplate ?? 'outreach_cold_invite'}
+          onSent={handleSendEmailComplete}
+        />
+      )}
 
       <NewLeadDialog
         open={newLeadOpen}
