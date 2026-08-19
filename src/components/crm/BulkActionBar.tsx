@@ -23,18 +23,17 @@ export default function BulkActionBar({
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 z-40 border-t-3 border-ink-950 bg-white dark:bg-card dark:border-border shadow-brutal-lg ${className}`}
+      className={`sticky bottom-0 z-40 border-t-2 border-ink-950 bg-white/95 dark:bg-ink-950/95 backdrop-blur-sm shadow-[0_-4px_12px_rgba(0,0,0,0.15)] ${className}`}
       role="region"
       aria-label="Bulk actions"
     >
-      <div className="page-shell !py-3 flex flex-wrap items-center gap-3">
-        <span className="text-sm font-semibold">
+      <div className="page-shell flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+        <span className="font-mono text-xs text-ink-500 dark:text-ink-400 shrink-0">
           {selectedCount.toLocaleString()} selected
         </span>
-
-        <div className="flex flex-wrap gap-2 items-center flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0 justify-end">
           <Select value="" onValueChange={onChangeStatus}>
-            <SelectTrigger className="w-[160px] min-h-[44px]">
+            <SelectTrigger className="w-[160px] min-h-[40px] text-sm">
               <SelectValue placeholder="Move to stage" />
             </SelectTrigger>
             <SelectContent>
@@ -49,18 +48,18 @@ export default function BulkActionBar({
           <button
             type="button"
             onClick={onSendEmail}
-            className="btn-brutal-teal min-h-[44px] text-sm px-4 flex items-center gap-2"
+            className="btn-brutal-teal text-sm min-h-[40px] px-4 inline-flex items-center gap-2 shrink-0 disabled:opacity-50"
             disabled={busy}
           >
-            <Send size={16} /> Send email
+            <Send size={14} /> Send email
           </button>
 
-          <button type="button" onClick={onClear} className="btn-brutal-outline min-h-[44px] text-sm px-4">
+          <button type="button" onClick={onClear} className="btn-brutal-outline text-sm min-h-[40px] px-4 shrink-0">
             Clear
           </button>
-        </div>
 
-        {busy && <Loader2 size={15} className="animate-spin text-ink-500" aria-label="Processing…" />}
+          {busy && <Loader2 size={14} className="animate-spin text-ink-500" aria-label="Processing…" />}
+        </div>
       </div>
     </div>
   );

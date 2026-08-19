@@ -78,60 +78,60 @@ export default function OutreachKanbanCard({
         e.dataTransfer.setData('application/from-status', column);
         e.dataTransfer.effectAllowed = 'move';
       }}
-      className={`border-2 bg-white p-3 dark:bg-ink-900 cursor-grab active:cursor-grabbing ${
+      className={`border-2 bg-white p-2.5 dark:bg-ink-900 cursor-grab active:cursor-grabbing ${
         selected ? 'border-accent ring-1 ring-accent' : 'border-ink-200'
       }`}
     >
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
         {onToggleSelect && (
           <input
             type="checkbox"
             checked={selected}
             onChange={() => onToggleSelect(org.id)}
-            className="mt-1 size-5 shrink-0 accent-accent"
+            className="mt-0.5 size-4 shrink-0 accent-accent"
             aria-label={`Select ${org.name}`}
             onClick={(e) => e.stopPropagation()}
           />
         )}
-        <GripVertical size={14} className="text-ink-300 shrink-0 mt-0.5" aria-hidden />
+        <GripVertical size={12} className="text-ink-300 shrink-0 mt-0.5" aria-hidden />
         <div className="min-w-0 flex-1">
           <Link
             to={`/organizations/${org.id}`}
-            className="text-sm font-semibold leading-tight hover:text-accent line-clamp-2"
+            className="text-sm font-semibold leading-snug hover:text-accent line-clamp-2"
             onClick={(e) => e.stopPropagation()}
           >
             {org.name}
           </Link>
           {(org.charity_registration_number || org.external_id) && (
-            <p className="font-mono text-2xs text-ink-400 mt-1">#{org.charity_registration_number || org.external_id}</p>
+            <p className="font-mono text-2xs text-ink-400 mt-0.5">#{org.charity_registration_number || org.external_id}</p>
           )}
-          {org.email ? (
-            <p className="font-mono text-2xs text-ink-500 truncate mt-1">{org.email}</p>
-          ) : (
-            <p className="font-mono text-2xs text-red-500 mt-1">No email on file</p>
-          )}
-          <div className="flex flex-wrap gap-1 mt-1">
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            {org.email ? (
+              <p className="font-mono text-2xs text-ink-500 truncate">{org.email}</p>
+            ) : (
+              <p className="font-mono text-2xs text-red-500">No email on file</p>
+            )}
             {org.website_url?.trim() ? (
-              <span className="inline-flex items-center gap-0.5 font-mono text-2xs text-teal">
+              <span className="inline-flex items-center gap-0.5 font-mono text-2xs text-teal whitespace-nowrap">
                 <Globe size={10} /> Website
               </span>
             ) : (
-              <span className="font-mono text-2xs text-ink-400">No website</span>
+              <span className="font-mono text-2xs text-ink-400 whitespace-nowrap">No website</span>
             )}
             {emailBadge(emailStatus)}
           </div>
           {emailStatus?.status === 'failed' && emailStatus.errorMessage && (
-            <p className="font-mono text-2xs text-red-600 mt-1 line-clamp-2" title={emailStatus.errorMessage}>
+            <p className="font-mono text-2xs text-red-600 mt-0.5 line-clamp-2" title={emailStatus.errorMessage}>
               {emailStatus.errorMessage}
             </p>
           )}
         </div>
       </div>
 
-      <label className="block mt-2">
+      <label className="block mt-1.5">
         <span className="sr-only">Move to column</span>
         <select
-          className="input-brutal w-full text-2xs py-1.5 min-h-[44px]"
+          className="input-brutal w-full text-2xs py-1 min-h-[36px]"
           value={column}
           onChange={async (e) => {
             const next = e.target.value as OutreachStatus;
@@ -151,36 +151,36 @@ export default function OutreachKanbanCard({
         </select>
       </label>
 
-      <div className="flex flex-wrap gap-1 mt-2">
+      <div className="flex flex-wrap gap-1 mt-1.5">
         {column === 'not_contacted' && (
-          <button type="button" onClick={() => move('cold_email')} className="btn-brutal-outline text-2xs py-1 px-2 min-h-[36px]">
+          <button type="button" onClick={() => move('cold_email')} className="btn-brutal-outline text-2xs py-1 px-2 min-h-[32px] whitespace-nowrap">
             → Cold email
           </button>
         )}
         {(column === 'not_contacted' || column === 'cold_email') && (
-          <button type="button" onClick={() => move('contacted')} className="btn-brutal-outline text-2xs py-1 px-2 min-h-[36px]">
+          <button type="button" onClick={() => move('contacted')} className="btn-brutal-outline text-2xs py-1 px-2 min-h-[32px] whitespace-nowrap">
             Contacted
           </button>
         )}
         {column === 'contacted' && (
           <>
-            <button type="button" onClick={() => move('follow_up')} className="btn-brutal-outline text-2xs py-1 px-2 min-h-[36px]">
+            <button type="button" onClick={() => move('follow_up')} className="btn-brutal-outline text-2xs py-1 px-2 min-h-[32px] whitespace-nowrap">
               Follow-up
             </button>
-            <button type="button" onClick={handleRegisterInbound} className="btn-brutal-teal text-2xs py-1 px-2 min-h-[36px]">
+            <button type="button" onClick={handleRegisterInbound} className="btn-brutal-teal text-2xs py-1 px-2 min-h-[32px] whitespace-nowrap">
               → Inbound
             </button>
-            <button type="button" onClick={() => move('declined')} className="btn-brutal-outline text-2xs py-1 px-2 min-h-[36px]">
+            <button type="button" onClick={() => move('declined')} className="btn-brutal-outline text-2xs py-1 px-2 min-h-[32px] whitespace-nowrap">
               Declined
             </button>
           </>
         )}
         {column === 'follow_up' && (
           <>
-            <button type="button" onClick={handleRegisterInbound} className="btn-brutal-teal text-2xs py-1 px-2 min-h-[36px]">
+            <button type="button" onClick={handleRegisterInbound} className="btn-brutal-teal text-2xs py-1 px-2 min-h-[32px] whitespace-nowrap">
               → Inbound
             </button>
-            <button type="button" onClick={() => move('declined')} className="btn-brutal-outline text-2xs py-1 px-2 min-h-[36px]">
+            <button type="button" onClick={() => move('declined')} className="btn-brutal-outline text-2xs py-1 px-2 min-h-[32px] whitespace-nowrap">
               Declined
             </button>
           </>
@@ -188,7 +188,7 @@ export default function OutreachKanbanCard({
         <button
           type="button"
           onClick={handleRegisterCustomer}
-          className="btn-brutal-accent text-2xs py-1 px-2 min-h-[36px] w-full sm:w-auto"
+          className="btn-brutal-accent text-2xs py-1 px-2 min-h-[32px] w-full sm:w-auto whitespace-nowrap"
         >
           Register as customer
         </button>

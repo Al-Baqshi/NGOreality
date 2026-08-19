@@ -142,7 +142,7 @@ export default function OutreachBoard() {
   );
 
   return (
-    <div className="page-shell w-full min-w-0 max-w-none pb-24">
+    <div className="page-shell w-full min-w-0 max-w-none pb-16">
       <OutreachHeader
         onNewLead={() => setNewLeadOpen(true)}
         onNavigateWorklist={() => window.location.href = '/outreach'}
