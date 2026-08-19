@@ -17,8 +17,6 @@ import NewLeadDialog from '../../components/crm/NewLeadDialog';
 import { OutreachBatchManager } from '../../components/crm/OutreachBulkToolbar';
 import RegistryInsights from '../../components/crm/RegistryInsights';
 
-const SELECT_SIZES = [50, 100, 1000] as const;
-
 function CollapsibleSection({
   title,
   summary,
@@ -87,19 +85,6 @@ export default function OutreachBoard() {
   }, []);
 
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
-
-  const selectFirstNPerColumn = useCallback(async (n: number) => {
-    setBusy(true);
-    try {
-      const ids: string[] = [];
-      for (const status of OUTREACH_KANBAN_STATUSES) {
-        ids.push(...(await fetchColumnLeadIds(status, n)));
-      }
-      selectMany(ids);
-    } finally {
-      setBusy(false);
-    }
-  }, [selectMany]);
 
   const handleSendEmail = async () => {
     if (selectedIds.size === 0) return;
@@ -179,18 +164,6 @@ export default function OutreachBoard() {
       />
 
       <div className="flex flex-wrap gap-2 mb-4 items-center">
-        <span className="label-brutal">Select per column</span>
-        {SELECT_SIZES.map((n) => (
-          <button
-            key={n}
-            type="button"
-            disabled={busy}
-            onClick={() => void selectFirstNPerColumn(n)}
-            className="btn-brutal-outline text-xs min-h-[44px] px-3 disabled:opacity-50"
-          >
-            First {n.toLocaleString()}
-          </button>
-        ))}
         <button type="button" onClick={clearSelection} className="btn-brutal-outline text-xs min-h-[44px] px-3">
           Clear selection
         </button>
@@ -220,6 +193,7 @@ export default function OutreachBoard() {
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
               onClearSelection={clearSelection}
+              onSelectMany={selectMany}
             />
           ))}
         </div>
