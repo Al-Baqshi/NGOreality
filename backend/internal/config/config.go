@@ -23,6 +23,7 @@ type Config struct {
 	NotifyFromEmail       string
 	NotifyStaffEmail      string
 	TurnstileSecretKey    string
+	AllowedOrigins        []string
 }
 
 func Load() (Config, error) {
@@ -66,6 +67,18 @@ func Load() (Config, error) {
 		trimmed = []string{"listed", "onboarding", "under_review", "verified", "active"}
 	}
 
+	allowedOrigins := strings.Split(strings.TrimSpace(envString("ALLOWED_ORIGINS", "https://www.ngoreality.com,http://localhost:5173")), ",")
+	trimmedOrigins := make([]string, 0, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		o = strings.TrimSpace(o)
+		if o != "" {
+			trimmedOrigins = append(trimmedOrigins, o)
+		}
+	}
+	if len(trimmedOrigins) == 0 {
+		trimmedOrigins = []string{"https://www.ngoreality.com", "http://localhost:5173"}
+	}
+
 	return Config{
 		DatabaseURL:           dbURL,
 		APIAddr:               envString("API_ADDR", ":8080"),
@@ -83,6 +96,7 @@ func Load() (Config, error) {
 		NotifyFromEmail:    envString("NOTIFY_FROM_EMAIL", "NGOreality <notifications@contact.ngoreality.com>"),
 		NotifyStaffEmail:   strings.TrimSpace(os.Getenv("NOTIFY_STAFF_EMAIL")),
 		TurnstileSecretKey: strings.TrimSpace(os.Getenv("TURNSTILE_SECRET_KEY")),
+		AllowedOrigins:     trimmedOrigins,
 	}, nil
 }
 
