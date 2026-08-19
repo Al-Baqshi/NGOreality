@@ -387,15 +387,33 @@ export default function OutreachWorklist() {
         </div>
       )}
 
-      <OutreachSelectionPanel
-        selectedCount={selected}
-        moveTo={moveTo}
-        onMoveToChange={setMoveTo}
-        onApply={() => void applyBulk()}
-        onClear={clear}
-        busy={busy}
-        applyLabel={`Apply to ${selected.toLocaleString()}`}
-      />
+      {/* Bulk bar */}
+      {selected > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t-3 border-ink-950 bg-white dark:bg-card dark:border-border shadow-brutal">
+          <div className="page-shell !py-3 flex flex-wrap items-center gap-3">
+            <span className="text-sm font-semibold">
+              {selected.toLocaleString()} selected
+            </span>
+            <label className="flex items-center gap-2">
+              <span className="label-brutal">Move to</span>
+              <select className="input-brutal min-h-[44px]" value={moveTo}
+                onChange={(e) => setMoveTo(e.target.value as OutreachStatus)}>
+                {OUTREACH_KANBAN_STATUSES.map((s) => (
+                  <option key={s} value={s}>{OUTREACH_STATUS_LABELS[s]}</option>
+                ))}
+              </select>
+            </label>
+            <button type="button" onClick={applyBulk} disabled={busy}
+              className="btn-brutal-teal text-sm min-h-[44px] inline-flex items-center gap-2 disabled:opacity-50">
+              {busy && <Loader2 size={15} className="animate-spin" />}
+              Apply to {selected.toLocaleString()}
+            </button>
+            <button type="button" onClick={clear} className="btn-brutal-outline text-sm min-h-[44px] ml-auto">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
