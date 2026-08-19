@@ -59,6 +59,39 @@ export default function SendEmailModal({
     }
   }, [open, defaultDraft.subject, defaultDraft.body]);
 
+  const handleSend = async () => {
+    if (!withEmail.length) {
+      setMessage('Select cards that have an email on file.');
+      return;
+    }
+    if (
+      !confirm(
+        `Queue ${withEmail.length} email(s) for ${columnLabel}?\n\nRecipients use the address on each card. Delivery happens from Email notifications — not when you drag cards.`
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await sendOutreachForColumn(withEmail, column as OutreachStatus, {
+        subjectDraft: subject,
+        bodyDraft: body,
+      });
+
+      const parts = [`Queued ${result.queued} — open Email notifications to deliver`];
+      if (result.skippedNoEmail) parts.push(`${result.skippedNoEmail} skipped (no email)`);
+      if (result.errors.length) parts.push(result.errors.slice(0, 2).join('; '));
+      setMessage(parts.join(' · '));
+      onSent();
+      setTimeout(() => onClose(), 2000);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Send failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSendNow = async () => {
     if (!withEmail.length) {
       setMessage('Select cards that have an email on file.');
