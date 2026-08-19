@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, UserPlus } from 'lucide-react';
+import { Users, UserPlus, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import {
@@ -36,6 +36,68 @@ type NgoOrganizationRegistrationFormProps = {
   compact?: boolean;
 };
 
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isValidPassword(password: string): { valid: boolean; message?: string } {
+  if (password.length < 8) {
+    return { valid: false, message: 'Password must be at least 8 characters' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, message: 'Password must contain at least one uppercase letter' };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, message: 'Password must contain at least one lowercase letter' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, message: 'Password must contain at least one number' };
+  }
+  return { valid: true };
+}
+
+function isValidDomain(url: string): boolean {
+  if (!url.trim()) return true;
+  try {
+    const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
+    const hostname = parsed.hostname;
+    if (!hostname.includes('.')) return false;
+    const tld = hostname.split('.').pop() || '';
+    return tld.length >= 2 && /^[a-zA-Z0-9-]+$/.test(tld);
+  } catch {
+    return false;
+  }
+}
+
+function validateSignupForm(form: any, loggedIn: boolean): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (!loggedIn) {
+    if (!form.fullName.trim()) {
+      errors.push('Full name is required');
+    }
+    if (!form.email.trim()) {
+      errors.push('Email is required');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      errors.push('Please enter a valid email address');
+    }
+    if (!form.password) {
+      errors.push('Password is required');
+    } else {
+      const pwdCheck = isValidPassword(form.password);
+      if (!pwdCheck.valid && pwdCheck.message) {
+        errors.push(pwdCheck.message);
+      }
+    }
+  }
+
+  if (form.websiteUrl.trim() && !isValidDomain(form.websiteUrl)) {
+    errors.push('Please enter a valid website URL (e.g., https://example.com)');
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 export default function NgoOrganizationRegistrationForm({
   loggedIn = false,
   onSuccess,
@@ -55,6 +117,7 @@ export default function NgoOrganizationRegistrationForm({
     websiteUrl: '',
   });
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -172,9 +235,25 @@ export default function NgoOrganizationRegistrationForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
 
     if (mode === 'existing' && !selectedOrg) {
       setError('Search the directory and select your organization, or register as new.');
+      return;
+    }
+
+    // Validate form
+    const validation = validateSignupForm(form, loggedIn);
+    if (!validation.valid) {
+      const fieldErrorMap: Record<string, string> = {};
+      validation.errors.forEach((err) => {
+        if (err.includes('name')) fieldErrorMap.fullName = err;
+        else if (err.includes('Email') || err.includes('email')) fieldErrorMap.email = err;
+        else if (err.includes('Password') || err.includes('password')) fieldErrorMap.password = err;
+        else if (err.includes('website') || err.includes('URL')) fieldErrorMap.websiteUrl = err;
+      });
+      setFieldErrors(fieldErrorMap);
+      setError(validation.errors.join('; '));
       return;
     }
 
@@ -373,11 +452,19 @@ export default function NgoOrganizationRegistrationForm({
             </label>
             <input
               id="full-name"
-              className="input-brutal w-full text-base"
+              className={`input-brutal w-full text-base ${fieldErrors.fullName ? 'border-accent' : ''}`}
               value={form.fullName}
-              onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, fullName: e.target.value });
+                if (fieldErrors.fullName) setFieldErrors((prev) => ({ ...prev, fullName: '' }));
+              }}
               required
             />
+            {fieldErrors.fullName && (
+              <p className="text-accent text-xs font-mono mt-1" role="alert">
+                <AlertCircle size={12} className="inline mr-1" /> {fieldErrors.fullName}
+              </p>
+            )}
           </div>
           <div>
             <label className="label-brutal" htmlFor="signup-email">
@@ -387,11 +474,19 @@ export default function NgoOrganizationRegistrationForm({
               id="signup-email"
               type="email"
               autoComplete="email"
-              className="input-brutal w-full text-base"
+              className={`input-brutal w-full text-base ${fieldErrors.email ? 'border-accent' : ''}`}
               value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, email: e.target.value });
+                if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: '' }));
+              }}
               required
             />
+            {fieldErrors.email && (
+              <p className="text-accent text-xs font-mono mt-1" role="alert">
+                <AlertCircle size={12} className="inline mr-1" /> {fieldErrors.email}
+              </p>
+            )}
           </div>
           <div>
             <label className="label-brutal" htmlFor="signup-password">
@@ -401,12 +496,20 @@ export default function NgoOrganizationRegistrationForm({
               id="signup-password"
               type="password"
               autoComplete="new-password"
-              className="input-brutal w-full text-base"
+              className={`input-brutal w-full text-base ${fieldErrors.password ? 'border-accent' : ''}`}
               value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, password: e.target.value });
+                if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: '' }));
+              }}
               minLength={8}
               required
             />
+            {fieldErrors.password && (
+              <p className="text-accent text-xs font-mono mt-1" role="alert">
+                <AlertCircle size={12} className="inline mr-1" /> {fieldErrors.password}
+              </p>
+            )}
           </div>
         </>
       )}
@@ -433,11 +536,19 @@ export default function NgoOrganizationRegistrationForm({
             </label>
             <input
               id="org-name"
-              className="input-brutal w-full text-base"
+              className={`input-brutal w-full text-base ${fieldErrors.organizationName ? 'border-accent' : ''}`}
               value={form.organizationName}
-              onChange={(e) => setForm({ ...form, organizationName: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, organizationName: e.target.value });
+                if (fieldErrors.organizationName) setFieldErrors((prev) => ({ ...prev, organizationName: '' }));
+              }}
               required
             />
+            {fieldErrors.organizationName && (
+              <p className="text-accent text-xs font-mono mt-1" role="alert">
+                <AlertCircle size={12} className="inline mr-1" /> {fieldErrors.organizationName}
+              </p>
+            )}
           </div>
           <div>
             <label className="label-brutal" htmlFor="category">
@@ -476,11 +587,19 @@ export default function NgoOrganizationRegistrationForm({
             <input
               id="website"
               type="url"
-              className="input-brutal w-full text-base"
+              className={`input-brutal w-full text-base ${fieldErrors.websiteUrl ? 'border-accent' : ''}`}
               value={form.websiteUrl}
-              onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, websiteUrl: e.target.value });
+                if (fieldErrors.websiteUrl) setFieldErrors((prev) => ({ ...prev, websiteUrl: '' }));
+              }}
               placeholder="https://"
             />
+            {fieldErrors.websiteUrl && (
+              <p className="text-accent text-xs font-mono mt-1" role="alert">
+                <AlertCircle size={12} className="inline mr-1" /> {fieldErrors.websiteUrl}
+              </p>
+            )}
           </div>
         </>
       )}
