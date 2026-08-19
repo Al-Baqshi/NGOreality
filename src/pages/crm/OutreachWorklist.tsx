@@ -390,30 +390,32 @@ export default function OutreachWorklist() {
         </div>
       )}
 
-      {/* Bulk bar */}
+      {/* Bulk toolbar */}
       {selected > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t-3 border-ink-950 bg-white dark:bg-card dark:border-border shadow-brutal">
-          <div className="page-shell !py-3 flex flex-wrap items-center gap-3">
-            <span className="text-sm font-semibold">
+        <div className="sticky bottom-0 z-40 border-t-2 border-ink-950 bg-white/95 dark:bg-ink-950/95 backdrop-blur-sm shadow-[0_-4px_12px_rgba(0,0,0,0.15)]">
+          <div className="page-shell flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+            <span className="font-mono text-xs text-ink-500 dark:text-ink-400 shrink-0">
               {selected.toLocaleString()} selected
             </span>
-            <label className="flex items-center gap-2">
-              <span className="label-brutal">Move to</span>
-              <select className="input-brutal min-h-[44px]" value={moveTo}
-                onChange={(e) => setMoveTo(e.target.value as OutreachStatus)}>
-                {OUTREACH_KANBAN_STATUSES.map((s) => (
-                  <option key={s} value={s}>{OUTREACH_STATUS_LABELS[s]}</option>
-                ))}
-              </select>
-            </label>
-            <button type="button" onClick={applyBulk} disabled={busy}
-              className="btn-brutal-teal text-sm min-h-[44px] inline-flex items-center gap-2 disabled:opacity-50">
-              {busy && <Loader2 size={15} className="animate-spin" />}
-              Apply to {selected.toLocaleString()}
-            </button>
-            <button type="button" onClick={clear} className="btn-brutal-outline text-sm min-h-[44px] ml-auto">
-              Cancel
-            </button>
+            <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0 justify-end">
+              <label className="flex items-center gap-2 shrink-0">
+                <span className="label-brutal hidden sm:inline-block">Move to</span>
+                <select className="input-brutal min-h-[40px] text-sm w-auto min-w-[160px]" value={moveTo}
+                  onChange={(e) => setMoveTo(e.target.value as OutreachStatus)}>
+                  {OUTREACH_KANBAN_STATUSES.map((s) => (
+                    <option key={s} value={s}>{OUTREACH_STATUS_LABELS[s]}</option>
+                  ))}
+                </select>
+              </label>
+              <button type="button" onClick={applyBulk} disabled={busy}
+                className="btn-brutal-teal text-sm min-h-[40px] px-4 inline-flex items-center gap-2 shrink-0 disabled:opacity-50">
+                {busy && <Loader2 size={14} className="animate-spin" />}
+                Apply to {selected.toLocaleString()}
+              </button>
+              <button type="button" onClick={clear} className="btn-brutal-outline text-sm min-h-[40px] px-4 shrink-0">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
