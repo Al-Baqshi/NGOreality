@@ -19,7 +19,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import {
   NOTIFICATION_STATUS_LABELS,
-  NOTIFICATION_TEMPLATE_LABELS,
+  notificationTemplateLabel,
   type NotificationEvent,
   type NotificationStatus,
   type NotificationTemplate,
@@ -92,7 +92,7 @@ export default function EmailNotifications() {
     const seen = new Set<NotificationTemplate>();
     for (const e of events) seen.add(e.template);
     return [...seen].sort((a, b) =>
-      NOTIFICATION_TEMPLATE_LABELS[a].localeCompare(NOTIFICATION_TEMPLATE_LABELS[b]),
+      notificationTemplateLabel(a).localeCompare(notificationTemplateLabel(b)),
     );
   }, [events]);
 
@@ -103,7 +103,7 @@ export default function EmailNotifications() {
       if (templateFilter !== 'all' && e.template !== templateFilter) return false;
       if (!q) return true;
       const name = e.organizations?.name ?? '';
-      const label = NOTIFICATION_TEMPLATE_LABELS[e.template] ?? e.template;
+      const label = notificationTemplateLabel(e.template);
       return (
         name.toLowerCase().includes(q) ||
         e.recipient_email.toLowerCase().includes(q) ||
@@ -457,7 +457,7 @@ export default function EmailNotifications() {
                   <option value="all">All types</option>
                   {templatesInQueue.map((t) => (
                     <option key={t} value={t}>
-                      {NOTIFICATION_TEMPLATE_LABELS[t]}
+                      {notificationTemplateLabel(t)}
                     </option>
                   ))}
                 </select>
@@ -486,7 +486,7 @@ export default function EmailNotifications() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-semibold text-sm truncate">
-                      {NOTIFICATION_TEMPLATE_LABELS[e.template]}
+                      {notificationTemplateLabel(e.template)}
                     </p>
                     <p className="font-mono text-2xs text-ink-500 flex flex-wrap items-center gap-x-1.5 gap-y-1">
                       {e.organizations?.name ? (

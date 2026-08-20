@@ -93,6 +93,7 @@ export type NotificationTemplate =
   | 'site_down'
   | 'badge_issued'
   | 'membership_welcome'
+  | 'badge_request_received'
   | OutreachEmailTemplate;
 export type NotificationStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'skipped' | 'suppressed';
 
@@ -116,10 +117,15 @@ export const NOTIFICATION_TEMPLATE_LABELS: Record<NotificationTemplate, string> 
   site_down: 'Site down alert',
   badge_issued: 'Badge issued',
   membership_welcome: 'Membership welcome',
+  badge_request_received: 'Badge request received',
   outreach_cold_invite: 'Outreach — cold invite',
   outreach_no_website: 'Outreach — no website',
   outreach_website_help: 'Outreach — website help',
 };
+
+export function notificationTemplateLabel(template: string): string {
+  return NOTIFICATION_TEMPLATE_LABELS[template as NotificationTemplate] ?? template.replaceAll('_', ' ');
+}
 
 export type PortalNotificationAudience = 'staff' | 'ngo';
 
