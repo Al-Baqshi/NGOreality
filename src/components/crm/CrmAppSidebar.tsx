@@ -18,11 +18,7 @@ export function CrmAppSidebar(props: ComponentProps<typeof Sidebar>) {
   const navCounts = useCrmNavCounts();
 
   return (
-    <Sidebar
-      collapsible="icon"
-      className="top-(--header-height) h-[calc(100svh-var(--header-height))]!"
-      {...props}
-    >
+    <Sidebar collapsible="icon" {...props}>
       <AppSidebarBrand
         to="/dashboard"
         title="NGOreality"
@@ -31,7 +27,7 @@ export function CrmAppSidebar(props: ComponentProps<typeof Sidebar>) {
         isActive={pathname === '/dashboard'}
       />
 
-      <SidebarContent className="gap-1 px-1 py-2">
+      <SidebarContent className="gap-1 px-1 py-2 group-data-[collapsible=icon]:px-1.5 group-data-[collapsible=icon]:items-center">
         {CRM_NAV_GROUPS.map((group) => (
           <NavMain
             key={group.label}

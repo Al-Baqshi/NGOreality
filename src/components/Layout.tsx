@@ -19,32 +19,21 @@ export default function CRMLayout() {
 
   return (
     <TooltipProvider delay={0}>
-      <div className="[--header-height:calc(--spacing(14))]">
-        <SidebarProvider className="flex flex-col">
-          <SiteHeader
-            searchPlaceholder="Search organisations..."
-            onSearch={(query) => {
-              const params = new URLSearchParams();
-              if (query) params.set('q', query);
-              navigate(query ? `/organizations?${params.toString()}` : '/organizations');
-            }}
-          >
+      <SidebarProvider>
+        <CrmAppSidebar />
+        <SidebarInset className="flex min-h-svh min-w-0 flex-1 flex-col overflow-hidden bg-background">
+          <SiteHeader>
             <ThemeToggle variant="ghost" />
             <PortalNotificationBell audience="staff" to="/notifications" />
             <NavUser onSignOut={handleSignOut} />
           </SiteHeader>
-          <div className="flex min-h-0 flex-1">
-            <CrmAppSidebar />
-            <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 lg:p-8">
-                <div className="flex w-full min-w-0 flex-col gap-4 sm:gap-6">
-                  <Outlet />
-                </div>
-              </div>
-            </SidebarInset>
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 lg:p-8">
+            <div className="flex w-full min-w-0 flex-col gap-4 sm:gap-6">
+              <Outlet />
+            </div>
           </div>
-        </SidebarProvider>
-      </div>
+        </SidebarInset>
+      </SidebarProvider>
     </TooltipProvider>
   );
 }

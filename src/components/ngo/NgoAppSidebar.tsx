@@ -37,11 +37,7 @@ export function NgoAppSidebar({
     : [{ label: 'Get started', items: navItems }];
 
   return (
-    <Sidebar
-      collapsible="icon"
-      className="top-(--header-height) h-[calc(100svh-var(--header-height))]!"
-      {...props}
-    >
+    <Sidebar collapsible="icon" {...props}>
       <AppSidebarBrand
         to={homePath}
         title={organizationName}
@@ -50,7 +46,7 @@ export function NgoAppSidebar({
         isActive={activeId === 'overview'}
       />
 
-      <SidebarContent className="gap-1 px-1 py-2">
+      <SidebarContent className="gap-1 px-1 py-2 group-data-[collapsible=icon]:px-1.5 group-data-[collapsible=icon]:items-center">
         {groups.map((group) => (
           <NavMain
             key={group.label}

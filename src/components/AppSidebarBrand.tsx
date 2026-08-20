@@ -20,7 +20,7 @@ type AppSidebarBrandProps = {
 
 /**
  * Shared brand lockup for CRM + member-portal sidebars.
- * Reality Badge seal — collapses to icon-only when the rail is compact.
+ * Reality Badge seal — collapses to a centered icon on the compact rail.
  */
 export function AppSidebarBrand({
   to,
@@ -29,12 +29,23 @@ export function AppSidebarBrand({
   tooltip,
   isActive = false,
 }: AppSidebarBrandProps) {
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, setOpenMobile, state } = useSidebar();
+  const collapsed = state === 'collapsed' && !isMobile;
 
   return (
-    <SidebarHeader className="gap-0 border-b border-sidebar-border/35 p-0">
-      <div className="bg-gradient-to-b from-white/[0.06] to-transparent px-2 pb-2 pt-2.5">
-        <SidebarMenu>
+    <SidebarHeader
+      className={cn(
+        'gap-0 border-b border-sidebar-border/35 p-0',
+        collapsed && 'flex items-center justify-center py-3',
+      )}
+    >
+      <div
+        className={cn(
+          'bg-gradient-to-b from-white/[0.06] to-transparent',
+          collapsed ? 'flex w-full justify-center px-0' : 'px-2 pb-2 pt-2.5',
+        )}
+      >
+        <SidebarMenu className={cn(collapsed && 'w-auto')}>
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
@@ -42,7 +53,7 @@ export function AppSidebarBrand({
               isActive={isActive}
               className={cn(
                 'h-14 gap-3 rounded-lg px-2.5 hover:bg-white/10 data-active:bg-white/10',
-                'group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:p-1.5!',
+                'group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center',
               )}
               render={
                 <Link
@@ -55,16 +66,21 @@ export function AppSidebarBrand({
             >
               <BrandLogo
                 variant="icon"
-                iconClassName="size-10 shrink-0 object-contain drop-shadow-sm group-data-[collapsible=icon]:size-7"
+                iconClassName={cn(
+                  'shrink-0 object-contain drop-shadow-sm',
+                  collapsed ? 'size-9' : 'size-10',
+                )}
               />
-              <div className="grid min-w-0 flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
-                <span className="truncate text-[13px] font-bold tracking-[0.04em] text-white uppercase">
-                  {title}
-                </span>
-                <span className="mt-0.5 truncate font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-sidebar-primary">
-                  {subtitle}
-                </span>
-              </div>
+              {!collapsed ? (
+                <div className="grid min-w-0 flex-1 text-left leading-tight">
+                  <span className="truncate text-[13px] font-bold tracking-[0.04em] text-white uppercase">
+                    {title}
+                  </span>
+                  <span className="mt-0.5 truncate font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-sidebar-primary">
+                    {subtitle}
+                  </span>
+                </div>
+              ) : null}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

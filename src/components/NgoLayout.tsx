@@ -64,57 +64,55 @@ function NgoPortalFrame() {
 
   return (
     <>
-      <SiteHeader>
-        {organization ? (
-          <span className="hidden min-w-0 items-center gap-1.5 truncate font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:flex">
-            {isVerified ? (
-              <img
-                src="/reality-badge.png"
-                alt="Reality Badge"
-                className="size-5 shrink-0 object-contain"
-              />
-            ) : null}
-            <span className="truncate">{organization.name}</span>
-          </span>
-        ) : null}
-        <ThemeToggle variant="ghost" />
-        {!onboarding ? <PortalNotificationBell audience="ngo" to="/ngo/notifications" /> : null}
-        <NavUser
-          onSignOut={handleSignOut}
-          extraItems={
-            !onboarding
-              ? [
-                  { title: 'Profile', url: '/ngo/profile', icon: User },
-                  { title: 'Account', url: BAQSHI_ACCOUNT_URL, icon: UserCircle },
-                ]
-              : []
-          }
-        />
-      </SiteHeader>
-      <div className="flex min-h-0 flex-1">
-        <NgoAppSidebar
-          navItems={navItems}
-          activeId={activeId}
-          organizationName={organization?.name ?? 'NGOreality'}
-          subtitle={
-            organization
-              ? isVerified
-                ? 'Verified member'
-                : 'Member portal'
+      <NgoAppSidebar
+        navItems={navItems}
+        activeId={activeId}
+        organizationName={organization?.name ?? 'NGOreality'}
+        subtitle={
+          organization
+            ? isVerified
+              ? 'Verified member'
               : 'Member portal'
-          }
-          homePath={navItems[0]?.path ?? '/ngo'}
-        />
-        <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-            <div className="p-3 sm:p-6 lg:p-8">
-              <div className="mx-auto w-full min-w-0 max-w-3xl">
-                <Outlet />
-              </div>
+            : 'Member portal'
+        }
+        homePath={navItems[0]?.path ?? '/ngo'}
+      />
+      <SidebarInset className="flex min-h-svh min-w-0 flex-1 flex-col overflow-hidden bg-background">
+        <SiteHeader>
+          {organization ? (
+            <span className="hidden min-w-0 items-center gap-1.5 truncate font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:flex">
+              {isVerified ? (
+                <img
+                  src="/reality-badge.png"
+                  alt="Reality Badge"
+                  className="size-5 shrink-0 object-contain"
+                />
+              ) : null}
+              <span className="truncate">{organization.name}</span>
+            </span>
+          ) : null}
+          <ThemeToggle variant="ghost" />
+          {!onboarding ? <PortalNotificationBell audience="ngo" to="/ngo/notifications" /> : null}
+          <NavUser
+            onSignOut={handleSignOut}
+            extraItems={
+              !onboarding
+                ? [
+                    { title: 'Profile', url: '/ngo/profile', icon: User },
+                    { title: 'Account', url: BAQSHI_ACCOUNT_URL, icon: UserCircle },
+                  ]
+                : []
+            }
+          />
+        </SiteHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="p-3 sm:p-6 lg:p-8">
+            <div className="mx-auto w-full min-w-0 max-w-3xl">
+              <Outlet />
             </div>
           </div>
-        </SidebarInset>
-      </div>
+        </div>
+      </SidebarInset>
     </>
   );
 }
@@ -122,11 +120,9 @@ function NgoPortalFrame() {
 export default function NgoLayout() {
   return (
     <TooltipProvider delay={0}>
-      <div className="[--header-height:calc(--spacing(14))]">
-        <SidebarProvider className="flex flex-col">
-          <NgoPortalFrame />
-        </SidebarProvider>
-      </div>
+      <SidebarProvider>
+        <NgoPortalFrame />
+      </SidebarProvider>
     </TooltipProvider>
   );
 }
