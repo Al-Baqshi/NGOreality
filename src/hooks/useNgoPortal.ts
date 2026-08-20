@@ -118,6 +118,14 @@ export function useNgoPortal() {
       return { error: 'Not signed in', paymentReference: null };
     }
 
+    if (!member?.verified_at) {
+      return {
+        error:
+          'NGOreality still needs to confirm you manage this organisation before you can apply for a Reality Badge. Monitoring still works.',
+        paymentReference: null,
+      };
+    }
+
     const paymentReference = await ensurePaymentReference(organization.id);
 
     const { error: insertError } = await supabase.from('badge_requests').insert({
@@ -128,7 +136,15 @@ export function useNgoPortal() {
     });
 
     if (insertError) {
-      return { error: insertError.message, paymentReference: null };
+      const rlsDenied =
+        insertError.code === '42501' ||
+        /row-level security/i.test(insertError.message);
+      return {
+        error: rlsDenied
+          ? 'NGOreality still needs to confirm you manage this organisation before you can apply for a Reality Badge. Monitoring still works.'
+          : insertError.message,
+        paymentReference: null,
+      };
     }
 
     if (requestType === 'renewal') {
@@ -146,6 +162,7 @@ export function useNgoPortal() {
   const isLinked = Boolean(member);
   const hasOrganization = Boolean(organization);
   const needsRegistration = Boolean(user) && !isLinked && !loading;
+  const isSteward = Boolean(member?.verified_at);
 
   return {
     member,
@@ -162,5 +179,6 @@ export function useNgoPortal() {
     isLinked,
     hasOrganization,
     needsRegistration,
+    isSteward,
   };
 }

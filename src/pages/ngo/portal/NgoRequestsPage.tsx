@@ -12,7 +12,7 @@ import VerificationSubmittedDialog from '../../../components/ngo/VerificationSub
 import NgoBillingTopUpPanel from '../../../components/ngo/NgoBillingTopUpPanel';
 
 export default function NgoRequestsPage() {
-  const { organization, badgeRequests, submitBadgeRequest } = useNgoPortalContext();
+  const { organization, badgeRequests, submitBadgeRequest, isSteward } = useNgoPortalContext();
   const [requestType, setRequestType] = useState<BadgeRequestType>('new_badge');
   const [requestNotes, setRequestNotes] = useState('');
   const [requestError, setRequestError] = useState('');
@@ -62,14 +62,29 @@ export default function NgoRequestsPage() {
         </div>
 
         <p className="text-xs text-ink-500 leading-relaxed">
-          Submitting starts your verification review. After you submit, you can pay by bank transfer (use your unique
-          reference), or via Paymark / Airwallex when enabled. See{' '}
-          <Link to="/ngo/standards" className="text-teal font-semibold underline">
-            trust standards
-          </Link>{' '}
-          for what we check.
+          {isSteward ? (
+            <>
+              Submitting starts your verification review. After you submit, you can pay by bank transfer (use your unique
+              reference), or via Paymark / Airwallex when enabled. See{' '}
+              <Link to="/ngo/standards" className="text-teal font-semibold underline">
+                trust standards
+              </Link>{' '}
+              for what we check.
+            </>
+          ) : (
+            <>
+              Monitoring is available now. Applying for a Reality Badge waits until NGOreality confirms you manage{' '}
+              {organization.name}. That stops someone else putting a badge on a charity they do not run. If this is your
+              organisation,{' '}
+              <Link to="/public/contact" className="text-teal font-semibold underline">
+                contact us
+              </Link>
+              .
+            </>
+          )}
         </p>
 
+        {isSteward ? (
         <form onSubmit={handleBadgeRequest} className="space-y-4">
           <div>
             <label className="label-brutal" htmlFor="request-type">
@@ -115,11 +130,14 @@ export default function NgoRequestsPage() {
             {submitting ? 'Submitting…' : 'Submit verification request'}
           </button>
         </form>
+        ) : null}
 
-        <NgoBillingTopUpPanel
-          organizationId={organization.id}
-          paymentReference={organization.payment_reference}
-        />
+        {isSteward ? (
+          <NgoBillingTopUpPanel
+            organizationId={organization.id}
+            paymentReference={organization.payment_reference}
+          />
+        ) : null}
 
         {badgeRequests.length > 0 && (
           <div className="border-t border-ink-100 pt-6">

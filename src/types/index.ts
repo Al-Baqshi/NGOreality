@@ -476,6 +476,9 @@ export interface OrganizationMember {
   organization_id: string;
   role: 'owner' | 'admin';
   created_at: string;
+  /** Set = steward (may edit listing and request a Reality Badge). */
+  verified_at?: string | null;
+  verified_by?: string;
 }
 
 export interface OrganizationMembership {
