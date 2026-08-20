@@ -148,7 +148,7 @@ export function MetricCard({
   const tone = accent ? 'text-emerald-700' : 'text-ink-950';
   return (
     <div
-      className={`card-brutal stat-card ${compact ? 'p-3 sm:p-4' : 'p-4 sm:p-5 md:p-6'}`}
+      className={`card-brutal stat-card h-full ${compact ? 'p-3 sm:p-4' : 'p-4 sm:p-5 md:p-6'}`}
       title={typeof value === 'string' && value.length > 12 ? value : undefined}
     >
       <div className="label-brutal">{label}</div>

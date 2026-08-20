@@ -1,6 +1,19 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, Ban, Mail, RefreshCw, RotateCcw, Send, Trash2, UserCheck } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Ban,
+  Check,
+  Copy,
+  Mail,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  Send,
+  Trash2,
+  UserCheck,
+} from 'lucide-react';
 import { SectionHeader, MetricCard } from '../../components/ui';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -9,22 +22,23 @@ import {
   NOTIFICATION_TEMPLATE_LABELS,
   type NotificationEvent,
   type NotificationStatus,
+  type NotificationTemplate,
 } from '../../types';
 
 type StatusFilter = 'all' | NotificationStatus;
 
 function StatusBadge({ status }: { status: NotificationEvent['status'] }) {
   const styles: Record<NotificationEvent['status'], string> = {
-    pending: 'border-amber-400 bg-amber-50 text-amber-800',
+    pending: 'border-amber-400 bg-amber-50 text-amber-900',
     sending: 'border-sky-300 bg-sky-50 text-sky-800',
-    sent: 'border-teal bg-teal-light text-teal',
+    sent: 'border-gold bg-gold-light text-ink-950',
     failed: 'border-accent bg-accent-light text-accent',
     skipped: 'border-ink-200 bg-ink-50 text-ink-500',
     suppressed: 'border-ink-300 bg-ink-100 text-ink-600',
   };
   return (
     <span
-      className={`font-mono text-2xs uppercase tracking-wider px-2 py-0.5 border ${styles[status]}`}
+      className={`shrink-0 font-mono text-2xs uppercase tracking-wider px-2 py-0.5 border-2 ${styles[status]}`}
     >
       {NOTIFICATION_STATUS_LABELS[status]}
     </span>
@@ -53,6 +67,9 @@ export default function EmailNotifications() {
       ? statusParam
       : 'all';
   const [filter, setFilter] = useState<StatusFilter>(initialFilter);
+  const [search, setSearch] = useState('');
+  const [templateFilter, setTemplateFilter] = useState<'all' | NotificationTemplate>('all');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const { events, loading, error, summary, flushing, flushNow, requeue, removeFromQueue, restoreToQueue, getSuppressionInfo, allowEmailAgain, apiConfigured, refetch } =
     useNotifications();
@@ -71,10 +88,40 @@ export default function EmailNotifications() {
     setSearchParams(searchParams, { replace: true });
   };
 
+  const templatesInQueue = useMemo(() => {
+    const seen = new Set<NotificationTemplate>();
+    for (const e of events) seen.add(e.template);
+    return [...seen].sort((a, b) =>
+      NOTIFICATION_TEMPLATE_LABELS[a].localeCompare(NOTIFICATION_TEMPLATE_LABELS[b]),
+    );
+  }, [events]);
+
   const filteredEvents = useMemo(() => {
-    if (filter === 'all') return events;
-    return events.filter((e) => e.status === filter);
-  }, [events, filter]);
+    const q = search.trim().toLowerCase();
+    return events.filter((e) => {
+      if (filter !== 'all' && e.status !== filter) return false;
+      if (templateFilter !== 'all' && e.template !== templateFilter) return false;
+      if (!q) return true;
+      const name = e.organizations?.name ?? '';
+      const label = NOTIFICATION_TEMPLATE_LABELS[e.template] ?? e.template;
+      return (
+        name.toLowerCase().includes(q) ||
+        e.recipient_email.toLowerCase().includes(q) ||
+        e.subject.toLowerCase().includes(q) ||
+        label.toLowerCase().includes(q)
+      );
+    });
+  }, [events, filter, search, templateFilter]);
+
+  const copyEmail = async (id: string, email: string) => {
+    try {
+      await navigator.clipboard.writeText(email);
+      setCopiedId(id);
+      window.setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1500);
+    } catch {
+      showAction('Could not copy email.', true);
+    }
+  };
 
   const handleFlush = async () => {
     const pendingCount = summary.pending ?? 0;
@@ -166,8 +213,21 @@ export default function EmailNotifications() {
     showAction(err ?? 'Address allowed and email requeued — click Send pending when ready.', Boolean(err));
   };
 
+  const emptyMessage = (() => {
+    if (search.trim() || templateFilter !== 'all') {
+      return 'No emails match this search.';
+    }
+    if (filter === 'failed') {
+      return 'No failed sends in the latest queue rows — good. Failed items from the last 30 days may still appear in the count above after you send more mail.';
+    }
+    if (filter === 'suppressed') return 'No unsubscribed or suppressed emails in the last 30 days.';
+    if (filter === 'skipped') return 'No cancelled emails in the last 30 days.';
+    if (filter === 'all') return 'No queued emails yet.';
+    return `No ${NOTIFICATION_STATUS_LABELS[filter].toLowerCase()} emails in the latest queue rows.`;
+  })();
+
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto w-full min-w-0">
       <Link
         to="/notifications"
         className="inline-flex items-center gap-2 font-mono text-2xs uppercase tracking-wider text-ink-500 hover:text-ink-950 dark:hover:text-foreground mb-6 min-h-[44px]"
@@ -175,21 +235,40 @@ export default function EmailNotifications() {
         <ArrowLeft size={14} aria-hidden /> Notifications
       </Link>
 
-      <SectionHeader>Email notifications</SectionHeader>
+      <SectionHeader
+        action={
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void handleFlush()}
+              disabled={flushing}
+              className="btn-brutal-teal text-sm min-h-[44px] inline-flex items-center justify-center gap-2 px-4"
+            >
+              <Send size={14} aria-hidden />
+              {flushing ? 'Sending…' : 'Send pending now'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="btn-brutal-outline text-sm min-h-[44px] inline-flex items-center justify-center gap-2 px-4"
+            >
+              <RefreshCw size={14} aria-hidden /> Refresh
+            </button>
+          </div>
+        }
+      >
+        Email queue
+      </SectionHeader>
       <p className="font-mono text-2xs text-ink-500 -mt-4 mb-6 max-w-2xl leading-relaxed">
-        Outbound email queue: outreach campaigns, membership welcome, badge issued, and site-down alerts. Queued in the
-        database; sent via Resend when the worker runs or when you click Send pending below.{' '}
-        <strong className="text-ink-800 dark:text-foreground">Failed</strong> means Resend or the worker rejected the
-        send — not inbox bounce. For inquiry and portal alerts, use{' '}
+        Outbound mail for outreach, membership welcome, badges, and site-down alerts. Queued here, then sent via
+        Resend when you click Send pending or when the worker runs.{' '}
+        <strong className="text-ink-800 dark:text-foreground">Failed</strong> is a send error, not an inbox bounce.{' '}
+        <strong className="text-ink-800 dark:text-foreground">Cancelled</strong> was removed by staff.{' '}
+        <strong className="text-ink-800 dark:text-foreground">Unsubscribed</strong> opted out. In-app alerts live on{' '}
         <Link to="/notifications" className="underline font-semibold text-ink-800 dark:text-foreground">
           Notifications
         </Link>
-        .{' '}
-        <strong className="text-ink-800 dark:text-foreground">Cancelled</strong> means staff removed a pending send;{' '}
-        <strong className="text-ink-800 dark:text-foreground">Unsubscribed</strong> means the recipient opted out and mail
-        will not be sent to that address. Use the status filters below the summary cards — click{' '}
-        <strong className="text-ink-800 dark:text-foreground">Unsubscribed</strong> or{' '}
-        <strong className="text-ink-800 dark:text-foreground">Cancelled</strong> — to see reasons on each row.
+        .
       </p>
 
       {error && (
@@ -261,21 +340,21 @@ export default function EmailNotifications() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
-        <button type="button" onClick={() => setFilterAndUrl('pending')} className="text-left min-h-[44px]">
-          <MetricCard label="Pending" value={summary.pending ?? 0} />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        <button type="button" onClick={() => setFilterAndUrl('pending')} className="h-full min-h-[44px] text-left">
+          <MetricCard compact label="Pending" value={summary.pending ?? 0} sub="In queue" />
         </button>
-        <button type="button" onClick={() => setFilterAndUrl('sent')} className="text-left min-h-[44px]">
-          <MetricCard label="Sent (30d)" value={summary.sent ?? 0} accent />
+        <button type="button" onClick={() => setFilterAndUrl('sent')} className="h-full min-h-[44px] text-left">
+          <MetricCard compact label="Sent" value={summary.sent ?? 0} sub="Last 30 days" accent />
         </button>
-        <button type="button" onClick={() => setFilterAndUrl('failed')} className="text-left min-h-[44px]">
-          <MetricCard label="Failed (30d)" value={summary.failed ?? 0} />
+        <button type="button" onClick={() => setFilterAndUrl('failed')} className="h-full min-h-[44px] text-left">
+          <MetricCard compact label="Failed" value={summary.failed ?? 0} sub="Last 30 days" />
         </button>
-        <button type="button" onClick={() => setFilterAndUrl('skipped')} className="text-left min-h-[44px]">
-          <MetricCard label="Cancelled (30d)" value={summary.skipped ?? 0} />
+        <button type="button" onClick={() => setFilterAndUrl('skipped')} className="h-full min-h-[44px] text-left">
+          <MetricCard compact label="Cancelled" value={summary.skipped ?? 0} sub="Last 30 days" />
         </button>
-        <button type="button" onClick={() => setFilterAndUrl('suppressed')} className="text-left min-h-[44px]">
-          <MetricCard label="Unsubscribed (30d)" value={summary.suppressed ?? 0} />
+        <button type="button" onClick={() => setFilterAndUrl('suppressed')} className="h-full min-h-[44px] text-left">
+          <MetricCard compact label="Unsubscribed" value={summary.suppressed ?? 0} sub="Last 30 days" />
         </button>
       </div>
 
@@ -283,8 +362,9 @@ export default function EmailNotifications() {
         <p className="mb-4 text-sm text-ink-600 dark:text-muted-foreground">
           Each row shows why sending was blocked. When a recipient asks to hear from you again, click{' '}
           <strong className="text-ink-800 dark:text-foreground">Allow email again</strong> on their row,
-          then queue new outreach from the CRM — or use <strong className="text-ink-800 dark:text-foreground">Allow and requeue</strong>{' '}
-          to retry that specific email.
+          then queue new outreach from the CRM — or use{' '}
+          <strong className="text-ink-800 dark:text-foreground">Allow and requeue</strong> to retry that specific
+          email.
         </p>
       )}
 
@@ -294,48 +374,6 @@ export default function EmailNotifications() {
           <strong className="text-ink-800 dark:text-foreground">Restore to queue</strong> on each row.
         </p>
       )}
-
-      <div className="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Filter email queue">
-        {FILTER_OPTIONS.map((opt) => (
-          <button
-            key={opt.id}
-            type="button"
-            role="tab"
-            aria-selected={filter === opt.id}
-            onClick={() => setFilterAndUrl(opt.id)}
-            className={`font-mono text-2xs uppercase tracking-wider px-3 py-2 min-h-[44px] border-2 ${
-              filter === opt.id
-                ? 'border-ink-950 bg-ink-950 text-white dark:border-foreground dark:bg-foreground dark:text-background'
-                : 'border-ink-200 hover:border-ink-400'
-            }`}
-          >
-            {opt.label}
-            {opt.id === 'pending' && (summary.pending ?? 0) > 0 ? ` (${summary.pending})` : ''}
-            {opt.id === 'failed' && (summary.failed ?? 0) > 0 ? ` (${summary.failed})` : ''}
-            {opt.id === 'skipped' && (summary.skipped ?? 0) > 0 ? ` (${summary.skipped})` : ''}
-            {opt.id === 'suppressed' && (summary.suppressed ?? 0) > 0 ? ` (${summary.suppressed})` : ''}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-2 mb-6">
-        <button
-          type="button"
-          onClick={handleFlush}
-          disabled={flushing}
-          className="btn-brutal-teal text-xs min-h-[44px] flex items-center justify-center gap-2 px-4"
-        >
-          <Send size={14} aria-hidden />
-          {flushing ? 'Sending…' : 'Send pending now'}
-        </button>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          className="btn-brutal-outline text-xs min-h-[44px] flex items-center justify-center gap-2 px-4"
-        >
-          <RefreshCw size={14} aria-hidden /> Refresh
-        </button>
-      </div>
 
       {!apiConfigured && (
         <p className="text-xs text-ink-500 mb-4 border-2 border-ink-200 p-3 bg-ink-50 dark:bg-muted/30">
@@ -355,32 +393,85 @@ export default function EmailNotifications() {
         </p>
       )}
 
-      <div className="card-brutal overflow-hidden">
-        <div className="border-b-3 border-ink-950 dark:border-border px-4 py-3 flex flex-wrap items-center gap-2">
-          <Mail size={14} aria-hidden />
-          <span className="font-mono text-xs uppercase tracking-wider font-semibold">Email queue</span>
-          {filter !== 'all' && (
-            <span className="font-mono text-2xs text-ink-500">
-              · {NOTIFICATION_STATUS_LABELS[filter]} ({filteredEvents.length})
+      <div className="card-brutal overflow-hidden flex flex-col max-h-[min(78vh,860px)]">
+        <div className="border-b-2 border-gold bg-ink-950 px-4 py-3 flex flex-wrap items-center justify-between gap-2 shrink-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <Mail size={14} className="text-gold shrink-0" aria-hidden />
+            <span className="font-mono text-xs uppercase tracking-wider font-semibold text-white">
+              Queue
             </span>
-          )}
+            <span className="font-mono text-2xs uppercase bg-gold text-ink-950 px-2 py-0.5 font-semibold">
+              {filteredEvents.length}
+              {filter !== 'all' ? ` · ${NOTIFICATION_STATUS_LABELS[filter]}` : ''}
+            </span>
+          </div>
         </div>
+
+        <div className="shrink-0 border-b border-ink-200 bg-white px-4 py-3 space-y-3 dark:border-border dark:bg-card">
+          <div className="relative">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"
+            />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search org, email, or subject…"
+              className="input-brutal w-full pl-9 min-h-[40px] text-sm"
+              aria-label="Search email queue"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Filter email queue">
+            {FILTER_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                role="tab"
+                aria-selected={filter === opt.id}
+                onClick={() => setFilterAndUrl(opt.id)}
+                className={`font-mono text-2xs uppercase tracking-wider px-3 py-1.5 min-h-[36px] border-2 ${
+                  filter === opt.id
+                    ? 'border-ink-950 bg-ink-950 text-white'
+                    : 'border-ink-200 text-ink-600 hover:border-gold hover:bg-gold-light'
+                }`}
+              >
+                {opt.label}
+                {opt.id === 'pending' && (summary.pending ?? 0) > 0 ? ` (${summary.pending})` : ''}
+                {opt.id === 'failed' && (summary.failed ?? 0) > 0 ? ` (${summary.failed})` : ''}
+                {opt.id === 'skipped' && (summary.skipped ?? 0) > 0 ? ` (${summary.skipped})` : ''}
+                {opt.id === 'suppressed' && (summary.suppressed ?? 0) > 0 ? ` (${summary.suppressed})` : ''}
+              </button>
+            ))}
+            {templatesInQueue.length > 1 && (
+              <label className="ml-auto flex min-w-0 items-center gap-2">
+                <span className="shrink-0 font-mono text-2xs uppercase tracking-wider text-ink-400">Type</span>
+                <select
+                  value={templateFilter}
+                  onChange={(e) =>
+                    setTemplateFilter(e.target.value === 'all' ? 'all' : (e.target.value as NotificationTemplate))
+                  }
+                  className="input-brutal min-h-[36px] py-1 text-2xs font-mono"
+                  aria-label="Filter by email type"
+                >
+                  <option value="all">All types</option>
+                  {templatesInQueue.map((t) => (
+                    <option key={t} value={t}>
+                      {NOTIFICATION_TEMPLATE_LABELS[t]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+        </div>
+
         {loading ? (
           <p className="p-6 text-sm text-ink-400">Loading…</p>
         ) : filteredEvents.length === 0 ? (
-          <p className="p-6 text-sm text-ink-400">
-            {filter === 'failed'
-              ? 'No failed sends in the latest queue rows — good. Failed items from the last 30 days may still appear in the count above after you send more mail.'
-              : filter === 'suppressed'
-                ? 'No unsubscribed or suppressed emails in the last 30 days.'
-                : filter === 'skipped'
-                  ? 'No cancelled emails in the last 30 days.'
-                  : filter === 'all'
-                    ? 'No queued emails yet.'
-                    : `No ${NOTIFICATION_STATUS_LABELS[filter].toLowerCase()} emails in the latest queue rows.`}
-          </p>
+          <p className="p-6 text-sm text-ink-400">{emptyMessage}</p>
         ) : (
-          <div className="divide-y divide-ink-100 max-h-[60vh] overflow-y-auto">
+          <div className="divide-y divide-ink-100 overflow-y-auto min-h-0 flex-1">
             {filteredEvents.map((e) => (
               <div
                 key={e.id}
@@ -389,7 +480,7 @@ export default function EmailNotifications() {
                     ? 'bg-accent-light/20 dark:bg-accent/5'
                     : e.status === 'suppressed'
                       ? 'bg-ink-100/50 dark:bg-muted/20'
-                      : ''
+                      : 'hover:bg-gold-light/30'
                 }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -397,29 +488,39 @@ export default function EmailNotifications() {
                     <p className="font-semibold text-sm truncate">
                       {NOTIFICATION_TEMPLATE_LABELS[e.template]}
                     </p>
-                    <p className="font-mono text-2xs text-ink-500">
+                    <p className="font-mono text-2xs text-ink-500 flex flex-wrap items-center gap-x-1.5 gap-y-1">
                       {e.organizations?.name ? (
                         <Link to={`/organizations/${e.organization_id}`} className="text-accent hover:underline">
                           {e.organizations.name}
                         </Link>
                       ) : (
-                        '—'
-                      )}{' '}
-                      · {e.recipient_email}
+                        <span>—</span>
+                      )}
+                      <span aria-hidden>·</span>
+                      <span className="truncate">{e.recipient_email}</span>
+                      <button
+                        type="button"
+                        onClick={() => void copyEmail(e.id, e.recipient_email)}
+                        className="inline-flex size-7 items-center justify-center text-ink-400 hover:text-ink-950"
+                        aria-label={`Copy ${e.recipient_email}`}
+                      >
+                        {copiedId === e.id ? <Check size={12} aria-hidden /> : <Copy size={12} aria-hidden />}
+                      </button>
                     </p>
                   </div>
                   <StatusBadge status={e.status} />
                 </div>
                 <p className="font-mono text-2xs text-ink-400 truncate">{e.subject}</p>
-                {(e.status === 'failed' || e.status === 'skipped' || e.status === 'suppressed') && e.error_message && (
-                  <p
-                    className={`text-xs font-mono leading-snug break-words ${
-                      e.status === 'failed' ? 'text-accent' : 'text-ink-600 dark:text-muted-foreground'
-                    }`}
-                  >
-                    {e.error_message}
-                  </p>
-                )}
+                {(e.status === 'failed' || e.status === 'skipped' || e.status === 'suppressed') &&
+                  e.error_message && (
+                    <p
+                      className={`text-xs font-mono leading-snug break-words ${
+                        e.status === 'failed' ? 'text-accent' : 'text-ink-600 dark:text-muted-foreground'
+                      }`}
+                    >
+                      {e.error_message}
+                    </p>
+                  )}
                 <div className="flex flex-wrap items-center gap-2 font-mono text-2xs text-ink-400">
                   <span>{new Date(e.created_at).toLocaleString()}</span>
                   {e.sent_at && <span>Sent {new Date(e.sent_at).toLocaleString()}</span>}
@@ -437,7 +538,7 @@ export default function EmailNotifications() {
                     <button
                       type="button"
                       onClick={() => void handleRestoreToQueue(e.id, e.subject)}
-                      className="inline-flex min-h-[36px] items-center gap-1 rounded-md border border-teal/40 bg-teal/5 px-2 text-teal font-semibold hover:bg-teal/10"
+                      className="inline-flex min-h-[36px] items-center gap-1 rounded-md border border-gold/50 bg-gold-light/40 px-2 font-semibold text-ink-950 hover:bg-gold-light"
                     >
                       <RotateCcw size={12} aria-hidden />
                       Restore to queue
@@ -448,7 +549,7 @@ export default function EmailNotifications() {
                       <button
                         type="button"
                         onClick={() => void handleAllowEmailAgain(e.recipient_email, e.subject, e.id)}
-                        className="inline-flex min-h-[36px] items-center gap-1 rounded-md border border-teal/40 bg-teal/5 px-2 text-teal font-semibold hover:bg-teal/10"
+                        className="inline-flex min-h-[36px] items-center gap-1 rounded-md border border-gold/50 bg-gold-light/40 px-2 font-semibold text-ink-950 hover:bg-gold-light"
                       >
                         <UserCheck size={12} aria-hidden />
                         Allow email again
@@ -465,7 +566,7 @@ export default function EmailNotifications() {
                   {e.status === 'failed' && (
                     <button
                       type="button"
-                      onClick={() => handleRequeue(e.id)}
+                      onClick={() => void handleRequeue(e.id)}
                       className="text-accent underline min-h-[36px]"
                     >
                       Requeue

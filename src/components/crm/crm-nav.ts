@@ -14,6 +14,7 @@ import {
   // LineChart, // TODO: re-enable with the Business plan nav item
   ListTodo,
   Mail,
+  Mails,
   Send,
   Shield,
   Table2,
@@ -104,7 +105,7 @@ export const CRM_NAV_GROUPS: CrmNavGroup[] = [
       { to: '/contacts', icon: Users, label: 'Contacts' },
       { to: '/blog-manager', icon: FileText, label: 'Blog' },
       { to: '/notifications', icon: Bell, label: 'Notifications' },
-      { to: '/email-notifications', icon: Mail, label: 'Email queue' },
+      { to: '/email-notifications', icon: Mails, label: 'Email queue' },
       { to: '/public', icon: Globe, label: 'Public site' },
     ],
   },
