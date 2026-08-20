@@ -8,7 +8,6 @@ import {
   FileText,
   History,
   Landmark,
-  Globe,
   Inbox,
   LayoutDashboard,
   // LineChart, // TODO: re-enable with the Business plan nav item
@@ -52,6 +51,12 @@ export type CrmNavItem = {
 };
 
 export type CrmNavGroup = { label: string; items: CrmNavItem[] };
+
+export function isCrmNavActive(pathname: string, to: string): boolean {
+  if (to === '/dashboard') return pathname === '/dashboard';
+  if (to === '/public') return pathname.startsWith('/public');
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
 
 /**
  * Grouped by what you are trying to DO, not by what the data happens to be.
@@ -106,7 +111,6 @@ export const CRM_NAV_GROUPS: CrmNavGroup[] = [
       { to: '/blog-manager', icon: FileText, label: 'Blog' },
       { to: '/notifications', icon: Bell, label: 'Notifications' },
       { to: '/email-notifications', icon: Mails, label: 'Email queue' },
-      { to: '/public', icon: Globe, label: 'Public site' },
     ],
   },
 ];
