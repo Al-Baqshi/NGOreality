@@ -66,9 +66,15 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
 };
 
 export const PAYMENT_PRODUCT_LABELS: Record<PaymentProductType, string> = {
-  membership_annual: 'Annual membership — $100/year',
+  membership_annual: 'Annual membership',
   verification_annual: 'Reality Badge (legacy)',
   monitoring_monthly: 'Monitoring only (legacy)',
+};
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  stripe: 'Card',
+  bank_transfer: 'Bank transfer',
+  manual: 'Manual',
 };
 
 /** Outreach email templates (queued in notification_events) */
@@ -133,6 +139,7 @@ export interface PortalNotification {
 
 export const PORTAL_NOTIFICATION_EVENT_LABELS: Record<string, string> = {
   inquiry_new: 'New inquiry',
+  ngo_claim: 'NGO claim',
   ngo_setup_request: 'NGO setup request',
   ngo_portal_registration: 'Portal registration',
   badge_request: 'Badge request',
@@ -265,6 +272,8 @@ export const ORG_STATUS_LABELS: Record<OrgStatus, string> = {
 export const OUTREACH_STATUS_LABELS: Record<OutreachStatus, string> = {
   not_contacted: 'Lead — not contacted',
   cold_email: 'Cold email',
+  no_website: 'No website',
+  website_issues: 'Website issues',
   contacted: 'Contacted',
   follow_up: 'Follow-up',
   declined: 'Declined',

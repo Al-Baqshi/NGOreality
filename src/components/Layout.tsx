@@ -47,13 +47,13 @@ export default function CRMLayout() {
   return (
     <TooltipProvider delay={0}>
       <SidebarProvider defaultOpen>
-        <Sidebar collapsible="icon" variant="sidebar" className="border-r-2 border-ink-950 dark:border-gold">
-          <SidebarHeader className="border-b-2 border-ink-950 bg-white dark:border-gold dark:bg-transparent">
+        <Sidebar collapsible="icon" variant="sidebar" className="border-r-2 border-gold">
+          <SidebarHeader className="border-b border-gold/40 bg-ink-950">
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   size="lg"
-                  className="data-[slot=sidebar-menu-button]:!p-2 hover:bg-gold-light dark:hover:bg-gold/15"
+                  className="data-[slot=sidebar-menu-button]:!p-2 hover:bg-ink-800"
                   render={
                     <Link
                       to="/dashboard"
@@ -69,7 +69,7 @@ export default function CRMLayout() {
                     decoding="async"
                   />
                   <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-black uppercase tracking-[0.04em] text-ink-950 dark:text-foreground">
+                    <span className="truncate font-black uppercase tracking-[0.04em] text-white">
                       NGOreality
                     </span>
                     <span className="truncate font-mono text-2xs uppercase tracking-[0.14em] text-gold">
@@ -84,7 +84,7 @@ export default function CRMLayout() {
           <SidebarContent className="gap-0 px-1">
             {CRM_NAV_GROUPS.map((group) => (
               <SidebarGroup key={group.label}>
-                <SidebarGroupLabel className="font-mono text-2xs uppercase tracking-[0.14em] text-ink-500 px-3 dark:text-gold/70">
+                <SidebarGroupLabel className="font-mono text-2xs uppercase tracking-[0.14em] text-gold/80 px-3">
                   {group.label}
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -95,7 +95,7 @@ export default function CRMLayout() {
                         <SidebarMenuItem key={item.to}>
                           <SidebarMenuButton
                             isActive={isNavActive(pathname, item.to)}
-                            className="mx-1 rounded-md text-ink-950 transition-colors hover:bg-gold-light hover:text-ink-950 data-active:bg-gold-light data-active:font-semibold data-active:text-ink-950 data-active:shadow-[inset_3px_0_0_0_#EBBB57] dark:text-foreground dark:hover:bg-gold/15 dark:hover:text-gold dark:data-active:bg-gold/20 dark:data-active:text-gold"
+                            className="mx-1 rounded-md text-white transition-colors hover:bg-ink-800 hover:text-gold data-active:bg-gold data-active:font-semibold data-active:text-ink-950"
                             tooltip={count > 0 ? `${item.label} — ${count} waiting` : item.label}
                             render={
                               <NavLink
@@ -112,7 +112,7 @@ export default function CRMLayout() {
                                     className={`shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[10px] leading-none tabular-nums group-data-[collapsible=icon]:hidden ${
                                       item.urgent
                                         ? 'border-gold bg-gold font-semibold text-ink-950'
-                                        : 'border-ink-950 bg-white text-ink-950 dark:border-gold dark:bg-transparent dark:text-gold'
+                                        : 'border-white/30 bg-ink-800 text-white'
                                     }`}
                                   >
                                     {count > 999 ? '999+' : count}
@@ -130,7 +130,7 @@ export default function CRMLayout() {
             ))}
           </SidebarContent>
 
-          <SidebarFooter className="border-t-2 border-ink-950 bg-white dark:border-gold dark:bg-transparent">
+          <SidebarFooter className="border-t border-gold/40 bg-ink-950 p-2">
             <CrmNavUser onSignOut={handleSignOut} />
           </SidebarFooter>
           <SidebarRail />

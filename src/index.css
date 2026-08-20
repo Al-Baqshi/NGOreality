@@ -171,14 +171,14 @@
            font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1;
   }
 
-  /* CRM sidebar — white field, navy edges, gold/orange accents */
+  /* CRM sidebar — navy field, gold/orange accents */
   [data-sidebar='sidebar'] {
-    background: #ffffff;
+    background: #041C3C;
     border-color: var(--sidebar-border);
   }
 
   .dark [data-sidebar='sidebar'] {
-    background: #0a1628;
+    background: #041C3C;
   }
 }
 
@@ -457,13 +457,13 @@
   --input: oklch(0.9 0 0);
   --ring: oklch(0.425 0.070 219);
   --radius: 0.5rem;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #041C3C;
-  --sidebar-primary: #041C3C;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #fdf3d6;
-  --sidebar-accent-foreground: #041C3C;
-  --sidebar-border: #041C3C;
+  --sidebar: #041C3C;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #EBBB57;
+  --sidebar-primary-foreground: #041C3C;
+  --sidebar-accent: #0a2d5c;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #EBBB57;
   --sidebar-ring: #EBBB57;
 }
 
@@ -484,11 +484,11 @@
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.525 0.100 219);
-  --sidebar: #0a1628;
-  --sidebar-foreground: #F3F6F8;
+  --sidebar: #041C3C;
+  --sidebar-foreground: #ffffff;
   --sidebar-primary: #EBBB57;
   --sidebar-primary-foreground: #041C3C;
-  --sidebar-accent: #2a2415;
+  --sidebar-accent: #0a2d5c;
   --sidebar-accent-foreground: #FDF3D6;
   --sidebar-border: #EBBB57;
   --sidebar-ring: #EBBB57;
