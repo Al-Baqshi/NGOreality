@@ -1,24 +1,19 @@
 import type { ComponentProps } from 'react';
-import { Bell, Globe } from 'lucide-react';
+import { Globe } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 
 import { AppSidebarBrand } from '@/components/AppSidebarBrand';
 import { NavMain } from '@/components/nav-main';
 import { NavSecondary } from '@/components/nav-secondary';
-import { NavUser } from '@/components/nav-user';
 import { CRM_NAV_GROUPS, isCrmNavActive } from '@/components/crm/crm-nav';
 import { useCrmNavCounts } from '@/hooks/useCrmNavCounts';
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarRail,
 } from '@/components/ui/sidebar';
-import { useLocation } from 'react-router-dom';
 
-export function CrmAppSidebar({
-  onSignOut,
-  ...props
-}: ComponentProps<typeof Sidebar> & { onSignOut: () => void }) {
+export function CrmAppSidebar(props: ComponentProps<typeof Sidebar>) {
   const { pathname } = useLocation();
   const navCounts = useCrmNavCounts();
 
@@ -59,13 +54,6 @@ export function CrmAppSidebar({
           items={[{ title: 'Public site', url: '/public', icon: Globe }]}
         />
       </SidebarContent>
-
-      <SidebarFooter className="border-t border-sidebar-border/35 p-2">
-        <NavUser
-          onSignOut={onSignOut}
-          extraItems={[{ title: 'Notifications', url: '/notifications', icon: Bell }]}
-        />
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

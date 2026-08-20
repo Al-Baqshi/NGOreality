@@ -15,12 +15,12 @@ type BrandLogoProps = {
   linkClassName?: string;
   /** Icon mark size */
   iconClassName?: string;
-  /** Footer / CRM dark chrome — light text, light icon strokes */
+  /** Footer / CRM dark chrome — light text */
   onDark?: boolean;
 };
 
-const ICON_LIGHT = '/logo-icon.svg';
-const ICON_DARK = '/logo-icon-dark.svg';
+/** Reality Badge seal — primary brand mark for app chrome */
+const ICON_SRC = '/reality-badge.png';
 
 export default function BrandLogo({
   variant = 'full',
@@ -35,7 +35,6 @@ export default function BrandLogo({
 }: BrandLogoProps) {
   const { resolvedTheme } = useTheme();
   const isDark = onDark || resolvedTheme === 'dark';
-  const src = isDark ? ICON_DARK : ICON_LIGHT;
 
   const nameClass = isDark
     ? 'text-white'
@@ -48,7 +47,7 @@ export default function BrandLogo({
   if (variant === 'icon') {
     const icon = (
       <img
-        src={src}
+        src={ICON_SRC}
         alt="NGOreality"
         className={`object-contain ${iconClassName}`}
         decoding="async"
@@ -78,7 +77,7 @@ export default function BrandLogo({
       aria-label="NGOreality — Digital trust infrastructure"
     >
       <img
-        src={src}
+        src={ICON_SRC}
         alt=""
         aria-hidden
         className={`object-contain shrink-0 ${iconClassName}`}

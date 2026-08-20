@@ -1,32 +1,15 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 import { PanelLeftIcon } from 'lucide-react';
 
 import { SearchForm } from '@/components/search-form';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { useSidebar } from '@/components/ui/sidebar';
 
-export type SiteHeaderCrumb = {
-  label: string;
-  to?: string;
-};
-
 export function SiteHeader({
-  breadcrumbs,
   searchPlaceholder,
   onSearch,
   children,
 }: {
-  breadcrumbs: SiteHeaderCrumb[];
   searchPlaceholder?: string;
   onSearch?: (query: string) => void;
   children?: ReactNode;
@@ -45,33 +28,6 @@ export function SiteHeader({
           <PanelLeftIcon />
           <span className="sr-only">Toggle sidebar</span>
         </Button>
-        <Separator
-          orientation="vertical"
-          className="mr-2 data-vertical:h-4 data-vertical:self-auto"
-        />
-        <Breadcrumb className="hidden sm:block">
-          <BreadcrumbList>
-            {breadcrumbs.flatMap((crumb, index) => {
-              const last = index === breadcrumbs.length - 1;
-              const nodes = [];
-              if (index > 0) {
-                nodes.push(<BreadcrumbSeparator key={`sep-${crumb.label}-${index}`} />);
-              }
-              nodes.push(
-                <BreadcrumbItem key={`item-${crumb.label}-${index}`}>
-                  {last || !crumb.to ? (
-                    <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-                  ) : (
-                    <BreadcrumbLink render={<Link to={crumb.to} />}>
-                      {crumb.label}
-                    </BreadcrumbLink>
-                  )}
-                </BreadcrumbItem>,
-              );
-              return nodes;
-            })}
-          </BreadcrumbList>
-        </Breadcrumb>
         <div className="ml-auto flex min-w-0 items-center gap-2">
           {onSearch ? (
             <SearchForm

@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { User, UserCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import PortalNotificationBell from './notifications/PortalNotificationBell';
@@ -7,10 +8,11 @@ import {
   NGO_PORTAL_NAV,
   NGO_PORTAL_NAV_ONBOARDING,
   ngoNavIdFromPathname,
-  ngoNavItemById,
 } from './ngo/ngo-nav';
 import { NgoAppSidebar } from './ngo/NgoAppSidebar';
+import { NavUser } from './nav-user';
 import { useNgoPortal } from '../hooks/useNgoPortal';
+import { BAQSHI_ACCOUNT_URL } from '../lib/baqshiAuth';
 import { SiteHeader } from './site-header';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -45,8 +47,6 @@ function NgoPortalFrame() {
   );
 
   const activeId = ngoNavIdFromPathname(pathname);
-  const activeItem = ngoNavItemById(activeId, onboarding);
-  const pageTitle = activeItem?.label ?? 'Member portal';
 
   useEffect(() => {
     const sectionId = hash.replace('#', '');
@@ -64,12 +64,7 @@ function NgoPortalFrame() {
 
   return (
     <>
-      <SiteHeader
-        breadcrumbs={[
-          { label: 'Member portal', to: '/ngo' },
-          { label: pageTitle },
-        ]}
-      >
+      <SiteHeader>
         {organization ? (
           <span className="hidden min-w-0 items-center gap-1.5 truncate font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:flex">
             {isVerified ? (
@@ -84,6 +79,17 @@ function NgoPortalFrame() {
         ) : null}
         <ThemeToggle variant="ghost" />
         {!onboarding ? <PortalNotificationBell audience="ngo" to="/ngo/notifications" /> : null}
+        <NavUser
+          onSignOut={handleSignOut}
+          extraItems={
+            !onboarding
+              ? [
+                  { title: 'Profile', url: '/ngo/profile', icon: User },
+                  { title: 'Account', url: BAQSHI_ACCOUNT_URL, icon: UserCircle },
+                ]
+              : []
+          }
+        />
       </SiteHeader>
       <div className="flex min-h-0 flex-1">
         <NgoAppSidebar
@@ -98,8 +104,6 @@ function NgoPortalFrame() {
               : 'Member portal'
           }
           homePath={navItems[0]?.path ?? '/ngo'}
-          onSignOut={handleSignOut}
-          showAccountLinks={!onboarding}
         />
         <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">

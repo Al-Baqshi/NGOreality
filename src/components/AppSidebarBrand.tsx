@@ -20,7 +20,7 @@ type AppSidebarBrandProps = {
 
 /**
  * Shared brand lockup for CRM + member-portal sidebars.
- * Uses the new logo mark; collapses to icon-only when the rail is compact.
+ * Reality Badge seal — collapses to icon-only when the rail is compact.
  */
 export function AppSidebarBrand({
   to,
@@ -53,12 +53,10 @@ export function AppSidebarBrand({
                 />
               }
             >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/95 shadow-sm ring-1 ring-black/5 group-data-[collapsible=icon]:size-7">
-                <BrandLogo
-                  variant="icon"
-                  iconClassName="size-7 object-contain group-data-[collapsible=icon]:size-5"
-                />
-              </span>
+              <BrandLogo
+                variant="icon"
+                iconClassName="size-10 shrink-0 object-contain drop-shadow-sm group-data-[collapsible=icon]:size-7"
+              />
               <div className="grid min-w-0 flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
                 <span className="truncate text-[13px] font-bold tracking-[0.04em] text-white uppercase">
                   {title}
