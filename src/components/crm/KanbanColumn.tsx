@@ -1,7 +1,7 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, ChevronRight } from 'lucide-react';
-import { useOrganizationsPage } from '../../hooks/useCrm';
+import { useOrganizationsPage, type OrganizationsPageFilters } from '../../hooks/useCrm';
 import { useOutreachEmailStatus } from '../../hooks/useOutreachEmail';
 import { OUTREACH_STATUS_LABELS, type OutreachStatus, type Organization } from '../../types';
 import { bulkSetOutreachStatus } from '../../lib/crmOutreach';
@@ -14,6 +14,10 @@ interface Props {
   onToggleSelect: (id: string) => void;
   onClearSelection: () => void;
   onSelectMany: (ids: string[]) => void;
+  search?: string;
+  country?: string;
+  category?: string;
+  sortBy?: string;
 }
 
 const KANBAN_PAGE_SIZE = 50;
@@ -21,16 +25,26 @@ const KANBAN_LOAD_STEP = 50;
 const KANBAN_MAX_VISIBLE = 500;
 const SELECT_SIZES = [50, 100, 1000] as const;
 
-export async function fetchColumnLeadIds(status: OutreachStatus, limit: number): Promise<string[]> {
+export async function fetchColumnLeadIds(
+  status: OutreachStatus,
+  limit: number,
+  extra?: Pick<OrganizationsPageFilters, 'search' | 'country' | 'category'>,
+): Promise<string[]> {
   const { supabase } = await import('../../lib/supabase');
-  const { data, error } = await supabase
+  let query = supabase
     .from('organizations')
     .select('id')
     .eq('status', 'listed')
     .eq('is_customer', false)
-    .eq('outreach_status', status)
-    .order('name')
-    .limit(limit);
+    .eq('outreach_status', status);
+  if (extra?.country) query = query.eq('country', extra.country);
+  if (extra?.category) query = query.eq('category', extra.category);
+  const term = extra?.search?.trim();
+  if (term) {
+    const safe = term.replace(/[%_,]/g, ' ').trim();
+    if (safe) query = query.or(`name.ilike.%${safe}%,email.ilike.%${safe}%`);
+  }
+  const { data, error } = await query.order('name').limit(limit);
   if (error) throw error;
   return (data ?? []).map((r) => r.id);
 }
@@ -46,16 +60,36 @@ export default function KanbanColumn({
   onToggleSelect,
   onClearSelection,
   onSelectMany,
+  search,
+  country,
+  category,
+  sortBy,
 }: Props) {
   const [limit, setLimit] = useState(KANBAN_PAGE_SIZE);
   const [dragOver, setDragOver] = useState(false);
   const [selectBusy, setSelectBusy] = useState(false);
 
+  const pageFilters = useMemo(
+    () => ({
+      leadsOnly: true as const,
+      outreach: status,
+      search: search || undefined,
+      country: country || undefined,
+      category: category || undefined,
+      sortBy: sortBy || undefined,
+    }),
+    [status, search, country, category, sortBy],
+  );
+
   const { organizations, totalCount, loading, refetch } = useOrganizationsPage(
-    { leadsOnly: true, outreach: status },
+    pageFilters,
     1,
     limit,
   );
+
+  useEffect(() => {
+    setLimit(KANBAN_PAGE_SIZE);
+  }, [search, country, category, sortBy]);
 
   const orgIds = useMemo(() => organizations.map((o) => o.id), [organizations]);
   const { byOrgId, refetch: refetchEmail } = useOutreachEmailStatus(orgIds);
@@ -69,12 +103,12 @@ export default function KanbanColumn({
   const handleSelectFirstN = useCallback(async (n: number) => {
     setSelectBusy(true);
     try {
-      const ids = await fetchColumnLeadIds(status, n);
+      const ids = await fetchColumnLeadIds(status, n, { search, country, category });
       onSelectMany(ids);
     } finally {
       setSelectBusy(false);
     }
-  }, [status, onSelectMany]);
+  }, [status, onSelectMany, search, country, category]);
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
@@ -162,8 +196,14 @@ export default function KanbanColumn({
           </div>
         ) : (organizations ?? []).length === 0 ? (
           <div className="kanban-column-empty">
-            <p className="font-medium text-ink-600 dark:text-foreground">Empty stage</p>
-            <p className="mt-1">Drop cards here or use Select above</p>
+            <p className="font-medium text-ink-600 dark:text-foreground">
+              {search || country || category ? 'No matches' : 'Empty stage'}
+            </p>
+            <p className="mt-1">
+              {search || country || category
+                ? 'Try a different search or clear filters'
+                : 'Drop cards here or use Select above'}
+            </p>
           </div>
         ) : (
           <>

@@ -47,13 +47,13 @@ export default function CRMLayout() {
   return (
     <TooltipProvider delay={0}>
       <SidebarProvider defaultOpen>
-        <Sidebar collapsible="icon" variant="sidebar" className="border-sidebar-border shadow-[2px_0_16px_-6px_rgba(4,28,60,0.15)]">
-          <SidebarHeader className="border-b border-sidebar-border bg-sidebar-accent/30">
+        <Sidebar collapsible="icon" variant="sidebar" className="border-r-2 border-ink-950 dark:border-gold">
+          <SidebarHeader className="border-b-2 border-ink-950 bg-white dark:border-gold dark:bg-transparent">
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   size="lg"
-                  className="data-[slot=sidebar-menu-button]:!p-2 hover:bg-sidebar-accent/60"
+                  className="data-[slot=sidebar-menu-button]:!p-2 hover:bg-gold-light dark:hover:bg-gold/15"
                   render={
                     <Link
                       to="/dashboard"
@@ -69,10 +69,10 @@ export default function CRMLayout() {
                     decoding="async"
                   />
                   <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-black uppercase tracking-[0.04em] text-sidebar-foreground">
+                    <span className="truncate font-black uppercase tracking-[0.04em] text-ink-950 dark:text-foreground">
                       NGOreality
                     </span>
-                    <span className="truncate font-mono text-2xs uppercase tracking-[0.14em] text-sidebar-foreground/65">
+                    <span className="truncate font-mono text-2xs uppercase tracking-[0.14em] text-gold">
                       Staff CRM
                     </span>
                   </div>
@@ -84,7 +84,7 @@ export default function CRMLayout() {
           <SidebarContent className="gap-0 px-1">
             {CRM_NAV_GROUPS.map((group) => (
               <SidebarGroup key={group.label}>
-                <SidebarGroupLabel className="font-mono text-2xs uppercase tracking-[0.14em] text-sidebar-foreground/55 px-3">
+                <SidebarGroupLabel className="font-mono text-2xs uppercase tracking-[0.14em] text-ink-500 px-3 dark:text-gold/70">
                   {group.label}
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -95,7 +95,7 @@ export default function CRMLayout() {
                         <SidebarMenuItem key={item.to}>
                           <SidebarMenuButton
                             isActive={isNavActive(pathname, item.to)}
-                            className="mx-1 rounded-md transition-colors data-active:bg-white/90 data-active:font-semibold data-active:text-sidebar-accent-foreground data-active:shadow-[inset_3px_0_0_0_var(--sidebar-ring),0_1px_3px_rgba(4,28,60,0.08)] hover:bg-sidebar-accent/55 dark:data-active:bg-sidebar-accent dark:data-active:text-sidebar-accent-foreground"
+                            className="mx-1 rounded-md text-ink-950 transition-colors hover:bg-gold-light hover:text-ink-950 data-active:bg-gold-light data-active:font-semibold data-active:text-ink-950 data-active:shadow-[inset_3px_0_0_0_#EBBB57] dark:text-foreground dark:hover:bg-gold/15 dark:hover:text-gold dark:data-active:bg-gold/20 dark:data-active:text-gold"
                             tooltip={count > 0 ? `${item.label} — ${count} waiting` : item.label}
                             render={
                               <NavLink
@@ -111,8 +111,8 @@ export default function CRMLayout() {
                                   <span
                                     className={`shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[10px] leading-none tabular-nums group-data-[collapsible=icon]:hidden ${
                                       item.urgent
-                                        ? 'border-gold/40 bg-gold-light font-semibold text-ink-950'
-                                        : 'border-sidebar-border bg-white/70 text-sidebar-foreground/85 dark:bg-sidebar-accent/50'
+                                        ? 'border-gold bg-gold font-semibold text-ink-950'
+                                        : 'border-ink-950 bg-white text-ink-950 dark:border-gold dark:bg-transparent dark:text-gold'
                                     }`}
                                   >
                                     {count > 999 ? '999+' : count}
@@ -130,7 +130,7 @@ export default function CRMLayout() {
             ))}
           </SidebarContent>
 
-          <SidebarFooter className="border-t border-sidebar-border bg-sidebar-accent/25">
+          <SidebarFooter className="border-t-2 border-ink-950 bg-white dark:border-gold dark:bg-transparent">
             <CrmNavUser onSignOut={handleSignOut} />
           </SidebarFooter>
           <SidebarRail />

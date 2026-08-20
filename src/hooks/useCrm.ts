@@ -109,6 +109,8 @@ export type OrganizationsPageFilters = {
   hasWebsite?: 'all' | 'yes' | 'no';
   search?: string;
   country?: string;
+  category?: string;
+  sortBy?: string;
   leadsOnly?: boolean;
   isCustomer?: boolean;
   inboundOnly?: boolean;
@@ -132,8 +134,7 @@ export function useOrganizationsPage(
 
     let query = supabase
       .from('organizations')
-      .select('*', { count: 'exact' })
-      .order('name', { ascending: true });
+      .select('*', { count: 'exact' });
 
     if (filters.status && filters.status !== 'all') {
       query = query.eq('status', filters.status);
@@ -168,6 +169,9 @@ export function useOrganizationsPage(
     if (filters.country) {
       query = query.eq('country', filters.country);
     }
+    if (filters.category) {
+      query = query.eq('category', filters.category);
+    }
     if (filters.hasWebsite === 'yes') {
       query = query.not('website_url', 'eq', '').not('website_url', 'is', null);
     } else if (filters.hasWebsite === 'no') {
@@ -175,7 +179,18 @@ export function useOrganizationsPage(
     }
     const term = filters.search?.trim();
     if (term) {
-      query = query.ilike('name', `%${term}%`);
+      const safe = term.replace(/[%_,]/g, ' ').trim();
+      if (safe) query = query.or(`name.ilike.%${safe}%,email.ilike.%${safe}%`);
+    }
+
+    if (filters.sortBy === '-name') {
+      query = query.order('name', { ascending: false });
+    } else if (filters.sortBy === 'last_outreach') {
+      query = query.order('last_outreach_at', { ascending: true, nullsFirst: true });
+    } else if (filters.sortBy === 'created') {
+      query = query.order('created_at', { ascending: false });
+    } else {
+      query = query.order('name', { ascending: true });
     }
 
     const { data, error, count } = await query.range(from, to);
@@ -192,6 +207,8 @@ export function useOrganizationsPage(
     filters.hasWebsite,
     filters.search,
     filters.country,
+    filters.category,
+    filters.sortBy,
     filters.leadsOnly,
     filters.isCustomer,
     filters.inboundOnly,

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   OUTREACH_KANBAN_STATUSES,
@@ -53,6 +53,7 @@ export default function OutreachBoard() {
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -65,6 +66,11 @@ export default function OutreachBoard() {
   const bump = useCallback(() => {
     setGlobalRefreshTick((t) => t + 1);
   }, []);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(searchValue.trim()), 300);
+    return () => window.clearTimeout(t);
+  }, [searchValue]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -134,28 +140,31 @@ export default function OutreachBoard() {
     ? OUTREACH_EMAIL_BY_COLUMN[statusFilter as OutreachStatus]
     : 'outreach_cold_invite';
 
+  const visibleStatuses = statusFilter
+    ? OUTREACH_KANBAN_STATUSES.filter((s) => s === statusFilter)
+    : OUTREACH_KANBAN_STATUSES;
+
   return (
     <div className="page-shell w-full min-w-0 max-w-none">
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-5">
         <OutreachHeader
           onNewLead={() => setNewLeadOpen(true)}
           onNavigateWorklist={() => window.location.href = '/outreach'}
         />
 
         <OutreachToolbar
-          className="mt-0 mb-0"
           searchValue={searchValue}
-        onSearchChange={setSearchValue}
-        onSearchSubmit={() => {}}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        locationFilter={locationFilter}
-        onLocationFilterChange={setLocationFilter}
-        categoryFilter={categoryFilter}
-        onCategoryFilterChange={setCategoryFilter}
-        sortBy={sortBy}
-        onSortChange={setSortBy}
-        totalCount={totalLeads}
+          onSearchChange={setSearchValue}
+          onSearchSubmit={(value) => setDebouncedSearch(value.trim())}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          locationFilter={locationFilter}
+          onLocationFilterChange={setLocationFilter}
+          categoryFilter={categoryFilter}
+          onCategoryFilterChange={setCategoryFilter}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
+          totalCount={totalLeads}
         />
       </div>
 
@@ -184,7 +193,7 @@ export default function OutreachBoard() {
 
       <div className="kanban-shell" key={globalRefreshTick}>
         <div className="kanban-board kanban-board-tall">
-          {OUTREACH_KANBAN_STATUSES.map((status) => (
+          {visibleStatuses.map((status) => (
             <KanbanColumn
               key={status}
               status={status}
@@ -193,6 +202,10 @@ export default function OutreachBoard() {
               onToggleSelect={toggleSelect}
               onClearSelection={clearSelection}
               onSelectMany={selectMany}
+              search={debouncedSearch}
+              country={locationFilter}
+              category={categoryFilter}
+              sortBy={sortBy}
             />
           ))}
         </div>

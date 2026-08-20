@@ -44,30 +44,33 @@ export default function OutreachToolbar({
   const [showFilters, setShowFilters] = useState(false);
 
   return (
-    <div className={`w-full rounded-lg border-2 border-teal/20 bg-gradient-to-r from-sky-50/90 via-white to-teal-50/60 p-4 mb-2 shadow-sm dark:border-border dark:from-card dark:via-card dark:to-muted/30 ${className}`}>
-      <div className="flex flex-wrap items-center gap-3 mb-3">
-        <span className="font-mono text-2xs uppercase tracking-wider text-teal/80 shrink-0">
+    <div className={`card-brutal p-4 mb-4 ${className}`}>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="font-mono text-2xs uppercase tracking-wider text-ink-500 shrink-0">
           {totalCount.toLocaleString()} organizations
         </span>
 
         <form
-          className="flex-1 min-w-[280px]"
+          className="flex flex-1 min-w-[240px] items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             onSearchSubmit(searchValue);
           }}
         >
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none" />
             <input
               type="search"
               className="input-brutal w-full pl-9 min-h-[44px]"
-              placeholder="Search organizations..."
+              placeholder="Search by name or email…"
               value={searchValue}
               onChange={(e) => onSearchChange(e.target.value)}
               aria-label="Search organizations"
             />
           </div>
+          <button type="submit" className="btn-brutal text-sm min-h-[44px] px-4 shrink-0">
+            Search
+          </button>
         </form>
 
         <button
