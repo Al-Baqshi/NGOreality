@@ -85,6 +85,30 @@ export async function syncMonitorTierForOrg(organizationId: string): Promise<voi
     .eq('organization_id', organizationId);
 }
 
+/** Globally unique REAL-{year}-{n} — verification_id is unique across all orgs. */
+async function nextVerificationId(): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `REAL-${year}-`;
+  const { data } = await supabase
+    .from('verification_badges')
+    .select('verification_id')
+    .like('verification_id', `${prefix}%`);
+
+  let max = 0;
+  for (const row of data ?? []) {
+    const match = /^REAL-\d{4}-(\d+)$/.exec(row.verification_id);
+    if (match) max = Math.max(max, Number.parseInt(match[1], 10));
+  }
+  return `${prefix}${String(max + 1).padStart(3, '0')}`;
+}
+
+function isUniqueViolation(message: string): boolean {
+  return (
+    message.includes('verification_badges_verification_id_key') ||
+    message.includes('duplicate key')
+  );
+}
+
 export async function issueBadgeIfEligible(
   organizationId: string,
   organization: Pick<Organization, 'verification_level' | 'name'>,
@@ -108,12 +132,6 @@ export async function issueBadgeIfEligible(
     return { issued: false, verificationId: activeBadges[0].verification_id, error: null };
   }
 
-  const { count } = await supabase
-    .from('verification_badges')
-    .select('id', { count: 'exact', head: true })
-    .eq('organization_id', organizationId);
-
-  const verificationId = `REAL-${new Date().getFullYear()}-${String((count ?? 0) + 1).padStart(3, '0')}`;
   const now = new Date().toISOString();
   const expiresAt = new Date();
   expiresAt.setFullYear(expiresAt.getFullYear() + 1);
@@ -121,16 +139,37 @@ export async function issueBadgeIfEligible(
   const level =
     organization.verification_level === 'none' ? 'verified' : organization.verification_level;
 
-  const { error } = await supabase.from('verification_badges').insert({
-    organization_id: organizationId,
-    verification_id: verificationId,
-    level,
-    issued_at: now,
-    expires_at: expiresAt.toISOString(),
-    is_active: true,
-  });
+  let verificationId: string | null = null;
+  let lastError: string | null = null;
 
-  if (error) return { issued: false, verificationId: null, error: error.message };
+  for (let attempt = 0; attempt < 5; attempt++) {
+    verificationId = await nextVerificationId();
+    const { error } = await supabase.from('verification_badges').insert({
+      organization_id: organizationId,
+      verification_id: verificationId,
+      level,
+      issued_at: now,
+      expires_at: expiresAt.toISOString(),
+      is_active: true,
+    });
+
+    if (!error) {
+      lastError = null;
+      break;
+    }
+    lastError = error.message;
+    if (!isUniqueViolation(error.message)) {
+      return { issued: false, verificationId: null, error: error.message };
+    }
+  }
+
+  if (lastError || !verificationId) {
+    return {
+      issued: false,
+      verificationId: null,
+      error: lastError ?? 'Could not allocate a unique badge ID.',
+    };
+  }
 
   await supabase.from('activity_log').insert({
     organization_id: organizationId,
@@ -222,7 +261,7 @@ export async function activateMembershipBenefits(input: {
       badgeIssued: badge.issued,
       message: badge.issued
         ? `Membership active. Badge ${badge.verificationId} issued. Monitoring is live.`
-        : 'Membership active. Monitoring enabled. Issue badge after all public standards pass.',
+        : 'Membership active. Monitoring enabled. Badge issues automatically when all public standards pass.',
       error: null,
     };
   }

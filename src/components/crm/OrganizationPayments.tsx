@@ -20,10 +20,12 @@ export default function OrganizationPayments({
   organizationId,
   organizationName,
   paymentReference,
+  onPaymentRecorded,
 }: {
   organizationId: string;
   organizationName: string;
   paymentReference: string | null;
+  onPaymentRecorded?: () => void | Promise<void>;
 }) {
   const { payments, loading, refetch } = useOrganizationPayments(organizationId);
   const [reference, setReference] = useState(paymentReference ?? '');
@@ -67,7 +69,8 @@ export default function OrganizationPayments({
         msg += ' Welcome emails queued (send via Email notifications if still pending).';
       }
       setMessage(msg);
-      refetch();
+      await refetch();
+      await onPaymentRecorded?.();
     }
   };
 
@@ -87,7 +90,8 @@ export default function OrganizationPayments({
     } else {
       setNotes('');
       setMessage(resultMsg ?? 'Landing package recorded — fulfill via Setup requests.');
-      refetch();
+      await refetch();
+      await onPaymentRecorded?.();
     }
   };
 
@@ -126,6 +130,11 @@ export default function OrganizationPayments({
               ? `Paid · active until ${new Date(latestMembership.period_end).toLocaleDateString()}`
               : 'Not paid — record payment after bank transfer clears'}
           </p>
+          {membershipActive && (
+            <p className="font-mono text-2xs text-amber-800 bg-amber-50 border border-amber-200 px-2 py-1.5 mt-2">
+              Membership active — Reality Badge issues automatically only after all public standards pass
+            </p>
+          )}
         </div>
 
         <div className="text-sm">

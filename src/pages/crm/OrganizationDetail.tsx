@@ -32,9 +32,10 @@ import OrganizationEngagements from '../../components/crm/OrganizationEngagement
 import OrganizationPortalMembers from '../../components/crm/OrganizationPortalMembers';
 import OrganizationPayments from '../../components/crm/OrganizationPayments';
 import { updateCriterionStatuses, tryAutoVerifyOrganization, allPublicCriteriaPass } from '../../lib/verification';
-import { issueBadgeIfEligible } from '../../lib/membershipBenefits';
-import { queueAndTrySend } from '../../lib/notifications';
 import { publicCriteriaScore } from '../../lib/criteria';
+import { BADGE_PIPELINE_STAFF, getBadgePipelineStage } from '../../lib/badgePipeline';
+import { useOrganizationPayments } from '../../hooks/useCrm';
+import { hasActiveMembershipPayment } from '../../lib/payments';
 import { ArrowLeft, Globe, Mail, Phone, MapPin, CreditCard as Edit3, Save, X, Shield, Clock, User, Plus, Trash2, Award, CheckCheck } from 'lucide-react';
 
 export default function OrganizationDetail() {
@@ -44,6 +45,7 @@ export default function OrganizationDetail() {
   const { contacts, loading: contactsLoading } = useContacts(id);
   const { criteria, loading: criteriaLoading, refetch: refetchCriteria, setCriteria } = useVerificationCriteria(id);
   const { badges, loading: badgesLoading, refetch: refetchBadges } = useBadges(id);
+  const { payments } = useOrganizationPayments(id);
   const { entries, loading: logLoading } = useActivityLog(id);
 
   const [editing, setEditing] = useState(false);
@@ -52,7 +54,6 @@ export default function OrganizationDetail() {
   const [contactForm, setContactForm] = useState({ name: '', role: '', email: '', phone: '', is_primary: false, notes: '' });
   const [criteriaBusy, setCriteriaBusy] = useState(false);
   const [verifyNotice, setVerifyNotice] = useState<string | null>(null);
-  const [badgeBusy, setBadgeBusy] = useState(false);
   const [badgeNotice, setBadgeNotice] = useState<{ text: string; tone: 'ok' | 'err' } | null>(null);
 
   useEffect(() => {
@@ -222,81 +223,6 @@ export default function OrganizationDetail() {
     window.location.reload();
   };
 
-  const handleIssueBadge = async () => {
-    if (!id || !organization) return;
-    setBadgeNotice(null);
-
-    if (!allPublicCriteriaPass(criteria)) {
-      setBadgeNotice({
-        text: 'All public trust standards must pass before issuing the badge.',
-        tone: 'err',
-      });
-      return;
-    }
-
-    const { data: hasMembership } = await supabase.rpc('has_active_membership', {
-      p_org_id: id,
-    });
-    if (!hasMembership) {
-      const ok = await confirm({
-        title: 'No active membership',
-        description:
-          'This organization has no active paid membership. Issue the Reality Badge anyway?',
-        confirmLabel: 'Issue anyway',
-        variant: 'danger',
-      });
-      if (!ok) return;
-    }
-
-    setBadgeBusy(true);
-    const badge = await issueBadgeIfEligible(id, organization, criteria);
-    if (badge.error) {
-      setBadgeNotice({ text: badge.error, tone: 'err' });
-      setBadgeBusy(false);
-      return;
-    }
-    if (!badge.issued) {
-      setBadgeNotice({
-        text: badge.verificationId
-          ? `Active badge ${badge.verificationId} already on file.`
-          : 'Badge already present.',
-        tone: 'ok',
-      });
-      setBadgeBusy(false);
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const orgUpdates: Record<string, unknown> = { updated_at: now };
-    if (organization.status !== 'verified' && organization.status !== 'active') {
-      orgUpdates.status = 'verified';
-    }
-    if (organization.verification_level === 'none') {
-      orgUpdates.verification_level = 'verified';
-    }
-    if (Object.keys(orgUpdates).length > 1) {
-      await supabase.from('organizations').update(orgUpdates).eq('id', id);
-    }
-
-    if (organization.email?.trim()) {
-      await queueAndTrySend({
-        organizationId: id,
-        template: 'badge_issued',
-        recipientEmail: organization.email.trim(),
-        organizationName: organization.name,
-        extra: { verificationId: badge.verificationId ?? '' },
-      });
-    }
-
-    setBadgeNotice({
-      text: `Badge ${badge.verificationId} issued.`,
-      tone: 'ok',
-    });
-    await refetchBadges();
-    await refetchOrganization();
-    setBadgeBusy(false);
-  };
-
   const handleRevokeBadge = async (badgeId: string, verificationId: string) => {
     if (!id || !organization) return;
     const ok = await confirm({
@@ -338,6 +264,15 @@ export default function OrganizationDetail() {
   const publicScore = publicCriteriaScore(criteria);
   const publicReady = allPublicCriteriaPass(criteria);
   const financialScore = financialCriteriaList.length > 0 ? Math.round((financialCriteriaList.filter((c) => c.status === 'pass').length / financialCriteriaList.length) * 100) : 0;
+  const membershipPaid = hasActiveMembershipPayment(payments);
+  const hasActiveBadge = badges.some((b) => b.is_active);
+  const badgeStage = getBadgePipelineStage({
+    hasActiveBadge,
+    hasActiveMembership: membershipPaid,
+    standardsPass: publicReady,
+  });
+  const badgeStatusCopy =
+    badgeStage === 'issued' ? null : BADGE_PIPELINE_STAFF[badgeStage];
 
   return (
     <div className="max-w-6xl mx-auto min-w-0 w-full">
@@ -566,8 +501,8 @@ export default function OrganizationDetail() {
             <div>
               <div className="label-brutal">Change trust stage</div>
               <p className="text-2xs text-ink-500 mt-1 mb-2 leading-snug">
-                One setting for pipeline and public trust. Issuing the NGOreality badge also happens when
-                public criteria pass below.
+                One setting for pipeline and public trust. The Reality Badge issues automatically when
+                all public standards pass and membership is paid.
               </p>
               <div className="flex flex-wrap gap-2 mt-2">
                 {getTrustStageQuickActions(organization).map((stage) => (
@@ -627,8 +562,12 @@ export default function OrganizationDetail() {
             <div className="border-b border-ink-100 px-6 py-2 bg-amber-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <span className="font-mono text-2xs text-amber-700 uppercase tracking-wider">
                 {publicReady
-                  ? 'Standards met → badge auto-issues if membership is paid; otherwise record $100 payment'
-                  : 'All public standards must pass before badge (outreach-safe checklist)'}
+                  ? membershipPaid
+                    ? 'Standards + membership met → badge auto-issues'
+                    : 'Standards met — badge pending membership payment'
+                  : membershipPaid
+                    ? 'Membership active — badge pending public standards'
+                    : 'All public standards must pass before the badge can issue'}
               </span>
               {criteriaBusy && <span className="font-mono text-2xs text-ink-500">Saving…</span>}
               {verifyNotice && !criteriaBusy && (
@@ -784,6 +723,10 @@ export default function OrganizationDetail() {
               organizationId={id}
               organizationName={organization.name}
               paymentReference={organization.payment_reference}
+              onPaymentRecorded={async () => {
+                await refetchOrganization();
+                await refetchBadges();
+              }}
             />
           )}
 
@@ -822,20 +765,15 @@ export default function OrganizationDetail() {
             </div>
           </div>
 
-          {/* Badges */}
+          {/* Badges — issued automatically when standards + paid membership */}
           <div className="card-brutal">
-            <div className="flex items-center justify-between border-b-3 border-ink-950 px-6 py-4">
+            <div className="border-b-3 border-ink-950 px-6 py-4">
               <h3 className="font-mono text-xs uppercase tracking-wider font-semibold flex items-center gap-2">
                 <Award size={14} /> Badges
               </h3>
-              <button
-                type="button"
-                onClick={handleIssueBadge}
-                disabled={badgeBusy}
-                className="btn-brutal-outline text-2xs py-1.5 px-3 flex items-center gap-1 disabled:opacity-50"
-              >
-                <Plus size={12} /> {badgeBusy ? 'Issuing…' : 'Issue'}
-              </button>
+              <p className="font-mono text-2xs text-ink-500 mt-1">
+                Auto-issued when all public standards pass and membership is paid
+              </p>
             </div>
             {badgeNotice && (
               <div
@@ -846,11 +784,25 @@ export default function OrganizationDetail() {
                 {badgeNotice.text}
               </div>
             )}
+            {!badgeNotice && badgeStatusCopy && (
+              <div
+                className={`border-b border-ink-100 px-6 py-2 font-mono text-2xs ${
+                  badgeStage === 'membership_active_badge_pending' ||
+                  badgeStage === 'standards_ready_awaiting_payment'
+                    ? 'bg-amber-50 text-amber-800'
+                    : badgeStage === 'both_met_badge_missing'
+                      ? 'bg-red-50 text-red-700'
+                      : 'bg-ink-50 text-ink-600'
+                }`}
+              >
+                {badgeStatusCopy}
+              </div>
+            )}
             <div className="divide-y divide-ink-100">
               {badgesLoading ? (
                 <div className="px-6 py-4 font-mono text-xs text-ink-400">Loading...</div>
               ) : badges.length === 0 ? (
-                <div className="px-6 py-6 text-center text-sm text-ink-400">No badges issued</div>
+                <div className="px-6 py-6 text-center text-sm text-ink-400">No badge issued yet</div>
               ) : (
                 badges.map((b) => (
                   <div key={b.id} className="px-6 py-3">

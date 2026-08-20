@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Award, Check, Copy, Download } from 'lucide-react';
 import { useNgoPortalContext } from '../../../contexts/NgoPortalContext';
-import { formatMembershipDate } from '../../../lib/membership';
+import { formatMembershipDate, getLatestMembership, getMembershipDisplayStatus } from '../../../lib/membership';
+import { allPublicCriteriaPass } from '../../../lib/criteria';
+import { BADGE_PIPELINE_NGO, getBadgePipelineStage } from '../../../lib/badgePipeline';
 import NgoPortalPageShell from '../../../components/ngo/NgoPortalPageShell';
 
 function badgeEmbedSnippet(organizationName: string): string {
@@ -17,9 +19,18 @@ function badgeEmbedSnippet(organizationName: string): string {
 }
 
 export default function NgoBadgePage() {
-  const { badges, organization } = useNgoPortalContext();
+  const { badges, organization, memberships, criteria } = useNgoPortalContext();
   const activeBadge = badges.find((b) => b.is_active);
   const [copied, setCopied] = useState(false);
+
+  const membershipStatus = getMembershipDisplayStatus(getLatestMembership(memberships));
+  const hasActiveMembership =
+    membershipStatus === 'active' || membershipStatus === 'expiring_soon';
+  const badgeStage = getBadgePipelineStage({
+    hasActiveBadge: Boolean(activeBadge),
+    hasActiveMembership,
+    standardsPass: allPublicCriteriaPass(criteria),
+  });
 
   const embedCode = organization ? badgeEmbedSnippet(organization.name) : '';
 
@@ -66,21 +77,22 @@ export default function NgoBadgePage() {
               </dl>
             </div>
           ) : (
-            <p className="text-sm text-ink-500">
-              No active Reality Badge yet. Complete{' '}
-              <Link to="/ngo/standards" className="font-semibold underline">
-                trust standards
-              </Link>{' '}
-              and{' '}
-              <Link to="/ngo/membership" className="font-semibold underline">
-                membership
-              </Link>
-              , then submit a request from{' '}
-              <Link to="/ngo/requests" className="font-semibold underline">
-                Requests
-              </Link>
-              .
-            </p>
+            <div className="space-y-3">
+              <p className="text-sm text-ink-700 leading-relaxed">
+                {BADGE_PIPELINE_NGO[badgeStage === 'issued' ? 'awaiting_standards_and_payment' : badgeStage]}
+              </p>
+              <p className="text-sm text-ink-500">
+                See{' '}
+                <Link to="/ngo/standards" className="font-semibold underline">
+                  trust standards
+                </Link>{' '}
+                and{' '}
+                <Link to="/ngo/membership" className="font-semibold underline">
+                  membership
+                </Link>
+                .
+              </p>
+            </div>
           )}
         </div>
 

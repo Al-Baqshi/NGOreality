@@ -7,13 +7,24 @@ import {
 } from '../../../lib/ngoProfileCompletion';
 import { NgoPortalQuickLinks } from '../../../components/ngo/NgoPortalPageShell';
 import SEO from '../../../components/SEO';
+import { getLatestMembership, getMembershipDisplayStatus } from '../../../lib/membership';
+import { allPublicCriteriaPass } from '../../../lib/criteria';
+import { BADGE_PIPELINE_NGO, getBadgePipelineStage } from '../../../lib/badgePipeline';
 
 export default function NgoOverviewPage() {
-  const { organization, badges } = useNgoPortalContext();
+  const { organization, badges, memberships, criteria } = useNgoPortalContext();
   if (!organization) return null;
 
   const activeBadge = badges.find((b) => b.is_active);
   const profilePct = profileCompletionPercent(getProfileCompletionItems(organization));
+  const membershipStatus = getMembershipDisplayStatus(getLatestMembership(memberships));
+  const hasActiveMembership =
+    membershipStatus === 'active' || membershipStatus === 'expiring_soon';
+  const badgeStage = getBadgePipelineStage({
+    hasActiveBadge: Boolean(activeBadge),
+    hasActiveMembership,
+    standardsPass: allPublicCriteriaPass(criteria),
+  });
 
   return (
     <>
@@ -58,12 +69,24 @@ export default function NgoOverviewPage() {
           </div>
         )}
 
+        {!activeBadge && badgeStage === 'membership_active_badge_pending' && (
+          <div className="card-brutal border-l-4 border-l-amber-500 p-5 sm:p-6">
+            <h2 className="text-lg font-black uppercase tracking-tight">Membership active</h2>
+            <p className="mt-1 text-sm text-ink-600 dark:text-muted-foreground leading-relaxed">
+              {BADGE_PIPELINE_NGO.membership_active_badge_pending}
+            </p>
+            <Link to="/ngo/badge" className="btn-brutal-outline mt-3 inline-block px-4 py-2 text-xs">
+              Badge status
+            </Link>
+          </div>
+        )}
+
         <p className="text-sm text-ink-600 dark:text-muted-foreground leading-relaxed">
           Use the menu to manage your profile, pay for Reality Badge or a trust landing page, and track
           your progress.
         </p>
 
-        {!activeBadge && (
+        {!activeBadge && badgeStage !== 'membership_active_badge_pending' && (
           <Link
             to="/ngo/services"
             className="card-brutal block border-l-4 border-l-teal p-5 hover:bg-paper dark:hover:bg-muted/20"

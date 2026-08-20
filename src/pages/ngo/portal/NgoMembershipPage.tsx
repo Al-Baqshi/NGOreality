@@ -267,9 +267,20 @@ export default function NgoMembershipPage() {
           )}
 
           <p className="text-xs text-ink-400 mt-4 leading-relaxed">
-            Annual membership is {membershipPrice} (NZD) and includes the Reality Badge, public trust review, and website
-            monitoring with email alerts.
+            Annual membership is {membershipPrice} (NZD) and unlocks website monitoring and the member portal.
+            The Reality Badge is separate: it issues automatically only after membership is active and all
+            public trust standards pass.
           </p>
+          {(membershipStatus === 'active' || membershipStatus === 'expiring_soon') && (
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 mt-3 leading-relaxed">
+              Membership active — badge may still be pending standards. That is expected until review is complete.
+              See{' '}
+              <Link to="/ngo/badge" className="font-semibold underline">
+                Reality Badge
+              </Link>
+              .
+            </p>
+          )}
         </div>
 
         <div className="card-brutal p-5 sm:p-6">
