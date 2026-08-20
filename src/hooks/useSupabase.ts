@@ -88,18 +88,24 @@ export function useBadges(organizationId: string | undefined) {
   const [badges, setBadges] = useState<VerificationBadge[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const refetch = useCallback(async () => {
     if (!organizationId) return;
     setLoading(true);
-    supabase.from('verification_badges').select('*').eq('organization_id', organizationId).order('issued_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (error) captureError(error, { where: 'useBadges' });
-        else if (data) setBadges(data);
-        setLoading(false);
-      });
+    const { data, error } = await supabase
+      .from('verification_badges')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .order('issued_at', { ascending: false });
+    if (error) captureError(error, { where: 'useBadges' });
+    else if (data) setBadges(data);
+    setLoading(false);
   }, [organizationId]);
 
-  return { badges, loading };
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  return { badges, loading, refetch };
 }
 
 export function useActivityLog(organizationId: string | undefined) {

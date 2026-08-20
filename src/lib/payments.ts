@@ -197,15 +197,49 @@ export async function createPendingBankPayment(input: {
 }): Promise<{ payment: OrganizationPayment | null; reference: string; error: string | null }> {
   const productType =
     input.productType === 'verification_annual' ? 'membership_annual' : input.productType;
+
+  // Prefer the SECURITY DEFINER RPC — members cannot INSERT payments via RLS
+  // (migration 031). Fall back to direct insert for staff sessions if the RPC
+  // is not yet applied locally.
+  const { data: rpcRow, error: rpcError } = await supabase.rpc('request_pending_bank_payment', {
+    p_organization_id: input.organizationId,
+    p_product_type: productType,
+    p_notes: input.notes ?? '',
+  });
+
+  if (!rpcError && rpcRow) {
+    const payment = (Array.isArray(rpcRow) ? rpcRow[0] : rpcRow) as OrganizationPayment | undefined;
+    if (payment?.id) {
+      const reference =
+        payment.bank_transfer_reference?.trim() ||
+        (await ensurePaymentReference(input.organizationId));
+      return { payment, reference, error: null };
+    }
+  }
+
+  if (rpcError && !/could not find|schema cache|function .* does not exist/i.test(rpcError.message)) {
+    return {
+      payment: null,
+      reference: await ensurePaymentReference(input.organizationId).catch(() => ''),
+      error: rpcError.message,
+    };
+  }
+
+  // Legacy path (staff RLS / pre-migration).
   const amountCents = amountForProduct(productType);
   const reference = await ensurePaymentReference(input.organizationId);
+
+  const membershipTypes =
+    productType === 'membership_annual'
+      ? (['membership_annual', 'verification_annual'] as const)
+      : ([productType] as const);
 
   const { data: existing } = await supabase
     .from('organization_payments')
     .select('*')
     .eq('organization_id', input.organizationId)
-    .eq('product_type', productType)
     .eq('status', 'pending')
+    .in('product_type', [...membershipTypes])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();

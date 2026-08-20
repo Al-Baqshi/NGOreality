@@ -14,7 +14,7 @@ import { GST_PRICE_SUFFIX, MEMBERSHIP_ANNUAL_CENTS, PRICING_CURRENCY } from '../
 import { PAYMENT_STATUS_LABELS, type OrganizationPayment } from '../../../types';
 import NgoPortalPageShell from '../../../components/ngo/NgoPortalPageShell';
 import NgoBillingTopUpPanel from '../../../components/ngo/NgoBillingTopUpPanel';
-import { Toggle } from '@/components/ui/toggle';
+import { cn } from '@/lib/utils';
 
 const STATUS_STYLES = {
   active: 'border-teal bg-teal-light text-teal',
@@ -157,33 +157,74 @@ export default function NgoMembershipPage() {
                 </div>
               </dl>
 
-              <div className="border-2 border-ink-950 dark:border-border p-4 bg-ink-50 dark:bg-ink-800/50">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <ShieldCheck size={20} className="text-teal" aria-hidden />
-                    <div>
-                      <p className="font-semibold text-ink-950 dark:text-white">Auto-renew membership</p>
-                      <p className="text-xs text-ink-500 dark:text-ink-400">
-                        Automatically renew your membership and charge the annual fee ({membershipPrice}) before expiry.
+              <div className="border-2 border-ink-950 bg-ink-50 p-4 dark:border-border dark:bg-ink-800/50">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <ShieldCheck size={20} className="mt-0.5 shrink-0 text-teal" aria-hidden />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-ink-950 dark:text-white">
+                          Auto-renew
+                        </p>
+                        <span
+                          className={
+                            autoRenew
+                              ? 'border border-teal/40 bg-teal-light px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wider text-teal'
+                              : 'border border-ink-300 bg-white px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wider text-ink-500'
+                          }
+                        >
+                          {autoRenew ? 'On' : 'Off'}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
+                        When on, we renew your membership and charge {membershipPrice} before
+                        expiry. When off, you renew manually.
                       </p>
                     </div>
                   </div>
-                  <Toggle
-                    pressed={autoRenew}
-                    onPressedChange={handleAutoRenewToggle}
-                    disabled={autoRenewLoading || membershipStatus === 'none' || membershipStatus === 'expired'}
-                    className="data-[state=on]:bg-teal data-[state=on]:border-teal"
-                    aria-label={autoRenew ? 'Disable auto-renew' : 'Enable auto-renew'}
-                  />
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={autoRenew}
+                    aria-label={autoRenew ? 'Turn auto-renew off' : 'Turn auto-renew on'}
+                    disabled={
+                      autoRenewLoading ||
+                      membershipStatus === 'none' ||
+                      membershipStatus === 'expired'
+                    }
+                    onClick={() => void handleAutoRenewToggle(!autoRenew)}
+                    className={cn(
+                      'relative inline-flex h-9 w-[3.75rem] shrink-0 items-center rounded-full border-2 border-ink-950 transition-colors',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+                      'disabled:cursor-not-allowed disabled:opacity-50',
+                      autoRenew ? 'bg-teal' : 'bg-ink-200 dark:bg-ink-700',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'pointer-events-none absolute top-0.5 size-7 rounded-full border-2 border-ink-950 bg-white transition-transform',
+                        autoRenew ? 'left-[calc(100%-1.875rem)]' : 'left-0.5',
+                      )}
+                      aria-hidden
+                    />
+                    <span className="sr-only">{autoRenew ? 'On' : 'Off'}</span>
+                  </button>
                 </div>
-                {autoRenew && (
-                  <p className="text-xs text-teal mt-2 font-mono flex items-center gap-1">
-                    <RotateCcw size={12} /> Auto-renew enabled — membership will renew automatically before {formatMembershipDate(latestMembership.expires_at)}
+                {autoRenew ? (
+                  <p className="mt-3 flex items-center gap-1.5 font-mono text-xs text-teal">
+                    <RotateCcw size={12} aria-hidden />
+                    Will renew automatically before{' '}
+                    {formatMembershipDate(latestMembership.expires_at)}.
                   </p>
-                )}
-                {!autoRenew && membershipStatus !== 'none' && membershipStatus !== 'expired' && (
-                  <p className="text-xs text-ink-500 mt-2 font-mono">
-                    Auto-renew is off. You will need to manually renew before {formatMembershipDate(latestMembership.expires_at)} to avoid interruption.
+                ) : membershipStatus !== 'none' && membershipStatus !== 'expired' ? (
+                  <p className="mt-3 font-mono text-xs text-ink-500">
+                    Manual renewal needed before{' '}
+                    {formatMembershipDate(latestMembership.expires_at)} to avoid interruption.
+                  </p>
+                ) : null}
+                {(membershipStatus === 'none' || membershipStatus === 'expired') && (
+                  <p className="mt-3 font-mono text-xs text-ink-500">
+                    Auto-renew unlocks once you have an active membership.
                   </p>
                 )}
               </div>

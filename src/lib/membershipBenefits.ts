@@ -139,6 +139,13 @@ export async function issueBadgeIfEligible(
     performed_by: 'system',
   });
 
+  const nowIso = new Date().toISOString();
+  await supabase
+    .from('badge_requests')
+    .update({ status: 'approved', updated_at: nowIso })
+    .eq('organization_id', organizationId)
+    .in('status', ['pending', 'in_review']);
+
   return { issued: true, verificationId, error: null };
 }
 

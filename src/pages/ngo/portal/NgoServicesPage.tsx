@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CheckCircle, CreditCard, Layout, Shield } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNgoPortalContext } from '../../../contexts/NgoPortalContext';
@@ -17,6 +17,7 @@ import {
 import { NGO_BANK_ACCOUNT } from '../../../config/billing';
 import { PAYMENT_PRODUCT_LABELS, type OrganizationPayment, type PaymentProductType } from '../../../types';
 import { supabase } from '../../../lib/supabase';
+import { cn } from '@/lib/utils';
 
 function money(cents: number) {
   return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: PRICING_CURRENCY }).format(
@@ -25,13 +26,15 @@ function money(cents: number) {
 }
 
 export default function NgoServicesPage() {
-  const { user } = useAuth();
+  const { user, centralUser, isAuthenticated } = useAuth();
   const { organization, refetch } = useNgoPortalContext();
   const [payments, setPayments] = useState<OrganizationPayment[]>([]);
   const [reference, setReference] = useState('');
   const [busy, setBusy] = useState<PaymentProductType | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [highlightBank, setHighlightBank] = useState(false);
+  const bankPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!organization?.id) return;
@@ -75,70 +78,87 @@ export default function NgoServicesPage() {
     await refetch();
   };
 
+  const showBankInstructions = (ref: string, statusText: string) => {
+    setReference(ref);
+    setMessage(statusText);
+    setHighlightBank(true);
+    bankPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => setHighlightBank(false), 2500);
+  };
+
   const startPayment = async (productType: PaymentProductType) => {
-    if (!user) return;
+    if (!isAuthenticated) {
+      setError('Please sign in again to request payment instructions.');
+      return;
+    }
+
     setBusy(productType);
     setError(null);
     setMessage(null);
 
-    const { payment, reference: ref, error: payError } = await createPendingBankPayment({
-      organizationId: organization.id,
-      productType,
-      notes:
-        productType === 'landing_standards_package'
-          ? 'NGO requested trust landing package via portal'
-          : 'NGO requested Reality Badge membership via portal',
-      recordedBy: user.email ?? user.id,
-    });
+    const recordedBy = user?.email ?? centralUser?.email ?? user?.id ?? centralUser?.id ?? 'ngo_portal';
 
-    if (payError) {
-      setError(payError);
-      setBusy(null);
-      return;
-    }
+    try {
+      const { payment, reference: ref, error: payError } = await createPendingBankPayment({
+        organizationId: organization.id,
+        productType,
+        notes:
+          productType === 'landing_standards_package'
+            ? 'NGO requested trust landing package via portal'
+            : 'NGO requested Reality Badge membership via portal',
+        recordedBy,
+      });
 
-    setReference(ref);
+      if (payError) {
+        setError(payError);
+        return;
+      }
 
-    if (productType === 'landing_standards_package') {
-      const { data: existingSetup } = await supabase
-        .from('ngo_setup_requests')
-        .select('id')
-        .eq('organization_id', organization.id)
-        .eq('request_kind', 'landing_standards')
-        .in('status', ['pending', 'in_review'])
-        .limit(1)
-        .maybeSingle();
+      if (productType === 'landing_standards_package' && user?.id) {
+        const { data: existingSetup } = await supabase
+          .from('ngo_setup_requests')
+          .select('id')
+          .eq('organization_id', organization.id)
+          .eq('request_kind', 'landing_standards')
+          .in('status', ['pending', 'in_review'])
+          .limit(1)
+          .maybeSingle();
 
-      if (!existingSetup) {
-        const { error: setupError } = await submitNgoSetupRequest({
-          organizationId: organization.id,
-          userId: user.id,
-          hasExistingWebsite: Boolean(organization.website_url?.trim()),
-          wantsLandingPackage: true,
-          logoUrl: organization.logo_url ?? '',
-          brandPrimary: organization.brand_primary ?? '',
-          brandSecondary: organization.brand_secondary ?? '',
-          notes: 'Requested with bank payment from Services page',
-          questionnaire: {
-            has_existing_website: Boolean(organization.website_url?.trim()),
-            wants_landing_package: true,
-          },
-        });
-        if (setupError) {
-          setError(setupError);
-          setBusy(null);
-          return;
+        if (!existingSetup) {
+          const { error: setupError } = await submitNgoSetupRequest({
+            organizationId: organization.id,
+            userId: user.id,
+            hasExistingWebsite: Boolean(organization.website_url?.trim()),
+            wantsLandingPackage: true,
+            logoUrl: organization.logo_url ?? '',
+            brandPrimary: organization.brand_primary ?? '',
+            brandSecondary: organization.brand_secondary ?? '',
+            notes: 'Requested with bank payment from Services page',
+            questionnaire: {
+              has_existing_website: Boolean(organization.website_url?.trim()),
+              wants_landing_package: true,
+            },
+          });
+          if (setupError) {
+            // Payment is already queued — show bank details anyway, surface setup issue.
+            setError(`Payment ready, but setup request failed: ${setupError}`);
+          }
         }
       }
-    }
 
-    setMessage(
-      payment
-        ? `${PAYMENT_PRODUCT_LABELS[productType]} is ready — transfer ${money(payment.amount_cents)} with reference ${ref}.`
-        : 'Payment instructions ready.',
-    );
-    await refreshPayments();
-    setBusy(null);
+      const amountLabel = payment ? money(payment.amount_cents) : '';
+      showBankInstructions(
+        ref,
+        payment
+          ? `${PAYMENT_PRODUCT_LABELS[productType]} — transfer ${amountLabel} with reference ${ref}.`
+          : `Use reference ${ref} on your bank transfer.`,
+      );
+      await refreshPayments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not prepare payment instructions.');
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (
@@ -147,8 +167,14 @@ export default function NgoServicesPage() {
       path="/ngo/services"
     >
       <div className="space-y-6">
-        <div className="card-brutal p-5 space-y-3 border-l-4 border-l-teal">
-          <h2 className="font-mono text-xs uppercase tracking-wider font-semibold flex items-center gap-2">
+        <div
+          ref={bankPanelRef}
+          className={cn(
+            'card-brutal space-y-3 border-l-4 border-l-teal p-5 transition-shadow',
+            highlightBank && 'ring-2 ring-teal shadow-brutal',
+          )}
+        >
+          <h2 className="flex items-center gap-2 font-mono text-xs font-semibold uppercase tracking-wider">
             <CreditCard size={14} /> Bank transfer
           </h2>
           <p className="text-sm text-ink-600 dark:text-muted-foreground">
@@ -160,18 +186,18 @@ export default function NgoServicesPage() {
         </div>
 
         {error && (
-          <p className="text-sm text-accent border-2 border-accent px-3 py-2" role="alert">
+          <p className="border-2 border-accent px-3 py-2 text-sm text-accent" role="alert">
             {error}
           </p>
         )}
         {message && (
-          <p className="text-sm text-teal border-2 border-teal/40 bg-teal/5 px-3 py-2" role="status">
+          <p className="border-2 border-teal/40 bg-teal/5 px-3 py-2 text-sm text-teal" role="status">
             {message}
           </p>
         )}
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="card-brutal p-5 space-y-4">
+        <div className="grid gap-4 md:grid-cols-2 md:items-stretch">
+          <div className="card-brutal flex h-full flex-col gap-4 p-5">
             <div className="flex items-center gap-2">
               <Shield size={18} className="text-teal" />
               <h3 className="font-black uppercase tracking-tight">Reality Badge membership</h3>
@@ -180,36 +206,38 @@ export default function NgoServicesPage() {
               {money(MEMBERSHIP_ANNUAL_CENTS)}{' '}
               <span className="text-sm font-mono font-normal text-ink-500">/ year {GST_PRICE_SUFFIX}</span>
             </p>
-            <p className="text-sm text-ink-600 dark:text-muted-foreground">
+            <p className="flex-1 text-sm text-ink-600 dark:text-muted-foreground">
               Public trust standards review, Reality Badge when criteria pass, and website monitoring
               alerts.
             </p>
-            {membershipPaid ? (
-              <p className="text-sm font-semibold text-teal inline-flex items-center gap-2">
-                <CheckCircle size={16} /> Membership paid
+            <div className="mt-auto space-y-2">
+              {membershipPaid ? (
+                <p className="inline-flex min-h-[48px] items-center gap-2 text-sm font-semibold text-teal">
+                  <CheckCircle size={16} /> Membership paid
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => void startPayment('membership_annual')}
+                  className="btn-brutal-teal w-full min-h-[48px]"
+                >
+                  {busy === 'membership_annual'
+                    ? 'Preparing…'
+                    : membershipPending
+                      ? 'Show bank instructions again'
+                      : `Pay ${money(MEMBERSHIP_ANNUAL_CENTS)} by bank transfer`}
+                </button>
+              )}
+              <p className="min-h-[2.75rem] font-mono text-2xs text-ink-500">
+                {membershipPending && !membershipPaid
+                  ? 'Pending — we will activate membership after we receive your transfer.'
+                  : null}
               </p>
-            ) : (
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void startPayment('membership_annual')}
-                className="btn-brutal-teal w-full min-h-[48px]"
-              >
-                {busy === 'membership_annual'
-                  ? 'Preparing…'
-                  : membershipPending
-                    ? 'Show bank instructions again'
-                    : `Pay ${money(MEMBERSHIP_ANNUAL_CENTS)} by bank transfer`}
-              </button>
-            )}
-            {membershipPending && !membershipPaid && (
-              <p className="font-mono text-2xs text-ink-500">
-                Pending — we will activate membership after we receive your transfer.
-              </p>
-            )}
+            </div>
           </div>
 
-          <div className="card-brutal p-5 space-y-4">
+          <div className="card-brutal flex h-full flex-col gap-4 p-5">
             <div className="flex items-center gap-2">
               <Layout size={18} className="text-teal" />
               <h3 className="font-black uppercase tracking-tight">Trust landing page</h3>
@@ -218,32 +246,34 @@ export default function NgoServicesPage() {
               {money(LANDING_STANDARDS_PACKAGE_CENTS)}{' '}
               <span className="text-sm font-mono font-normal text-ink-500">one-off {GST_PRICE_SUFFIX}</span>
             </p>
-            <p className="text-sm text-ink-600 dark:text-muted-foreground">
+            <p className="flex-1 text-sm text-ink-600 dark:text-muted-foreground">
               {LANDING_STANDARDS_PACKAGE_LABEL}. Membership is separate if you also want the badge.
             </p>
-            {packagePaid ? (
-              <p className="text-sm font-semibold text-teal inline-flex items-center gap-2">
-                <CheckCircle size={16} /> Package paid — our team will fulfill
+            <div className="mt-auto space-y-2">
+              {packagePaid ? (
+                <p className="inline-flex min-h-[48px] items-center gap-2 text-sm font-semibold text-teal">
+                  <CheckCircle size={16} /> Package paid — our team will fulfill
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => void startPayment('landing_standards_package')}
+                  className="btn-brutal-teal w-full min-h-[48px]"
+                >
+                  {busy === 'landing_standards_package'
+                    ? 'Preparing…'
+                    : packagePending
+                      ? 'Show bank instructions again'
+                      : `Pay ${money(LANDING_STANDARDS_PACKAGE_CENTS)} by bank transfer`}
+                </button>
+              )}
+              <p className="min-h-[2.75rem] font-mono text-2xs text-ink-500">
+                {packagePending && !packagePaid
+                  ? 'Pending — a setup request is also queued for our team.'
+                  : null}
               </p>
-            ) : (
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void startPayment('landing_standards_package')}
-                className="btn-brutal-teal w-full min-h-[48px]"
-              >
-                {busy === 'landing_standards_package'
-                  ? 'Preparing…'
-                  : packagePending
-                    ? 'Show bank instructions again'
-                    : `Pay ${money(LANDING_STANDARDS_PACKAGE_CENTS)} by bank transfer`}
-              </button>
-            )}
-            {packagePending && !packagePaid && (
-              <p className="font-mono text-2xs text-ink-500">
-                Pending — a setup request is also queued for our team.
-              </p>
-            )}
+            </div>
           </div>
         </div>
       </div>
