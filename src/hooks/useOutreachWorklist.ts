@@ -182,6 +182,78 @@ export async function bulkSetOutreachByIds(
   return data as BulkResult;
 }
 
+export interface EnqueueEmailResult {
+  matched: number;
+  queued: number;
+  skipped_no_email: number;
+  skipped_suppressed: number;
+  skipped_dedupe: number;
+  capped: boolean;
+  cap: number;
+}
+
+function siteBaseUrl(): string {
+  return (
+    (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/$/, '') ||
+    'https://www.ngoreality.com'
+  );
+}
+
+/** Queue outreach emails for every lead matching the filter (minus exclusions). */
+export async function enqueueOutreachEmailsByFilter(
+  filters: OutreachFilters,
+  template: string,
+  excludedIds: string[],
+  options?: { subject?: string; body?: string; max?: number },
+): Promise<EnqueueEmailResult> {
+  const { data, error } = await supabase.rpc('outreach_enqueue_emails', {
+    p_template: template,
+    p_segment: filters.segment,
+    p_outreach: filters.outreach || null,
+    p_q: filters.q || null,
+    p_exclude: excludedIds,
+    p_ids: null,
+    p_site_url: siteBaseUrl(),
+    p_subject: options?.subject ?? null,
+    p_body: options?.body ?? null,
+    p_max: options?.max ?? 25000,
+  });
+  if (error) throw new Error(error.message);
+  return data as EnqueueEmailResult;
+}
+
+/** Queue outreach emails for an explicit id list (checkbox selection). */
+export async function enqueueOutreachEmailsByIds(
+  ids: string[],
+  template: string,
+  options?: { subject?: string; body?: string },
+): Promise<EnqueueEmailResult> {
+  if (!ids.length) {
+    return {
+      matched: 0,
+      queued: 0,
+      skipped_no_email: 0,
+      skipped_suppressed: 0,
+      skipped_dedupe: 0,
+      capped: false,
+      cap: 0,
+    };
+  }
+  const { data, error } = await supabase.rpc('outreach_enqueue_emails', {
+    p_template: template,
+    p_segment: 'all',
+    p_outreach: null,
+    p_q: null,
+    p_exclude: [],
+    p_ids: ids,
+    p_site_url: siteBaseUrl(),
+    p_subject: options?.subject ?? null,
+    p_body: options?.body ?? null,
+  });
+  if (error) throw new Error(error.message);
+  return data as EnqueueEmailResult;
+}
+
 /* ---------------------------------------------------------------------- */
 /* Selection                                                               */
 /* ---------------------------------------------------------------------- */

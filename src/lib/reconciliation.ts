@@ -164,5 +164,26 @@ export async function reconcilePayment(input: {
     return { error: null, message: 'Payment recorded and membership activated.' };
   }
 
+  if (input.productType === 'landing_standards_package') {
+    await supabase
+      .from('ngo_setup_requests')
+      .update({
+        status: 'in_review',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('organization_id', input.organizationId)
+      .eq('request_kind', 'landing_standards')
+      .in('status', ['pending', 'in_review']);
+
+    await supabase.from('activity_log').insert({
+      organization_id: input.organizationId,
+      action: 'landing_package_paid',
+      description: 'Trust landing page package reconciled — ready for staff fulfillment',
+      performed_by: input.recordedBy ?? 'staff',
+    });
+
+    return { error: null, message: 'Payment recorded — fulfill landing package via Setup requests.' };
+  }
+
   return { error: null, message: 'Payment recorded.' };
 }

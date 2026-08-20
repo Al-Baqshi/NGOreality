@@ -19,7 +19,8 @@ type BrandLogoProps = {
   onDark?: boolean;
 };
 
-const ICON_SRC = '/reality-badge.png';
+const ICON_LIGHT = '/logo-icon.svg';
+const ICON_DARK = '/logo-icon-dark.svg';
 
 export default function BrandLogo({
   variant = 'full',
@@ -34,14 +35,14 @@ export default function BrandLogo({
 }: BrandLogoProps) {
   const { resolvedTheme } = useTheme();
   const isDark = onDark || resolvedTheme === 'dark';
-  const src = ICON_SRC;
+  const src = isDark ? ICON_DARK : ICON_LIGHT;
 
   const nameClass = isDark
     ? 'text-white'
     : 'text-ink-950 dark:text-ink-50';
 
   const taglineClass = isDark
-    ? 'text-ink-300'
+    ? 'text-[#EBBB57]'
     : 'text-ink-500 dark:text-ink-400';
 
   if (variant === 'icon') {

@@ -6,6 +6,7 @@ import {
   PRICING_CURRENCY,
   VERIFICATION_ANNUAL_CENTS,
 } from '../config/pricing';
+import { LANDING_STANDARDS_PACKAGE_CENTS } from '../config/customerProducts';
 import { activateMembershipBenefits, isMembershipProduct } from './membershipBenefits';
 import type { OrganizationPayment, PaymentProductType, PaymentStatus } from '../types';
 
@@ -32,6 +33,9 @@ export async function ensurePaymentReference(orgId: string): Promise<string> {
 }
 
 function periodForProduct(productType: PaymentProductType, paidAt: Date) {
+  if (productType === 'landing_standards_package') {
+    return { period_start: paidAt.toISOString(), period_end: null as string | null };
+  }
   const start = new Date(paidAt);
   const end = new Date(paidAt);
   if (productType === 'monitoring_monthly') {
@@ -46,13 +50,37 @@ function amountForProduct(productType: PaymentProductType, amountCents?: number)
   if (amountCents != null) return amountCents;
   if (productType === 'monitoring_monthly') return MONITORING_MONTHLY_CENTS;
   if (productType === 'membership_annual') return MEMBERSHIP_ANNUAL_CENTS;
+  if (productType === 'landing_standards_package') return LANDING_STANDARDS_PACKAGE_CENTS;
   return VERIFICATION_ANNUAL_CENTS;
+}
+
+export function isLandingPackageProduct(productType: string): boolean {
+  return productType === 'landing_standards_package';
+}
+
+async function markLandingPackagePaid(organizationId: string, recordedBy?: string) {
+  await supabase
+    .from('ngo_setup_requests')
+    .update({
+      status: 'in_review',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('organization_id', organizationId)
+    .eq('request_kind', 'landing_standards')
+    .in('status', ['pending', 'in_review']);
+
+  await supabase.from('activity_log').insert({
+    organization_id: organizationId,
+    action: 'landing_package_paid',
+    description: 'Trust landing page package marked paid — ready for staff fulfillment',
+    performed_by: recordedBy ?? 'staff',
+  });
 }
 
 export async function recordPayment(input: {
   organizationId: string;
   productType: PaymentProductType;
-  paymentMethod: 'bank_transfer' | 'stripe' | 'manual';
+  paymentMethod: 'bank_transfer' | 'stripe' | 'manual' | 'paymark';
   status?: PaymentStatus;
   amountCents?: number;
   notes?: string;
@@ -118,6 +146,15 @@ export async function recordPayment(input: {
       };
     }
 
+    if (isLandingPackageProduct(productType)) {
+      await markLandingPackagePaid(input.organizationId, input.recordedBy);
+      return {
+        payment: data as OrganizationPayment,
+        error: null,
+        message: 'Landing package recorded — fulfill via Setup requests.',
+      };
+    }
+
     if (productType === 'monitoring_monthly') {
       const { count } = await supabase
         .from('service_engagements')
@@ -149,6 +186,55 @@ export async function recordPayment(input: {
   }
 
   return { payment: data as OrganizationPayment, error: null };
+}
+
+/** Create a pending bank-transfer payment the NGO can settle with their NGR reference. */
+export async function createPendingBankPayment(input: {
+  organizationId: string;
+  productType: PaymentProductType;
+  notes?: string;
+  recordedBy?: string;
+}): Promise<{ payment: OrganizationPayment | null; reference: string; error: string | null }> {
+  const productType =
+    input.productType === 'verification_annual' ? 'membership_annual' : input.productType;
+  const amountCents = amountForProduct(productType);
+  const reference = await ensurePaymentReference(input.organizationId);
+
+  const { data: existing } = await supabase
+    .from('organization_payments')
+    .select('*')
+    .eq('organization_id', input.organizationId)
+    .eq('product_type', productType)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) {
+    return { payment: existing as OrganizationPayment, reference, error: null };
+  }
+
+  const { data, error } = await supabase
+    .from('organization_payments')
+    .insert({
+      organization_id: input.organizationId,
+      product_type: productType,
+      amount_cents: amountCents,
+      currency: PRICING_CURRENCY,
+      status: 'pending',
+      payment_method: 'bank_transfer',
+      bank_transfer_reference: reference,
+      paid_at: null,
+      period_start: null,
+      period_end: null,
+      notes: input.notes ?? '',
+      recorded_by: input.recordedBy ?? 'ngo_portal',
+    })
+    .select()
+    .maybeSingle();
+
+  if (error) return { payment: null, reference, error: error.message };
+  return { payment: data as OrganizationPayment, reference, error: null };
 }
 
 /** Bank transfer instructions shown in CRM */

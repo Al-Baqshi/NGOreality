@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react';
-import { Link, useLocation } from 'react-router-dom';
 import { Bell, Globe } from 'lucide-react';
 
+import { AppSidebarBrand } from '@/components/AppSidebarBrand';
 import { NavMain } from '@/components/nav-main';
 import { NavSecondary } from '@/components/nav-secondary';
 import { NavUser } from '@/components/nav-user';
@@ -11,12 +11,9 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
+import { useLocation } from 'react-router-dom';
 
 export function CrmAppSidebar({
   onSignOut,
@@ -31,32 +28,15 @@ export function CrmAppSidebar({
       className="top-(--header-height) h-[calc(100svh-var(--header-height))]!"
       {...props}
     >
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              size="lg"
-              tooltip="NGOreality Staff CRM"
-              render={<Link to="/dashboard" />}
-            >
-              <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                <img
-                  src="/reality-badge.png"
-                  alt=""
-                  className="size-5 object-contain"
-                  decoding="async"
-                />
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">NGOreality</span>
-                <span className="truncate text-xs">Staff CRM</span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
+      <AppSidebarBrand
+        to="/dashboard"
+        title="NGOreality"
+        subtitle="Staff CRM"
+        tooltip="NGOreality Staff CRM"
+        isActive={pathname === '/dashboard'}
+      />
 
-      <SidebarContent>
+      <SidebarContent className="gap-1 px-1 py-2">
         {CRM_NAV_GROUPS.map((group) => (
           <NavMain
             key={group.label}
@@ -80,7 +60,7 @@ export function CrmAppSidebar({
         />
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="border-t border-sidebar-border/35 p-2">
         <NavUser
           onSignOut={onSignOut}
           extraItems={[{ title: 'Notifications', url: '/notifications', icon: Bell }]}

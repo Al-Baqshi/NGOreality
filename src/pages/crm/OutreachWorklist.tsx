@@ -8,6 +8,7 @@ import NewLeadDialog from '../../components/crm/NewLeadDialog';
 import {
   useOutreachLeads, useOutreachSegmentCounts, useOutreachSelection,
   bulkSetOutreachByFilter, bulkSetOutreachByIds, selectionCount, isRowSelected,
+  enqueueOutreachEmailsByFilter, enqueueOutreachEmailsByIds,
   OUTREACH_PAGE_SIZE,
   type OutreachSegment, type OutreachFilters, type OutreachLead,
 } from '../../hooks/useOutreachWorklist';
@@ -16,6 +17,7 @@ import { EmptyState } from '../../components/ui';
 import OutreachBatchCommand from '../../components/crm/OutreachBatchCommand';
 import SendEmailModal from '../../components/crm/SendEmailModal';
 import { supabase } from '../../lib/supabase';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 /**
  * The outreach worklist.
@@ -91,6 +93,7 @@ export default function OutreachWorklist() {
   const [notice, setNotice] = useState<string | null>(null);
   const [sendEmailOpen, setSendEmailOpen] = useState(false);
   const [sendEmailOrganizations, setSendEmailOrganizations] = useState<Pick<Organization, 'id' | 'name' | 'email'>[]>([]);
+  const confirm = useConfirm();
 
   const { counts } = useOutreachSegmentCounts(refreshKey);
   const { leads, total, loading, error } = useOutreachLeads(filters, page, refreshKey);
@@ -146,14 +149,79 @@ export default function OutreachWorklist() {
     }
   }
 
+  const emailColumn = (filters.outreach || 'cold_email') as OutreachStatus;
+  const emailTemplate = OUTREACH_EMAIL_BY_COLUMN[emailColumn] ?? 'outreach_cold_invite';
+  const emailColumnLabel = filters.outreach
+    ? OUTREACH_STATUS_LABELS[filters.outreach as OutreachStatus]
+    : 'Selected';
+
   async function handleSendEmail() {
     if (!selected) return;
+    const template = emailTemplate;
+
+    // Select-all matching: server-side enqueue — never load 29k rows into the browser.
     if (selection.mode === 'all') {
-      setNotice('To send email, select specific rows with the checkboxes (not “select all matching”).');
+      const ok = await confirm({
+        title: 'Queue outreach emails?',
+        description:
+          `Queue the default ${template} template for about ${selected.toLocaleString()} organisations matching this filter?\n\n` +
+          `Orgs without email, suppressed addresses, and recent duplicates (14 days) are skipped. ` +
+          `Delivery is via Email notifications (pg_cron). Pilot a small segment before a full cohort.`,
+        confirmLabel: 'Queue emails',
+      });
+      if (!ok) return;
+
+      setBusy(true);
+      setNotice(null);
+      try {
+        const result = await enqueueOutreachEmailsByFilter(
+          filters,
+          template,
+          Array.from(selection.excluded),
+        );
+        setNotice(
+          `Queued ${result.queued.toLocaleString()} · skipped no email ${result.skipped_no_email.toLocaleString()} · ` +
+            `suppressed ${result.skipped_suppressed.toLocaleString()} · deduped ${result.skipped_dedupe.toLocaleString()}` +
+            (result.capped ? ` · capped at ${result.cap.toLocaleString()} — run again to continue` : ''),
+        );
+        clear();
+        setRefreshKey((k) => k + 1);
+      } catch (e) {
+        setNotice(e instanceof Error ? e.message : 'Could not queue emails.');
+      } finally {
+        setBusy(false);
+      }
       return;
     }
+
     const ids = Array.from(selection.ids);
     if (!ids.length) return;
+
+    // Large checkbox sets: also use the RPC (no modal draft for hundreds of rows).
+    if (ids.length > 50) {
+      const ok = await confirm({
+        title: 'Queue outreach emails?',
+        description: `Queue ${template} for ${ids.length.toLocaleString()} selected organisations (server-side)?`,
+        confirmLabel: 'Queue emails',
+      });
+      if (!ok) return;
+      setBusy(true);
+      setNotice(null);
+      try {
+        const result = await enqueueOutreachEmailsByIds(ids, template);
+        setNotice(
+          `Queued ${result.queued.toLocaleString()} · skipped no email ${result.skipped_no_email.toLocaleString()} · ` +
+            `suppressed ${result.skipped_suppressed.toLocaleString()} · deduped ${result.skipped_dedupe.toLocaleString()}`,
+        );
+        clear();
+        setRefreshKey((k) => k + 1);
+      } catch (e) {
+        setNotice(e instanceof Error ? e.message : 'Could not queue emails.');
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
 
     setBusy(true);
     setNotice(null);
@@ -175,12 +243,6 @@ export default function OutreachWorklist() {
       setBusy(false);
     }
   }
-
-  const emailColumn = (filters.outreach || 'cold_email') as OutreachStatus;
-  const emailTemplate = OUTREACH_EMAIL_BY_COLUMN[emailColumn] ?? 'outreach_cold_invite';
-  const emailColumnLabel = filters.outreach
-    ? OUTREACH_STATUS_LABELS[filters.outreach as OutreachStatus]
-    : 'Selected';
 
   return (
     <div className="page-shell">

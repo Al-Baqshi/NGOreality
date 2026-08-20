@@ -33,9 +33,13 @@ export interface Organization {
   updated_at: string;
 }
 
-export type PaymentProductType = 'membership_annual' | 'verification_annual' | 'monitoring_monthly';
+export type PaymentProductType =
+  | 'membership_annual'
+  | 'verification_annual'
+  | 'monitoring_monthly'
+  | 'landing_standards_package';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled';
-export type PaymentMethod = 'stripe' | 'bank_transfer' | 'manual';
+export type PaymentMethod = 'stripe' | 'bank_transfer' | 'manual' | 'paymark';
 
 export interface OrganizationPayment {
   id: string;
@@ -69,12 +73,14 @@ export const PAYMENT_PRODUCT_LABELS: Record<PaymentProductType, string> = {
   membership_annual: 'Annual membership',
   verification_annual: 'Reality Badge (legacy)',
   monitoring_monthly: 'Monitoring only (legacy)',
+  landing_standards_package: 'Trust landing page package',
 };
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   stripe: 'Card',
   bank_transfer: 'Bank transfer',
   manual: 'Manual',
+  paymark: 'Online EFTPOS',
 };
 
 /** Outreach email templates (queued in notification_events) */

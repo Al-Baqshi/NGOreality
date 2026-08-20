@@ -59,9 +59,23 @@ export default function NgoOverviewPage() {
         )}
 
         <p className="text-sm text-ink-600 dark:text-muted-foreground leading-relaxed">
-          Use the menu to manage your profile, request a trust landing page, check membership, and track your Reality
-          Badge progress.
+          Use the menu to manage your profile, pay for Reality Badge or a trust landing page, and track
+          your progress.
         </p>
+
+        {!activeBadge && (
+          <Link
+            to="/ngo/services"
+            className="card-brutal block border-l-4 border-l-teal p-5 hover:bg-paper dark:hover:bg-muted/20"
+          >
+            <h2 className="text-lg font-black uppercase tracking-tight">Choose services</h2>
+            <p className="mt-1 text-sm text-ink-600 dark:text-muted-foreground">
+              Pay by bank transfer for Reality Badge membership ($70/yr) and/or the trust landing page
+              package ($650).
+            </p>
+            <span className="btn-brutal-teal mt-3 inline-block px-4 py-2 text-xs">Open services &amp; pay</span>
+          </Link>
+        )}
 
         <NgoPortalQuickLinks />
       </div>

@@ -10,9 +10,11 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { cn } from '@/lib/utils';
 
 export function NavSecondary({
   items,
+  className,
   ...props
 }: {
   items: {
@@ -24,13 +26,17 @@ export function NavSecondary({
   const { isMobile, setOpenMobile } = useSidebar();
 
   return (
-    <SidebarGroup {...props}>
+    <SidebarGroup
+      {...props}
+      className={cn('border-t border-sidebar-border/30 pt-2', className)}
+    >
       <SidebarGroupContent>
-        <SidebarMenu>
+        <SidebarMenu className="gap-0.5">
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton
                 tooltip={item.title}
+                className="h-9 rounded-md px-2.5 text-[13px] text-white/65 hover:bg-white/10 hover:text-white"
                 render={
                   <Link
                     to={item.url}
@@ -40,7 +46,7 @@ export function NavSecondary({
                   />
                 }
               >
-                <item.icon />
+                <item.icon className="size-4 opacity-70" />
                 <span>{item.title}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>

@@ -48,6 +48,7 @@ export default function NgoPortalPageShell({
 
 export function NgoPortalQuickLinks() {
   const links = [
+    { to: '/ngo/services', label: 'Services & pay' },
     { to: '/ngo/profile', label: 'Complete profile' },
     { to: '/ngo/setup-request', label: 'Request setup' },
     { to: '/ngo/membership', label: 'Membership' },

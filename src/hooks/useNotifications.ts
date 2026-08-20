@@ -2,10 +2,21 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { fetchNotificationSummaryFromDb } from '../lib/notificationSummary';
 import { fetchNotificationSummary, flushPendingNotifications, isMonitorApiConfigured } from '../lib/monitorApi';
-import type { NotificationEvent } from '../types';
+import type { NotificationEvent, NotificationStatus } from '../types';
 
-export function useNotifications(limit = 100) {
+export const NOTIFICATION_PAGE_SIZE = 50;
+
+export function useNotifications(options?: {
+  pageSize?: number;
+  page?: number;
+  status?: NotificationStatus | 'all';
+}) {
+  const pageSize = options?.pageSize ?? NOTIFICATION_PAGE_SIZE;
+  const page = options?.page ?? 1;
+  const status = options?.status ?? 'all';
+
   const [events, setEvents] = useState<NotificationEvent[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState({ pending: 0, sent: 0, failed: 0, skipped: 0, suppressed: 0 });
@@ -15,53 +26,28 @@ export function useNotifications(limit = 100) {
     setLoading(true);
     setError(null);
 
-    const since = new Date();
-    since.setDate(since.getDate() - 30);
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
 
-    const [recentRes, failedRes, skippedRes, suppressedRes] = await Promise.all([
-      supabase
-        .from('notification_events')
-        .select('*, organizations(name)')
-        .order('created_at', { ascending: false })
-        .limit(limit),
-      supabase
-        .from('notification_events')
-        .select('*, organizations(name)')
-        .eq('status', 'failed')
-        .gte('created_at', since.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(50),
-      supabase
-        .from('notification_events')
-        .select('*, organizations(name)')
-        .eq('status', 'skipped')
-        .gte('created_at', since.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(50),
-      supabase
-        .from('notification_events')
-        .select('*, organizations(name)')
-        .eq('status', 'suppressed')
-        .gte('created_at', since.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(50),
-    ]);
+    let query = supabase
+      .from('notification_events')
+      .select('*, organizations(name)', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
-    const qError = recentRes.error ?? failedRes.error ?? skippedRes.error ?? suppressedRes.error;
-    const data = recentRes.data;
+    if (status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    const { data, error: qError, count } = await query;
 
     if (qError) {
       setError(qError.message);
+      setEvents([]);
+      setTotal(0);
     } else {
-      const merged = new Map<string, NotificationEvent>();
-      for (const row of failedRes.data ?? []) merged.set(row.id, row as NotificationEvent);
-      for (const row of skippedRes.data ?? []) merged.set(row.id, row as NotificationEvent);
-      for (const row of suppressedRes.data ?? []) merged.set(row.id, row as NotificationEvent);
-      for (const row of data ?? []) merged.set(row.id, row as NotificationEvent);
-      const list = [...merged.values()].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      );
-      setEvents(list);
+      setEvents((data ?? []) as NotificationEvent[]);
+      setTotal(count ?? 0);
     }
 
     try {
@@ -74,18 +60,11 @@ export function useNotifications(limit = 100) {
         setSummary(await fetchNotificationSummaryFromDb());
       }
     } catch {
-      const rows = data ?? [];
-      setSummary({
-        pending: rows.filter((e) => e.status === 'pending').length,
-        sent: rows.filter((e) => e.status === 'sent').length,
-        failed: rows.filter((e) => e.status === 'failed').length,
-        skipped: rows.filter((e) => e.status === 'skipped').length,
-        suppressed: rows.filter((e) => e.status === 'suppressed').length,
-      });
+      /* keep previous summary */
     }
 
     setLoading(false);
-  }, [limit]);
+  }, [page, pageSize, status]);
 
   useEffect(() => {
     refetch();
@@ -93,7 +72,7 @@ export function useNotifications(limit = 100) {
 
   const flushNow = async (): Promise<string | null> => {
     if (!isMonitorApiConfigured()) {
-      return 'Set VITE_MONITOR_API_URL and VITE_MONITOR_API_KEY to send from CRM (or wait for the worker).';
+      return 'Set VITE_MONITOR_API_URL and VITE_MONITOR_API_KEY to send from CRM (or wait for the worker / cron).';
     }
     setFlushing(true);
     try {
@@ -169,8 +148,6 @@ export function useNotifications(limit = 100) {
     const { error: rpcError } = await supabase.rpc('unsuppress_email', { p_email: email });
     if (rpcError) return rpcError.message;
 
-    // A 0/false/null return means the address is already allowed — still
-    // update this queue row so it does not stay labelled unsubscribed.
     if (eventId) {
       const { error: uError } = await supabase
         .from('notification_events')
@@ -195,6 +172,9 @@ export function useNotifications(limit = 100) {
 
   return {
     events,
+    total,
+    page,
+    pageSize,
     loading,
     error,
     summary,

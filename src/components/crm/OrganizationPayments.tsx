@@ -8,7 +8,8 @@ import {
 } from '../../lib/payments';
 import { isMonitorApiConfigured } from '../../lib/monitorApi';
 import { MEMBERSHIP_ANNUAL_CENTS, MEMBERSHIP_LABEL, PRICING_CURRENCY } from '../../config/pricing';
-import { PAYMENT_STATUS_LABELS } from '../../types';
+import { LANDING_STANDARDS_PACKAGE_CENTS } from '../../config/customerProducts';
+import { PAYMENT_PRODUCT_LABELS, PAYMENT_STATUS_LABELS } from '../../types';
 import { CreditCard, Copy, Check } from 'lucide-react';
 
 function formatMoney(cents: number, currency: string) {
@@ -70,18 +71,41 @@ export default function OrganizationPayments({
     }
   };
 
+  const handleRecordPackage = async () => {
+    setRecording(true);
+    setMessage(null);
+    const { error, message: resultMsg } = await recordPayment({
+      organizationId,
+      productType: 'landing_standards_package',
+      paymentMethod: 'bank_transfer',
+      status: 'paid',
+      notes: notes.trim() || `Trust landing package for ${organizationName}`,
+    });
+    setRecording(false);
+    if (error) {
+      setMessage(error);
+    } else {
+      setNotes('');
+      setMessage(resultMsg ?? 'Landing package recorded — fulfill via Setup requests.');
+      refetch();
+    }
+  };
+
   const membershipActive = hasActiveMembershipPayment(payments);
   const latestMembership = payments.find(
     (p) =>
       (p.product_type === 'membership_annual' || p.product_type === 'verification_annual') &&
       p.status === 'paid',
   );
+  const packagePaid = payments.some(
+    (p) => p.product_type === 'landing_standards_package' && p.status === 'paid',
+  );
 
   return (
     <div className="card-brutal">
       <div className="border-b-3 border-ink-950 px-4 py-3">
         <h3 className="font-mono text-xs uppercase tracking-wider font-semibold flex items-center gap-2">
-          <CreditCard size={14} /> Membership
+          <CreditCard size={14} /> Membership & packages
         </h3>
       </div>
 
@@ -97,13 +121,22 @@ export default function OrganizationPayments({
             <li>Website monitoring with email alerts if site goes down</li>
             <li>Member portal for security checklist (repository, baseline, etc.)</li>
           </ul>
-          <p className="font-mono text-2xs text-ink-400 mt-2">
-            Consulting, custom sites, and hands-on support are billed separately.
-          </p>
           <p className="font-mono text-2xs text-ink-500 mt-2">
             {membershipActive && latestMembership?.period_end
               ? `Paid · active until ${new Date(latestMembership.period_end).toLocaleDateString()}`
-              : 'Not paid — record payment after standards pass'}
+              : 'Not paid — record payment after bank transfer clears'}
+          </p>
+        </div>
+
+        <div className="text-sm">
+          <span className="label-brutal">Trust landing package</span>
+          <p className="font-semibold text-lg mt-1">
+            {formatMoney(LANDING_STANDARDS_PACKAGE_CENTS, PRICING_CURRENCY)} one-off
+          </p>
+          <p className="font-mono text-2xs text-ink-500 mt-2">
+            {packagePaid
+              ? 'Paid — fulfill via Setup / Registrations queue'
+              : 'Record when the $650 transfer clears (does not activate membership)'}
           </p>
         </div>
 
@@ -138,16 +171,34 @@ export default function OrganizationPayments({
           onChange={(e) => setNotes(e.target.value)}
         />
 
-        <button
-          type="button"
-          disabled={recording}
-          onClick={handleRecordMembership}
-          className="btn-brutal-teal text-xs w-full sm:w-auto min-h-[48px] px-6"
-        >
-          {recording ? 'Saving…' : `Record membership paid (${formatMoney(MEMBERSHIP_ANNUAL_CENTS, PRICING_CURRENCY)})`}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={recording}
+            onClick={handleRecordMembership}
+            className="btn-brutal-teal text-xs min-h-[48px] px-6"
+          >
+            {recording
+              ? 'Saving…'
+              : `Record membership paid (${formatMoney(MEMBERSHIP_ANNUAL_CENTS, PRICING_CURRENCY)})`}
+          </button>
+          <button
+            type="button"
+            disabled={recording}
+            onClick={handleRecordPackage}
+            className="btn-brutal-outline text-xs min-h-[48px] px-6"
+          >
+            {recording
+              ? 'Saving…'
+              : `Record landing package paid (${formatMoney(LANDING_STANDARDS_PACKAGE_CENTS, PRICING_CURRENCY)})`}
+          </button>
+        </div>
         {message && (
-          <p className={`font-mono text-2xs ${message.includes('error') ? 'text-accent' : 'text-teal'}`}>
+          <p
+            className={`font-mono text-2xs ${
+              message.includes('error') || message.includes('fail') ? 'text-accent' : 'text-teal'
+            }`}
+          >
             {message}
           </p>
         )}
@@ -160,14 +211,11 @@ export default function OrganizationPayments({
           <p className="p-4 text-sm text-ink-400">No payments recorded yet.</p>
         ) : (
           payments.map((p) => (
-            <div key={p.id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm">
-              <span className="font-medium">
-                {p.product_type === 'membership_annual'
-                  ? 'Annual membership'
-                  : p.product_type === 'verification_annual'
-                    ? 'Membership (legacy)'
-                    : 'Monitoring (legacy)'}
-              </span>
+            <div
+              key={p.id}
+              className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm"
+            >
+              <span className="font-medium">{PAYMENT_PRODUCT_LABELS[p.product_type] ?? p.product_type}</span>
               <span>{formatMoney(p.amount_cents, p.currency)}</span>
               <span className="font-mono text-2xs uppercase">{PAYMENT_STATUS_LABELS[p.status]}</span>
               <span className="font-mono text-2xs text-ink-400 sm:ml-auto">

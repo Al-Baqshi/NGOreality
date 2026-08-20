@@ -8,9 +8,11 @@ export type NotificationTemplate =
   | 'badge_request_received'
   | OutreachEmailTemplate;
 
-function portalSignupUrl(): string {
+function portalSignupUrl(organizationId?: string): string {
   const base = (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/$/, '');
-  return base ? `${base}/ngo/signup` : 'https://www.ngoreality.com/ngo/signup';
+  const root = base || 'https://www.ngoreality.com';
+  if (organizationId) return `${root}/ngo/signup?org=${encodeURIComponent(organizationId)}`;
+  return `${root}/ngo/signup`;
 }
 
 function buildMessage(
@@ -18,6 +20,7 @@ function buildMessage(
   organizationName: string,
   extra?: Record<string, string>,
 ): { subject: string; body: string } {
+  const signupUrl = portalSignupUrl(extra?.organizationId);
   switch (template) {
     case 'site_down':
       return {
@@ -94,10 +97,12 @@ function buildMessage(
           ``,
           `We are reaching out from NGOreality because ${organizationName} is listed on the New Zealand charities register and may benefit from a verified public profile, optional website support, and trust standards that funders recognise.`,
           ``,
-          `You can claim and onboard your organisation here (free to start):`,
-          portalSignupUrl(),
+          `Claim and onboard your organisation here (free to start):`,
+          signupUrl,
           ``,
-          `If you already have a website, you can link it during setup. If not, we can help with a simple landing page as part of onboarding.`,
+          `Once claimed, you can pay by bank transfer for:`,
+          `• Reality Badge membership — NZD $70 / year (badge + website monitoring)`,
+          `• Trust landing page package — NZD $650 one-off (we build a standards-ready page)`,
           ``,
           `Reply to this email if you have questions — we are happy to walk you through it.`,
           ``,
@@ -110,10 +115,10 @@ function buildMessage(
         body: [
           `Kia ora,`,
           ``,
-          `We noticed ${organizationName} does not currently have a public website listed. Many charities use NGOreality for a lightweight landing page, verified registry details, and optional monitoring once you are ready.`,
+          `We noticed ${organizationName} does not currently have a public website listed. Many charities use NGOreality for a lightweight trust landing page (NZD $650), verified registry details, and optional Reality Badge membership (NZD $70 / year) with monitoring.`,
           ``,
           `Start here when it suits you:`,
-          portalSignupUrl(),
+          signupUrl,
           ``,
           `There is no obligation — reply if you would like a short call about options.`,
           ``,
@@ -128,10 +133,10 @@ function buildMessage(
           ``,
           `Our systems flagged that the website for ${organizationName} may be unreachable or returning errors${extra?.errorDetail ? ` (${extra.errorDetail})` : ''}.`,
           ``,
-          `NGOreality members receive monitoring alerts; we can also help fix or replace a site as a separate service.`,
+          `NGOreality members receive monitoring alerts with Reality Badge membership (NZD $70 / year). We can also help fix or replace a site with our trust landing page package (NZD $650).`,
           ``,
           `If you would like support, reply to this email or claim your profile:`,
-          portalSignupUrl(),
+          signupUrl,
           ``,
           `— NGOreality`,
         ].join('\n'),
@@ -160,7 +165,10 @@ export async function queueNotification(input: {
   const email = input.recipientEmail.trim();
   if (!email) return { error: 'No recipient email' };
 
-  const built = buildMessage(input.template, input.organizationName, input.extra);
+  const built = buildMessage(input.template, input.organizationName, {
+    ...input.extra,
+    organizationId: input.organizationId,
+  });
   const subject = input.subjectOverride
     ? personalizeOutreachDraft(input.subjectOverride, input.organizationName)
     : built.subject;

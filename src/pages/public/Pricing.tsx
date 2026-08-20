@@ -229,7 +229,7 @@ export default function Pricing() {
         'Ready to submit for Reality Badge assessment',
         'Connect your own domain',
       ],
-      cta: { label: 'Talk to us', to: '/public/contact' },
+      cta: { label: 'Pay in the portal', to: '/ngo/signup' },
       footnote: 'Membership is separate and still required for the badge itself.',
     },
     {

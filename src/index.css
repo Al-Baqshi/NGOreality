@@ -171,14 +171,26 @@
            font-mono text-2xs font-semibold uppercase tracking-wider px-2.5 py-1;
   }
 
-  /* CRM sidebar — navy field, gold/orange accents */
+  /* App sidebars (CRM + NGO portal) — navy field, gold accents */
   [data-sidebar='sidebar'] {
-    background: #041C3C;
-    border-color: var(--sidebar-border);
+    background:
+      radial-gradient(120% 60% at 0% 0%, rgba(235, 187, 87, 0.12), transparent 55%),
+      linear-gradient(180deg, #062447 0%, #041C3C 42%, #03162f 100%);
+    border-color: color-mix(in srgb, var(--sidebar-border) 55%, transparent);
   }
 
   .dark [data-sidebar='sidebar'] {
-    background: #041C3C;
+    background:
+      radial-gradient(120% 60% at 0% 0%, rgba(235, 187, 87, 0.12), transparent 55%),
+      linear-gradient(180deg, #062447 0%, #041C3C 42%, #03162f 100%);
+  }
+
+  [data-sidebar='sidebar'] [data-sidebar='group-label'] {
+    color: color-mix(in srgb, var(--sidebar-primary) 85%, white);
+  }
+
+  [data-sidebar='sidebar'] [data-slot='sidebar-rail']:hover::after {
+    background: var(--sidebar-primary);
   }
 }
 

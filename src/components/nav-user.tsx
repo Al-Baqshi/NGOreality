@@ -53,18 +53,22 @@ export function NavUser({
             render={
               <SidebarMenuButton
                 size="lg"
-                className="aria-expanded:bg-sidebar-accent aria-expanded:text-sidebar-accent-foreground"
+                className="h-12 rounded-lg px-2 hover:bg-white/10 aria-expanded:bg-white/10 aria-expanded:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:p-1.5!"
               />
             }
           >
-            <Avatar className="size-8 rounded-lg">
-              <AvatarFallback className="rounded-lg">{letters}</AvatarFallback>
+            <Avatar className="size-8 rounded-lg after:rounded-lg after:border-white/20">
+              <AvatarFallback className="rounded-lg bg-sidebar-primary/90 font-semibold text-sidebar-primary-foreground">
+                {letters}
+              </AvatarFallback>
             </Avatar>
-            <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-medium">{name}</span>
-              {email ? <span className="truncate text-xs">{email}</span> : null}
+            <div className="grid min-w-0 flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+              <span className="truncate font-medium text-white">{name}</span>
+              {email ? (
+                <span className="truncate text-xs text-white/55">{email}</span>
+              ) : null}
             </div>
-            <ChevronsUpDown className="ml-auto size-4" />
+            <ChevronsUpDown className="ml-auto size-4 text-white/50 group-data-[collapsible=icon]:hidden" />
           </DropdownMenuTrigger>
           <DropdownMenuContent
             className="min-w-56 rounded-lg"
@@ -75,12 +79,14 @@ export function NavUser({
             <DropdownMenuGroup>
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                  <Avatar className="size-8 rounded-lg">
-                    <AvatarFallback className="rounded-lg">{letters}</AvatarFallback>
+                  <Avatar className="size-8 rounded-lg after:rounded-lg">
+                    <AvatarFallback className="rounded-lg bg-sidebar-primary/90 font-semibold text-sidebar-primary-foreground">
+                      {letters}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">{name}</span>
-                    {email ? <span className="truncate text-xs">{email}</span> : null}
+                    {email ? <span className="truncate text-xs text-muted-foreground">{email}</span> : null}
                   </div>
                 </div>
               </DropdownMenuLabel>

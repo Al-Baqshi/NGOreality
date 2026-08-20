@@ -34,11 +34,9 @@ type NgoOrganizationRegistrationFormProps = {
   onSuccess?: () => void;
   title?: string;
   compact?: boolean;
+  /** Deep-link from outreach invite: `/ngo/signup?org=<uuid>` */
+  prefillOrgId?: string | null;
 };
-
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
 
 function isValidPassword(password: string): { valid: boolean; message?: string } {
   if (password.length < 8) {
@@ -103,10 +101,13 @@ export default function NgoOrganizationRegistrationForm({
   onSuccess,
   title = 'Complete registration',
   compact = false,
+  prefillOrgId = null,
 }: NgoOrganizationRegistrationFormProps) {
   const { signUp, user } = useAuth();
   const [mode, setMode] = useState<SignupMode>('existing');
   const [selectedOrg, setSelectedOrg] = useState<ClaimSearchOrganization | null>(null);
+  const [prefillLoading, setPrefillLoading] = useState(Boolean(prefillOrgId));
+  const [prefillError, setPrefillError] = useState('');
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -124,6 +125,36 @@ export default function NgoOrganizationRegistrationForm({
   const [alreadyManaged, setAlreadyManaged] = useState<AlreadyManagedState | null>(null);
   const [resuming, setResuming] = useState(false);
   const resumeAttempted = useRef(false);
+
+  useEffect(() => {
+    if (!prefillOrgId) {
+      setPrefillLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setPrefillLoading(true);
+    setPrefillError('');
+    void supabase
+      .from('directory_listings')
+      .select(
+        'id, name, slug, charity_registration_number, location, country, status, description, mission_statement, website_url, logo_url, category',
+      )
+      .eq('id', prefillOrgId)
+      .maybeSingle()
+      .then(({ data, error: loadError }) => {
+        if (cancelled) return;
+        setPrefillLoading(false);
+        if (loadError || !data) {
+          setPrefillError('We could not find that organisation. Search the directory below.');
+          return;
+        }
+        setMode('existing');
+        setSelectedOrg(data as ClaimSearchOrganization);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [prefillOrgId]);
 
   useEffect(() => {
     if (!loggedIn || !user) return;
@@ -408,6 +439,21 @@ export default function NgoOrganizationRegistrationForm({
         <UserPlus size={20} className="text-teal" aria-hidden />
         <h2 className="text-lg sm:text-xl font-black uppercase tracking-tight">{title}</h2>
       </div>
+
+      {prefillLoading && (
+        <p className="text-sm text-ink-600 dark:text-muted-foreground">Loading your organisation from the invite…</p>
+      )}
+      {prefillError && (
+        <p className="text-sm text-amber-800 dark:text-amber-200 border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-2">
+          {prefillError}
+        </p>
+      )}
+      {selectedOrg && prefillOrgId && !prefillError && (
+        <p className="text-sm text-teal border-2 border-teal/40 bg-teal/5 px-3 py-2">
+          Invite linked to <strong>{selectedOrg.name}</strong>. Create your account (or sign in) to claim it,
+          then choose Reality Badge or the trust landing package in the portal.
+        </p>
+      )}
 
       {loggedIn && (
         <p className="text-sm text-ink-600 dark:text-muted-foreground leading-relaxed">

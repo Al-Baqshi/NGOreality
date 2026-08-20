@@ -1,4 +1,4 @@
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNgoPortal } from '../../hooks/useNgoPortal';
 import SEO from '../../components/SEO';
@@ -9,9 +9,11 @@ import NgoOrganizationRegistrationForm from '../../components/ngo/NgoOrganizatio
 export default function NgoSignup() {
   const { user, loading: authLoading } = useAuth();
   const { hasOrganization, isLinked, loading: portalLoading, refetch } = useNgoPortal();
+  const [searchParams] = useSearchParams();
+  const prefillOrgId = searchParams.get('org');
 
   if (!authLoading && !portalLoading && user && hasOrganization) {
-    return <Navigate to="/ngo" replace />;
+    return <Navigate to="/ngo/services" replace />;
   }
 
   const loggedIn = Boolean(user);
@@ -41,10 +43,11 @@ export default function NgoSignup() {
 
           <NgoOrganizationRegistrationForm
             loggedIn={loggedIn}
+            prefillOrgId={prefillOrgId}
             title={loggedIn ? 'Complete registration' : 'NGO sign up'}
             onSuccess={() => {
               void refetch();
-              window.location.assign('/ngo');
+              window.location.assign('/ngo/services');
             }}
           />
 

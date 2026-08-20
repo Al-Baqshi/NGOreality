@@ -66,6 +66,7 @@ const NgoOverviewPage = lazy(() => import('./pages/ngo/portal/NgoOverviewPage'))
 const NgoProfilePage = lazy(() => import('./pages/ngo/portal/NgoProfilePage'));
 const NgoSetupRequestPage = lazy(() => import('./pages/ngo/portal/NgoSetupRequestPage'));
 const NgoMembershipPage = lazy(() => import('./pages/ngo/portal/NgoMembershipPage'));
+const NgoServicesPage = lazy(() => import('./pages/ngo/portal/NgoServicesPage'));
 const NgoStandardsPage = lazy(() => import('./pages/ngo/portal/NgoStandardsPage'));
 const NgoBadgePage = lazy(() => import('./pages/ngo/portal/NgoBadgePage'));
 const NgoMonitoringPage = lazy(() => import('./pages/ngo/portal/NgoMonitoringPage'));
@@ -151,6 +152,7 @@ export default function App() {
                 <Route index element={<NgoOverviewPage />} />
                 <Route path="profile" element={<NgoProfilePage />} />
                 <Route path="setup-request" element={<NgoSetupRequestPage />} />
+                <Route path="services" element={<NgoServicesPage />} />
                 <Route path="membership" element={<NgoMembershipPage />} />
                 <Route path="standards" element={<NgoStandardsPage />} />
                 <Route path="badge" element={<NgoBadgePage />} />

@@ -28,7 +28,7 @@ const FILTER_ITEM =
 
 const PAGE_SIZE = 25;
 const STATUSES: PaymentStatus[] = ['pending', 'paid', 'failed', 'refunded', 'cancelled'];
-const METHODS: PaymentMethod[] = ['bank_transfer', 'stripe', 'manual'];
+const METHODS: PaymentMethod[] = ['bank_transfer', 'stripe', 'manual', 'paymark'];
 
 function formatMoney(cents: number, currency: string) {
   return new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(cents / 100);
@@ -272,7 +272,7 @@ export default function PaymentsList() {
                           <span className="font-mono text-2xs text-ink-400">—</span>
                         )}
                       </td>
-                      <td className="p-3 text-xs">{PAYMENT_PRODUCT_LABELS[p.product_type]}</td>
+                      <td className="p-3 text-xs">{PAYMENT_PRODUCT_LABELS[p.product_type] ?? p.product_type}</td>
                       <td className="p-3 font-semibold whitespace-nowrap">
                         {formatMoney(p.amount_cents, p.currency)}
                       </td>

@@ -56,6 +56,9 @@ yarn db:verify
 
 See [docs/DATABASE.md](docs/DATABASE.md) for troubleshooting schema-cache errors.
 
+Before bulk registry outreach, follow [docs/OUTREACH_PILOT.md](docs/OUTREACH_PILOT.md).
+See [docs/OUTREACH_PILOT.md](docs/OUTREACH_PILOT.md) before bulk outreach to the registry.
+
 ### 4. Run the app
 
 ```bash
@@ -219,6 +222,7 @@ After deploy, add your production URL(s) in **Supabase → Authentication → UR
 |-----|----------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layer split, scaling rules |
 | [docs/DATABASE.md](docs/DATABASE.md) | Migrations, schema verify |
+| [docs/OUTREACH_PILOT.md](docs/OUTREACH_PILOT.md) | Pilot checklist before 29k outreach |
 | [docs/BUSINESS_PLAN.md](docs/BUSINESS_PLAN.md) | Business plan feature notes |
 | [backend/README.md](backend/README.md) | Go worker/API setup |
 | [SHORTEXET.md](SHORTEXET.md) | Session handoff / current work status |

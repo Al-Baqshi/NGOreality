@@ -5,6 +5,8 @@ import {
   ArrowLeft,
   Ban,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Mail,
   RefreshCw,
@@ -15,7 +17,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { SectionHeader, MetricCard } from '../../components/ui';
-import { useNotifications } from '../../hooks/useNotifications';
+import { NOTIFICATION_PAGE_SIZE, useNotifications } from '../../hooks/useNotifications';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import {
   NOTIFICATION_STATUS_LABELS,
@@ -66,13 +68,30 @@ export default function EmailNotifications() {
     statusParam === 'sending'
       ? statusParam
       : 'all';
+  const pageFromUrl = Math.max(1, Number(searchParams.get('page')) || 1);
   const [filter, setFilter] = useState<StatusFilter>(initialFilter);
+  const [page, setPage] = useState(pageFromUrl);
   const [search, setSearch] = useState('');
   const [templateFilter, setTemplateFilter] = useState<'all' | NotificationTemplate>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const { events, loading, error, summary, flushing, flushNow, requeue, removeFromQueue, restoreToQueue, getSuppressionInfo, allowEmailAgain, apiConfigured, refetch } =
-    useNotifications();
+  const {
+    events,
+    total,
+    pageSize,
+    loading,
+    error,
+    summary,
+    flushing,
+    flushNow,
+    requeue,
+    removeFromQueue,
+    restoreToQueue,
+    getSuppressionInfo,
+    allowEmailAgain,
+    apiConfigured,
+    refetch,
+  } = useNotifications({ page, status: filter });
   const confirm = useConfirm();
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [actionIsError, setActionIsError] = useState(false);
@@ -81,11 +100,24 @@ export default function EmailNotifications() {
     setActionMsg(msg);
   };
 
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
   const setFilterAndUrl = (next: StatusFilter) => {
     setFilter(next);
-    if (next === 'all') searchParams.delete('status');
-    else searchParams.set('status', next);
-    setSearchParams(searchParams, { replace: true });
+    setPage(1);
+    const nextParams = new URLSearchParams(searchParams);
+    if (next === 'all') nextParams.delete('status');
+    else nextParams.set('status', next);
+    nextParams.delete('page');
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const setPageAndUrl = (next: number) => {
+    setPage(next);
+    const nextParams = new URLSearchParams(searchParams);
+    if (next <= 1) nextParams.delete('page');
+    else nextParams.set('page', String(next));
+    setSearchParams(nextParams, { replace: true });
   };
 
   const templatesInQueue = useMemo(() => {
@@ -99,7 +131,6 @@ export default function EmailNotifications() {
   const filteredEvents = useMemo(() => {
     const q = search.trim().toLowerCase();
     return events.filter((e) => {
-      if (filter !== 'all' && e.status !== filter) return false;
       if (templateFilter !== 'all' && e.template !== templateFilter) return false;
       if (!q) return true;
       const name = e.organizations?.name ?? '';
@@ -111,7 +142,7 @@ export default function EmailNotifications() {
         label.toLowerCase().includes(q)
       );
     });
-  }, [events, filter, search, templateFilter]);
+  }, [events, search, templateFilter]);
 
   const copyEmail = async (id: string, email: string) => {
     try {
@@ -215,15 +246,13 @@ export default function EmailNotifications() {
 
   const emptyMessage = (() => {
     if (search.trim() || templateFilter !== 'all') {
-      return 'No emails match this search.';
+      return 'No emails match this search on this page.';
     }
-    if (filter === 'failed') {
-      return 'No failed sends in the latest queue rows — good. Failed items from the last 30 days may still appear in the count above after you send more mail.';
-    }
-    if (filter === 'suppressed') return 'No unsubscribed or suppressed emails in the last 30 days.';
-    if (filter === 'skipped') return 'No cancelled emails in the last 30 days.';
-    if (filter === 'all') return 'No queued emails yet.';
-    return `No ${NOTIFICATION_STATUS_LABELS[filter].toLowerCase()} emails in the latest queue rows.`;
+    if (filter === 'all') return total === 0 ? 'No queued emails yet.' : 'No emails on this page.';
+    if (filter === 'failed') return 'No failed sends on this page.';
+    if (filter === 'suppressed') return 'No unsubscribed emails on this page.';
+    if (filter === 'skipped') return 'No cancelled emails on this page.';
+    return `No ${NOTIFICATION_STATUS_LABELS[filter].toLowerCase()} emails on this page.`;
   })();
 
   return (
@@ -401,8 +430,9 @@ export default function EmailNotifications() {
               Queue
             </span>
             <span className="font-mono text-2xs uppercase bg-gold text-ink-950 px-2 py-0.5 font-semibold">
-              {filteredEvents.length}
+              {total.toLocaleString()}
               {filter !== 'all' ? ` · ${NOTIFICATION_STATUS_LABELS[filter]}` : ''}
+              {` · ${NOTIFICATION_PAGE_SIZE}/page`}
             </span>
           </div>
         </div>
@@ -578,6 +608,36 @@ export default function EmailNotifications() {
           </div>
         )}
       </div>
+
+      {total > 0 && (
+        <div className="flex items-center justify-between gap-3 mt-4">
+          <p className="font-mono text-2xs text-ink-500">
+            {((page - 1) * pageSize + 1).toLocaleString()}–
+            {Math.min(page * pageSize, total).toLocaleString()} of {total.toLocaleString()}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPageAndUrl(page - 1)}
+              className="btn-brutal-outline text-sm min-h-[44px] inline-flex items-center gap-1 disabled:opacity-40"
+            >
+              <ChevronLeft size={15} /> Prev
+            </button>
+            <span className="font-mono text-2xs text-ink-500">
+              Page {page} / {totalPages.toLocaleString()}
+            </span>
+            <button
+              type="button"
+              disabled={page >= totalPages}
+              onClick={() => setPageAndUrl(page + 1)}
+              className="btn-brutal-outline text-sm min-h-[44px] inline-flex items-center gap-1 disabled:opacity-40"
+            >
+              Next <ChevronRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
