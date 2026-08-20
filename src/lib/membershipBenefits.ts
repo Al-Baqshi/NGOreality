@@ -85,21 +85,27 @@ export async function syncMonitorTierForOrg(organizationId: string): Promise<voi
     .eq('organization_id', organizationId);
 }
 
-/** Globally unique REAL-{year}-{n} — verification_id is unique across all orgs. */
-async function nextVerificationId(): Promise<string> {
+/**
+ * Globally unique badge ID. Format: REAL-{year}-{org8}-{seq}
+ * Org segment avoids cross-org collisions; seq is per-org; random suffix on retry.
+ */
+async function nextVerificationId(organizationId: string, attempt: number): Promise<string> {
   const year = new Date().getFullYear();
-  const prefix = `REAL-${year}-`;
-  const { data } = await supabase
-    .from('verification_badges')
-    .select('verification_id')
-    .like('verification_id', `${prefix}%`);
+  const orgKey = organizationId.replace(/-/g, '').slice(0, 8).toUpperCase();
+  const prefix = `REAL-${year}-${orgKey}-`;
 
-  let max = 0;
-  for (const row of data ?? []) {
-    const match = /^REAL-\d{4}-(\d+)$/.exec(row.verification_id);
-    if (match) max = Math.max(max, Number.parseInt(match[1], 10));
+  const { count } = await supabase
+    .from('verification_badges')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', organizationId);
+
+  const seq = String((count ?? 0) + 1 + attempt).padStart(2, '0');
+  if (attempt === 0) {
+    return `${prefix}${seq}`;
   }
-  return `${prefix}${String(max + 1).padStart(3, '0')}`;
+
+  const entropy = crypto.randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase();
+  return `${prefix}${seq}-${entropy}`;
 }
 
 function isUniqueViolation(message: string): boolean {
@@ -143,7 +149,7 @@ export async function issueBadgeIfEligible(
   let lastError: string | null = null;
 
   for (let attempt = 0; attempt < 5; attempt++) {
-    verificationId = await nextVerificationId();
+    verificationId = await nextVerificationId(organizationId, attempt);
     const { error } = await supabase.from('verification_badges').insert({
       organization_id: organizationId,
       verification_id: verificationId,
