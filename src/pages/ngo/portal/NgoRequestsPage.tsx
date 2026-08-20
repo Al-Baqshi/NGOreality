@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { useNgoPortalContext } from '../../../contexts/NgoPortalContext';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 import {
   BADGE_REQUEST_STATUS_LABELS,
+  BADGE_REQUEST_TYPE_HELP,
   BADGE_REQUEST_TYPE_LABELS,
+  NGO_BADGE_REQUEST_TYPES,
   type BadgeRequestType,
 } from '../../../types';
 import NgoPortalPageShell from '../../../components/ngo/NgoPortalPageShell';
@@ -12,8 +15,13 @@ import VerificationSubmittedDialog from '../../../components/ngo/VerificationSub
 import NgoBillingTopUpPanel from '../../../components/ngo/NgoBillingTopUpPanel';
 
 export default function NgoRequestsPage() {
-  const { organization, badgeRequests, submitBadgeRequest, isSteward } = useNgoPortalContext();
-  const [requestType, setRequestType] = useState<BadgeRequestType>('new_badge');
+  const confirm = useConfirm();
+  const { organization, badgeRequests, badges, submitBadgeRequest, isSteward } =
+    useNgoPortalContext();
+  const hasActiveBadge = badges.some((b) => b.is_active);
+  const [requestType, setRequestType] = useState<BadgeRequestType>(
+    hasActiveBadge ? 'reissue' : 'new_badge',
+  );
   const [requestNotes, setRequestNotes] = useState('');
   const [requestError, setRequestError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -26,6 +34,14 @@ export default function NgoRequestsPage() {
   const handleBadgeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!organization) return;
+
+    const ok = await confirm({
+      title: 'Send this request?',
+      description: `Submit “${BADGE_REQUEST_TYPE_LABELS[requestType]}” for ${organization.name}? Our team will review it and follow up by email.`,
+      confirmLabel: 'Send request',
+    });
+    if (!ok) return;
+
     setRequestError('');
     setSubmitting(true);
     const { error, paymentReference } = await submitBadgeRequest(requestType, requestNotes);
@@ -58,14 +74,21 @@ export default function NgoRequestsPage() {
       <div className="card-brutal border-t-4 border-t-accent p-5 sm:p-6 space-y-6">
         <div className="flex items-center gap-2">
           <RefreshCw size={18} className="text-accent" aria-hidden />
-          <h2 className="text-lg font-black uppercase tracking-tight">Request badge or renewal</h2>
+          <h2 className="text-lg font-black uppercase tracking-tight">Request Reality Badge</h2>
         </div>
 
         <p className="text-xs text-ink-500 leading-relaxed">
           {isSteward ? (
             <>
-              Submitting starts your verification review. After you submit, you can pay by bank transfer (use your unique
-              reference), or via Paymark / Airwallex when enabled. See{' '}
+              Submitting starts your verification review. Membership renewal and payment are on{' '}
+              <Link to="/ngo/membership" className="text-teal font-semibold underline">
+                Membership
+              </Link>{' '}
+              and{' '}
+              <Link to="/ngo/services" className="text-teal font-semibold underline">
+                Services
+              </Link>
+              . See{' '}
               <Link to="/ngo/standards" className="text-teal font-semibold underline">
                 trust standards
               </Link>{' '}
@@ -85,51 +108,56 @@ export default function NgoRequestsPage() {
         </p>
 
         {isSteward ? (
-        <form onSubmit={handleBadgeRequest} className="space-y-4">
-          <div>
-            <label className="label-brutal" htmlFor="request-type">
-              Request type
-            </label>
-            <select
-              id="request-type"
-              className="input-brutal w-full text-base"
-              value={requestType}
-              onChange={(e) => setRequestType(e.target.value as BadgeRequestType)}
+          <form onSubmit={(e) => void handleBadgeRequest(e)} className="space-y-4">
+            <div>
+              <label className="label-brutal" htmlFor="request-type">
+                Request type <span className="text-accent">*</span>
+              </label>
+              <select
+                id="request-type"
+                className="input-brutal w-full text-base"
+                value={requestType}
+                onChange={(e) => setRequestType(e.target.value as BadgeRequestType)}
+                required
+              >
+                {NGO_BADGE_REQUEST_TYPES.map((key) => (
+                  <option key={key} value={key}>
+                    {BADGE_REQUEST_TYPE_LABELS[key]}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-xs text-ink-500 leading-relaxed">
+                {BADGE_REQUEST_TYPE_HELP[requestType as 'new_badge' | 'reissue']}
+              </p>
+            </div>
+            <div>
+              <label className="label-brutal" htmlFor="request-notes">
+                Notes{' '}
+                <span className="font-normal normal-case tracking-normal text-ink-400">(optional)</span>
+              </label>
+              <textarea
+                id="request-notes"
+                className="input-brutal w-full min-h-[100px] text-base"
+                value={requestNotes}
+                onChange={(e) => setRequestNotes(e.target.value)}
+                placeholder="Anything we should know about this request…"
+              />
+            </div>
+
+            {requestError && (
+              <p className="text-accent text-xs font-mono" role="alert">
+                {requestError}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn-brutal-accent w-full sm:w-auto min-h-[48px] px-8 disabled:opacity-60"
             >
-              {(Object.keys(BADGE_REQUEST_TYPE_LABELS) as BadgeRequestType[]).map((key) => (
-                <option key={key} value={key}>
-                  {BADGE_REQUEST_TYPE_LABELS[key]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label-brutal" htmlFor="request-notes">
-              Notes (optional)
-            </label>
-            <textarea
-              id="request-notes"
-              className="input-brutal w-full min-h-[100px] text-base"
-              value={requestNotes}
-              onChange={(e) => setRequestNotes(e.target.value)}
-              placeholder="Anything we should know about this request…"
-            />
-          </div>
-
-          {requestError && (
-            <p className="text-accent text-xs font-mono" role="alert">
-              {requestError}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="btn-brutal-accent w-full sm:w-auto min-h-[48px] px-8 disabled:opacity-60"
-          >
-            {submitting ? 'Submitting…' : 'Submit verification request'}
-          </button>
-        </form>
+              {submitting ? 'Submitting…' : 'Submit request'}
+            </button>
+          </form>
         ) : null}
 
         {isSteward ? (

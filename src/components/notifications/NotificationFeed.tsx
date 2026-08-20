@@ -5,6 +5,14 @@ import {
   PORTAL_NOTIFICATION_EVENT_LABELS,
   type PortalNotification,
 } from '../../types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 function formatWhen(iso: string): string {
   const d = new Date(iso);
@@ -108,48 +116,65 @@ export default function NotificationFeed({
   };
 
   return (
-    <div className="card-brutal overflow-hidden flex flex-col max-h-[min(78vh,760px)]">
-      <div className="border-b-2 border-gold bg-ink-950 px-4 py-3 flex flex-wrap items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-2">
-          <Bell size={14} className="text-gold" aria-hidden />
-          <span className="font-mono text-xs uppercase tracking-wider font-semibold text-white">Activity</span>
-          {unread > 0 && (
-            <span className="font-mono text-2xs uppercase bg-gold text-ink-950 px-2 py-0.5 font-semibold">
-              {unread} new
+    <div className="flex max-h-[min(78vh,760px)] flex-col overflow-hidden rounded-xl border border-ink-200/90 bg-white shadow-sm dark:border-border dark:bg-card">
+      {/* Activity bar */}
+      <div className="shrink-0 border-b border-teal/30 bg-gradient-to-r from-[#041C3C] via-[#0a2a4a] to-[#0d3d4a] px-4 py-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15">
+              <Bell size={15} className="text-[#EBBB57]" aria-hidden />
             </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {unread > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-white">
+                Activity
+              </span>
+              {unread > 0 ? (
+                <span className="rounded-full bg-[#EBBB57] px-2.5 py-0.5 font-mono text-2xs font-bold uppercase tracking-wider text-[#041C3C]">
+                  {unread} new
+                </span>
+              ) : (
+                <span className="rounded-full bg-white/10 px-2.5 py-0.5 font-mono text-2xs uppercase tracking-wider text-white/70">
+                  Up to date
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {unread > 0 ? (
+              <button
+                type="button"
+                onClick={() => void onMarkAllRead()}
+                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-[#EBBB57]/70 bg-[#EBBB57]/10 px-3 font-mono text-2xs font-semibold uppercase tracking-wider text-[#EBBB57] transition-colors hover:bg-[#EBBB57] hover:text-[#041C3C]"
+              >
+                <CheckCheck size={12} aria-hidden />
+                Mark all read
+              </button>
+            ) : null}
             <button
               type="button"
-              onClick={() => void onMarkAllRead()}
-              className="inline-flex min-h-[36px] items-center gap-1 border-2 border-gold bg-transparent px-2 font-mono text-2xs font-semibold uppercase tracking-wider text-gold hover:bg-gold hover:text-ink-950"
+              onClick={() => void handleRefresh()}
+              className="inline-flex size-9 items-center justify-center rounded-lg border border-white/20 bg-white/5 text-white/80 transition-colors hover:border-[#EBBB57]/60 hover:bg-[#EBBB57]/15 hover:text-[#EBBB57]"
+              aria-label="Refresh"
             >
-              <CheckCheck size={12} aria-hidden />
-              Mark all read
+              <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} aria-hidden />
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => void handleRefresh()}
-            className="inline-flex size-9 items-center justify-center border-2 border-gold text-gold hover:bg-gold hover:text-ink-950"
-            aria-label="Refresh"
-          >
-            <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} aria-hidden />
-          </button>
+          </div>
         </div>
       </div>
 
-      <div className="shrink-0 border-b border-ink-200 dark:border-border bg-white px-4 py-3 space-y-3 dark:bg-card">
+      {/* Filters */}
+      <div className="shrink-0 space-y-3 border-b border-ink-100 bg-ink-50/40 px-4 py-3 dark:border-border dark:bg-muted/20">
         <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none" />
+          <Search
+            size={15}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"
+          />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search alerts…"
-            className="input-brutal w-full pl-9 min-h-[40px] text-sm"
+            className="w-full min-h-[40px] rounded-lg border border-ink-200 bg-white pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-ink-400 focus:border-teal focus:ring-2 focus:ring-teal/20 dark:border-border dark:bg-card"
             aria-label="Search notifications"
           />
         </div>
@@ -159,59 +184,70 @@ export default function NotificationFeed({
               key={id}
               type="button"
               onClick={() => setReadFilter(id)}
-              className={`font-mono text-2xs uppercase tracking-wider px-3 py-1.5 min-h-[36px] border-2 ${
+              className={cn(
+                'min-h-[36px] rounded-full border px-3.5 py-1.5 font-mono text-2xs uppercase tracking-wider transition-colors',
                 readFilter === id
-                  ? 'border-ink-950 bg-ink-950 text-white'
-                  : 'border-ink-200 text-ink-600 hover:border-gold hover:bg-gold-light'
-              }`}
+                  ? 'border-teal bg-teal text-white shadow-sm'
+                  : 'border-ink-200 bg-white text-ink-600 hover:border-teal/50 hover:text-teal dark:border-border dark:bg-card',
+              )}
             >
               {id === 'all' ? `All (${items.length})` : id === 'unread' ? `Unread (${unread})` : 'Read'}
             </button>
           ))}
-          {eventTypes.length > 1 && (
-            <label className="ml-auto flex items-center gap-2 min-w-0">
-              <span className="font-mono text-2xs uppercase tracking-wider text-ink-400 shrink-0">Type</span>
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="input-brutal min-h-[36px] py-1 text-2xs font-mono"
-                aria-label="Filter by type"
-              >
-                <option value="all">All types</option>
-                {eventTypes.map((t) => (
-                  <option key={t} value={t}>
-                    {eventLabel(t)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+          {eventTypes.length > 0 ? (
+            <div className="ml-auto flex min-w-0 items-center gap-2">
+              <span className="shrink-0 font-mono text-2xs uppercase tracking-wider text-ink-400">
+                Type
+              </span>
+              <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v ?? 'all')}>
+                <SelectTrigger
+                  size="sm"
+                  className="h-9 min-w-[9.5rem] max-w-[14rem] rounded-lg border-ink-200 bg-white font-mono text-2xs uppercase tracking-wide text-ink-700 shadow-none hover:border-teal/50 focus-visible:border-teal focus-visible:ring-teal/20 dark:border-border dark:bg-card"
+                  aria-label="Filter by type"
+                >
+                  <SelectValue>
+                    {typeFilter === 'all' ? 'All types' : eventLabel(typeFilter)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent align="end" className="min-w-[12rem] rounded-lg">
+                  <SelectItem value="all" className="font-mono text-2xs uppercase">
+                    All types
+                  </SelectItem>
+                  {eventTypes.map((t) => (
+                    <SelectItem key={t} value={t} className="text-xs">
+                      {eventLabel(t)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
         </div>
       </div>
 
-      {error && (
-        <p className="text-accent text-xs font-mono border-b border-accent px-4 py-3" role="alert">
+      {error ? (
+        <p className="border-b border-accent px-4 py-3 font-mono text-xs text-accent" role="alert">
           {error}
-          {error.includes('portal_notifications') && (
-            <span className="block mt-1">Apply migration 023 on Supabase.</span>
-          )}
+          {error.includes('portal_notifications') ? (
+            <span className="mt-1 block">Apply migration 023 on Supabase.</span>
+          ) : null}
         </p>
-      )}
+      ) : null}
 
       {loading ? (
         <p className="p-6 text-sm text-ink-400">Loading…</p>
       ) : items.length === 0 ? (
         <div className="p-10 text-center text-sm text-ink-500">
-          <Inbox size={32} className="mx-auto mb-3 text-gold" aria-hidden />
+          <Inbox size={32} className="mx-auto mb-3 text-teal" aria-hidden />
           {emptyMessage}
         </div>
       ) : filtered.length === 0 ? (
         <p className="p-8 text-center text-sm text-ink-500">No alerts match these filters.</p>
       ) : (
-        <ul className="overflow-y-auto flex-1 min-h-0">
+        <ul className="min-h-0 flex-1 overflow-y-auto">
           {grouped.map(([label, rows]) => (
             <li key={label}>
-              <p className="sticky top-0 z-[1] bg-ink-50 px-4 py-1.5 font-mono text-2xs uppercase tracking-wider text-ink-500 border-y border-ink-100 dark:bg-muted/40 dark:border-border">
+              <p className="sticky top-0 z-[1] border-y border-ink-100 bg-ink-50/90 px-4 py-1.5 font-mono text-2xs uppercase tracking-wider text-ink-500 backdrop-blur-sm dark:border-border dark:bg-muted/50">
                 {label}
               </p>
               <ul className="divide-y divide-ink-100 dark:divide-border">
@@ -220,55 +256,74 @@ export default function NotificationFeed({
                   return (
                     <li key={item.id}>
                       <div
-                        className={`flex items-stretch ${
+                        className={cn(
+                          'flex items-stretch',
                           isUnread
-                            ? 'bg-gold-light/50 dark:bg-gold/10'
-                            : 'bg-white dark:bg-transparent'
-                        }`}
+                            ? 'bg-teal/[0.06] dark:bg-teal/10'
+                            : 'bg-white dark:bg-transparent',
+                        )}
                       >
                         <button
                           type="button"
                           onClick={() => handleClick(item)}
-                          className="min-w-0 flex-1 text-left px-4 py-3 flex gap-3 min-h-[64px] hover:bg-gold-light/40 dark:hover:bg-muted/50 transition-colors"
+                          className="flex min-h-[64px] min-w-0 flex-1 gap-3 px-4 py-3 text-left transition-colors hover:bg-teal/[0.08] dark:hover:bg-muted/50"
                         >
                           <span
-                            className={`mt-2 size-2 shrink-0 rounded-full ${isUnread ? 'bg-gold' : 'bg-ink-200'}`}
+                            className={cn(
+                              'mt-2 size-2 shrink-0 rounded-full',
+                              isUnread ? 'bg-teal' : 'bg-ink-200',
+                            )}
                             aria-hidden
                           />
                           <span className="min-w-0 flex-1">
                             <span className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-                              <span className={`text-sm truncate ${isUnread ? 'font-bold text-ink-950' : 'font-semibold text-ink-800'} dark:text-foreground`}>
+                              <span
+                                className={cn(
+                                  'truncate text-sm dark:text-foreground',
+                                  isUnread
+                                    ? 'font-bold text-ink-950'
+                                    : 'font-semibold text-ink-800',
+                                )}
+                              >
                                 {item.title}
                               </span>
-                              <span className="font-mono text-2xs text-ink-400 shrink-0">{formatWhen(item.created_at)}</span>
+                              <span className="shrink-0 font-mono text-2xs text-ink-400">
+                                {formatWhen(item.created_at)}
+                              </span>
                             </span>
-                            <span className="mt-1 inline-flex border border-gold bg-gold/15 px-1.5 py-0.5 font-mono text-2xs uppercase tracking-wider text-ink-950">
+                            <span className="mt-1 inline-flex rounded-md border border-teal/30 bg-teal/10 px-1.5 py-0.5 font-mono text-2xs uppercase tracking-wider text-teal">
                               {eventLabel(item.event_type)}
                             </span>
-                            {item.organizations?.name && (
-                              <span className="text-2xs text-ink-500 block truncate mt-1">{item.organizations.name}</span>
-                            )}
-                            {item.body?.trim() && (
-                              <span className="text-xs text-ink-600 dark:text-muted-foreground line-clamp-2 block mt-1 leading-relaxed">
+                            {item.organizations?.name ? (
+                              <span className="mt-1 block truncate text-2xs text-ink-500">
+                                {item.organizations.name}
+                              </span>
+                            ) : null}
+                            {item.body?.trim() ? (
+                              <span className="mt-1 block line-clamp-2 text-xs leading-relaxed text-ink-600 dark:text-muted-foreground">
                                 {item.body}
                               </span>
-                            )}
+                            ) : null}
                           </span>
                           {item.link_path ? (
-                            <ChevronRight size={16} className="mt-2 shrink-0 text-ink-300" aria-hidden />
+                            <ChevronRight
+                              size={16}
+                              className="mt-2 shrink-0 text-ink-300"
+                              aria-hidden
+                            />
                           ) : null}
                         </button>
-                        {isUnread && (
+                        {isUnread ? (
                           <button
                             type="button"
                             onClick={() => void onOpen(item)}
-                            className="shrink-0 px-3 text-ink-400 hover:bg-gold hover:text-ink-950"
+                            className="shrink-0 px-3 text-ink-400 transition-colors hover:bg-teal hover:text-white"
                             title="Mark as read"
                             aria-label="Mark as read"
                           >
                             <Check size={16} />
                           </button>
-                        )}
+                        ) : null}
                       </div>
                     </li>
                   );
@@ -284,9 +339,12 @@ export default function NotificationFeed({
 
 export function NotificationFeedHint({ emailNotificationsPath }: { emailNotificationsPath: string }) {
   return (
-    <p className="text-xs text-ink-500 mt-4 leading-relaxed">
+    <p className="mt-4 text-xs leading-relaxed text-ink-500">
       Outbound membership and site-down emails are managed separately under{' '}
-      <Link to={emailNotificationsPath} className="font-semibold underline text-ink-950 hover:text-gold dark:text-foreground">
+      <Link
+        to={emailNotificationsPath}
+        className="font-semibold text-ink-950 underline hover:text-teal dark:text-foreground"
+      >
         Email notifications
       </Link>
       .

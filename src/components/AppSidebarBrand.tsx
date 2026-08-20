@@ -67,7 +67,7 @@ export function AppSidebarBrand({
               <BrandLogo
                 variant="icon"
                 iconClassName={cn(
-                  'shrink-0 object-contain drop-shadow-sm',
+                  'shrink-0 object-contain drop-shadow-sm mix-blend-lighten',
                   collapsed ? 'size-9' : 'size-10',
                 )}
               />

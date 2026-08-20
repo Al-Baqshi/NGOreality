@@ -7,6 +7,7 @@ import {
   profileCompletionPercent,
 } from '../../lib/ngoProfileCompletion';
 import type { Organization } from '../../types';
+import { CATEGORIES } from '../../types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
@@ -42,6 +43,7 @@ const LIMITS = {
 type ProfileForm = {
   mission_statement: string;
   description: string;
+  category: string;
   website_url: string;
   logo_url: string;
   phone_country: string;
@@ -160,6 +162,12 @@ function validateProfileForm(form: ProfileForm): FieldErrors {
     errors.description = `Description must be ${LIMITS.descriptionMax} characters or fewer.`;
   }
 
+  if (!form.category.trim()) {
+    errors.category = 'Select a category for your organisation.';
+  } else if (!CATEGORIES.includes(form.category)) {
+    errors.category = 'Select a category from the list.';
+  }
+
   if (!form.email.trim()) {
     errors.email = 'Contact email is required so donors and our team can reach you.';
   } else if (!isValidEmail(form.email)) {
@@ -218,6 +226,7 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
   const [profileForm, setProfileForm] = useState<ProfileForm>({
     mission_statement: organization.mission_statement ?? '',
     description: organization.description ?? '',
+    category: organization.category ?? '',
     website_url: organization.website_url ?? '',
     logo_url: organization.logo_url ?? '',
     phone_country: phoneParts.phoneCountry,
@@ -236,6 +245,7 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
     setProfileForm({
       mission_statement: organization.mission_statement ?? '',
       description: organization.description ?? '',
+      category: organization.category ?? '',
       website_url: organization.website_url ?? '',
       logo_url: organization.logo_url ?? '',
       phone_country: phoneParts.phoneCountry,
@@ -318,6 +328,7 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
       .update({
         mission_statement: profileForm.mission_statement.trim(),
         description: profileForm.description.trim(),
+        category: profileForm.category.trim(),
         website_url: website,
         logo_url: logo,
         phone: fullPhone,
@@ -461,6 +472,39 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
             aria-describedby={fieldErrors.description ? 'err-description' : undefined}
           />
           <FieldError id="err-description" message={fieldErrors.description} />
+        </div>
+
+        <div>
+          <label className="label-brutal" htmlFor="ngo-category">
+            Category <span className="text-accent">*</span>
+          </label>
+          <Select
+            value={profileForm.category || undefined}
+            onValueChange={(value) => {
+              updateField('category', value ?? '');
+              validateField('category', value ?? '');
+            }}
+          >
+            <SelectTrigger
+              id="ngo-category"
+              className={cn(
+                'min-h-[48px] w-full',
+                fieldErrors.category && 'border-accent ring-2 ring-accent/30',
+              )}
+              aria-invalid={Boolean(fieldErrors.category)}
+              aria-describedby={fieldErrors.category ? 'err-category' : undefined}
+            >
+              <SelectValue placeholder="Select NGO category" />
+            </SelectTrigger>
+            <SelectContent>
+              {CATEGORIES.map((cat) => (
+                <SelectItem key={cat} value={cat}>
+                  {cat}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FieldError id="err-category" message={fieldErrors.category} />
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -19,7 +19,21 @@ export default function NgoMonitoringPage() {
           the NGOreality team — you will receive alerts at your organisation contact email.
         </p>
         {organization.website_url?.trim() ? (
-          <p className="mt-3 font-mono text-2xs text-ink-500 break-all">Monitored URL: {organization.website_url}</p>
+          <p className="mt-3 font-mono text-2xs text-ink-500 break-all">
+            Monitored URL:{' '}
+            <a
+              href={
+                /^https?:\/\//i.test(organization.website_url.trim())
+                  ? organization.website_url.trim()
+                  : `https://${organization.website_url.trim()}`
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-teal underline hover:text-ink-950"
+            >
+              {organization.website_url.trim()}
+            </a>
+          </p>
         ) : (
           <p className="mt-3 text-sm text-amber-800 dark:text-amber-200">
             Add your website URL on{' '}

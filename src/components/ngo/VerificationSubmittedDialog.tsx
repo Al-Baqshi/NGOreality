@@ -39,7 +39,7 @@ export default function VerificationSubmittedDialog({
             <CheckCircle className="text-teal shrink-0" size={28} aria-hidden />
             <div className="min-w-0">
               <h2 id="verification-submitted-title" className="text-lg font-black uppercase tracking-tight">
-                Thank you
+                Request sent
               </h2>
               <p className="text-xs text-ink-500 mt-1 truncate">{organizationName}</p>
             </div>
@@ -56,8 +56,9 @@ export default function VerificationSubmittedDialog({
 
         <div className="p-4 sm:p-5 space-y-5">
           <p className="text-sm text-ink-600 leading-relaxed">
-            Your <strong>{requestLabel}</strong> has been received. We will review your organisation against NGOreality
-            public trust standards and get back to you if anything needs to be added, changed, or fixed on your site.
+            Your <strong>{requestLabel}</strong> request has been sent. We will review your organisation against
+            NGOreality public trust standards and get back to you if anything needs to be added, changed, or fixed on
+            your site.
           </p>
 
           <div className="p-4 border-2 border-ink-200 bg-ink-50 space-y-2">

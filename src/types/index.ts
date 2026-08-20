@@ -544,6 +544,14 @@ export const BADGE_REQUEST_TYPE_LABELS: Record<BadgeRequestType, string> = {
   reissue: 'Badge reissue',
 };
 
+/** Types NGOs can pick on Requests — renewal is handled on Membership / Services. */
+export const NGO_BADGE_REQUEST_TYPES: BadgeRequestType[] = ['new_badge', 'reissue'];
+
+export const BADGE_REQUEST_TYPE_HELP: Record<'new_badge' | 'reissue', string> = {
+  new_badge: 'First-time verification review so we can issue your Reality Badge.',
+  reissue: 'Ask for a replacement badge (e.g. after revoke) or updated badge assets.',
+};
+
 export const BADGE_REQUEST_STATUS_LABELS: Record<BadgeRequestStatus, string> = {
   pending: 'Pending',
   in_review: 'In review',

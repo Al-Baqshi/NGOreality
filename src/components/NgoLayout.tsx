@@ -85,7 +85,7 @@ function NgoPortalFrame() {
                 <img
                   src="/reality-badge.png"
                   alt="Reality Badge"
-                  className="size-5 shrink-0 object-contain"
+                  className="size-5 shrink-0 rounded-full object-cover"
                 />
               ) : null}
               <span className="truncate">{organization.name}</span>

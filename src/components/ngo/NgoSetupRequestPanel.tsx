@@ -59,7 +59,6 @@ function isValidHttpUrl(raw: string): boolean {
 }
 
 function isValidHexColour(raw: string): boolean {
-  if (!raw.trim()) return true;
   return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(raw.trim());
 }
 
@@ -100,7 +99,6 @@ export default function NgoSetupRequestPanel({
   }, [organization.id, organization.updated_at]);
 
   const pendingSetup = setupRequests.find((r) => r.status === 'pending' || r.status === 'in_review');
-  const logoRequired = !hasWebsite;
 
   const clearFieldError = (key: FieldKey) => {
     setFieldErrors((prev) => {
@@ -114,16 +112,21 @@ export default function NgoSetupRequestPanel({
   const validateForm = (): FieldErrors => {
     const errors: FieldErrors = {};
 
-    if (logoRequired && !logoUrl.trim()) {
-      errors.logoUrl = 'Logo URL is required when you do not have a website yet.';
-    } else if (logoUrl.trim() && !isValidHttpUrl(logoUrl)) {
+    if (!logoUrl.trim()) {
+      errors.logoUrl = 'Logo URL is required.';
+    } else if (!isValidHttpUrl(logoUrl)) {
       errors.logoUrl = 'Enter a valid logo URL (e.g. https://example.org/logo.png).';
     }
 
-    if (brandPrimary.trim() && !isValidHexColour(brandPrimary)) {
+    if (!brandPrimary.trim()) {
+      errors.brandPrimary = 'Primary brand colour is required.';
+    } else if (!isValidHexColour(brandPrimary)) {
       errors.brandPrimary = 'Use a hex colour like #041C3C or #EBB.';
     }
-    if (brandSecondary.trim() && !isValidHexColour(brandSecondary)) {
+
+    if (!brandSecondary.trim()) {
+      errors.brandSecondary = 'Secondary brand colour is required.';
+    } else if (!isValidHexColour(brandSecondary)) {
       errors.brandSecondary = 'Use a hex colour like #EBBB57 or #FFF.';
     }
 
@@ -132,7 +135,9 @@ export default function NgoSetupRequestPanel({
         'Select the trust landing package, or choose “Yes — use our existing site” above.';
     }
 
-    if (setupNotes.trim().length > NOTES_MAX) {
+    if (!setupNotes.trim()) {
+      errors.setupNotes = 'Add a short note so our team knows what you need.';
+    } else if (setupNotes.trim().length > NOTES_MAX) {
       errors.setupNotes = `Notes must be ${NOTES_MAX} characters or fewer.`;
     }
 
@@ -221,25 +226,16 @@ export default function NgoSetupRequestPanel({
         </div>
 
         <p className="text-xs leading-relaxed text-ink-500">
-          Tell us whether you have a website or need our trust landing package.
-          {logoRequired ? (
-            <>
-              {' '}
-              A logo URL is required — add it below or on{' '}
-              <Link
-                to="/ngo/profile"
-                className="font-semibold text-ink-950 underline dark:text-foreground"
-              >
-                Profile
-              </Link>
-              .
-            </>
-          ) : (
-            <>
-              {' '}
-              You can still add a logo and brand colours for your public profile.
-            </>
-          )}
+          Tell us whether you have a website or need our trust landing package. Logo URL, brand
+          colours, and a short note are required so we can fulfill your request. You can also update
+          assets on{' '}
+          <Link
+            to="/ngo/profile"
+            className="font-semibold text-ink-950 underline dark:text-foreground"
+          >
+            Profile
+          </Link>
+          .
         </p>
 
         {pendingSetup ? (
@@ -282,7 +278,6 @@ export default function NgoSetupRequestPanel({
                     setHasWebsite(true);
                     setWantsLanding(false);
                     clearFieldError('wantsLanding');
-                    clearFieldError('logoUrl');
                   }}
                 />
                 Yes — use our existing site
@@ -343,19 +338,13 @@ export default function NgoSetupRequestPanel({
 
             <div>
               <label className="label-brutal" htmlFor="setup-logo">
-                Logo URL{' '}
-                {logoRequired ? (
-                  <span className="text-accent">*</span>
-                ) : (
-                  <span className="font-normal normal-case tracking-normal text-ink-400">
-                    (optional)
-                  </span>
-                )}
+                Logo URL <span className="text-accent">*</span>
               </label>
               <input
                 id="setup-logo"
                 type="url"
                 inputMode="url"
+                required
                 className={inputClass(Boolean(fieldErrors.logoUrl))}
                 value={logoUrl}
                 onChange={(e) => {
@@ -373,15 +362,13 @@ export default function NgoSetupRequestPanel({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="label-brutal" htmlFor="setup-brand-primary">
-                  Brand colour{' '}
-                  <span className="font-normal normal-case tracking-normal text-ink-400">
-                    (optional)
-                  </span>
+                  Brand colour <span className="text-accent">*</span>
                 </label>
                 <div className="flex gap-2">
                   <input
                     id="setup-brand-primary"
                     type="text"
+                    required
                     className={inputClass(Boolean(fieldErrors.brandPrimary), 'flex-1')}
                     value={brandPrimary}
                     onChange={(e) => {
@@ -392,7 +379,7 @@ export default function NgoSetupRequestPanel({
                     aria-invalid={Boolean(fieldErrors.brandPrimary)}
                     aria-describedby={fieldErrors.brandPrimary ? 'err-brand-primary' : undefined}
                   />
-                  {isValidHexColour(brandPrimary) && brandPrimary.trim() ? (
+                  {isValidHexColour(brandPrimary) ? (
                     <span
                       className="size-12 shrink-0 border-3 border-ink-950"
                       style={{ backgroundColor: brandPrimary.trim() }}
@@ -404,15 +391,13 @@ export default function NgoSetupRequestPanel({
               </div>
               <div>
                 <label className="label-brutal" htmlFor="setup-brand-secondary">
-                  Secondary colour{' '}
-                  <span className="font-normal normal-case tracking-normal text-ink-400">
-                    (optional)
-                  </span>
+                  Secondary colour <span className="text-accent">*</span>
                 </label>
                 <div className="flex gap-2">
                   <input
                     id="setup-brand-secondary"
                     type="text"
+                    required
                     className={inputClass(Boolean(fieldErrors.brandSecondary), 'flex-1')}
                     value={brandSecondary}
                     onChange={(e) => {
@@ -425,7 +410,7 @@ export default function NgoSetupRequestPanel({
                       fieldErrors.brandSecondary ? 'err-brand-secondary' : undefined
                     }
                   />
-                  {isValidHexColour(brandSecondary) && brandSecondary.trim() ? (
+                  {isValidHexColour(brandSecondary) ? (
                     <span
                       className="size-12 shrink-0 border-3 border-ink-950"
                       style={{ backgroundColor: brandSecondary.trim() }}
@@ -440,10 +425,7 @@ export default function NgoSetupRequestPanel({
             <div>
               <div className="mb-2 flex items-end justify-between gap-2">
                 <label className="label-brutal mb-0" htmlFor="setup-notes">
-                  Notes for our team{' '}
-                  <span className="font-normal normal-case tracking-normal text-ink-400">
-                    (optional)
-                  </span>
+                  Notes for our team <span className="text-accent">*</span>
                 </label>
                 <span className="font-mono text-2xs tabular-nums text-ink-400">
                   {setupNotes.trim().length}/{NOTES_MAX}
@@ -451,14 +433,15 @@ export default function NgoSetupRequestPanel({
               </div>
               <textarea
                 id="setup-notes"
+                required
                 className={inputClass(Boolean(fieldErrors.setupNotes), 'min-h-[80px]')}
                 value={setupNotes}
                 onChange={(e) => {
                   setSetupNotes(e.target.value);
                   clearFieldError('setupNotes');
                 }}
-                placeholder="Anything else we should know before we start…"
-                maxLength={NOTES_MAX + 50}
+                placeholder="e.g. preferred page sections, contact for brand files, deadline…"
+                maxLength={NOTES_MAX}
                 aria-invalid={Boolean(fieldErrors.setupNotes)}
                 aria-describedby={fieldErrors.setupNotes ? 'err-notes' : undefined}
               />

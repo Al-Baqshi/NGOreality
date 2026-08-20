@@ -68,7 +68,7 @@ export function setupRequestSummary(input: {
   wantsLandingPackage: boolean;
 }): string {
   if (input.hasExistingWebsite) {
-    return 'You have a website on file — we will use it for monitoring and trust review. Submit your logo and brand colours if you want them on your NGOreality profile.';
+    return 'You have a website on file — we will use it for monitoring and trust review. Logo, brand colours, and notes are required with this request.';
   }
   if (input.wantsLandingPackage) {
     return LANDING_STANDARDS_PACKAGE_LABEL;

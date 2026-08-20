@@ -79,11 +79,31 @@ export default function NgoServicesPage() {
   };
 
   const showBankInstructions = (ref: string, statusText: string) => {
+    setError(null);
     setReference(ref);
     setMessage(statusText);
     setHighlightBank(true);
-    bankPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    window.setTimeout(() => setHighlightBank(false), 2500);
+    // Defer scroll so the status message has painted above the bank panel.
+    window.requestAnimationFrame(() => {
+      bankPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    window.setTimeout(() => setHighlightBank(false), 3500);
+  };
+
+  /** Already have a pending transfer — only re-show bank details (no new payment). */
+  const showPendingBankAgain = (
+    pending: OrganizationPayment,
+    productType: PaymentProductType,
+  ) => {
+    const ref =
+      pending.bank_transfer_reference?.trim() ||
+      reference ||
+      organization.payment_reference ||
+      '';
+    showBankInstructions(
+      ref,
+      `${PAYMENT_PRODUCT_LABELS[productType]} — transfer ${money(pending.amount_cents)} with reference ${ref || '…'}.`,
+    );
   };
 
   const startPayment = async (productType: PaymentProductType) => {
@@ -170,13 +190,18 @@ export default function NgoServicesPage() {
         <div
           ref={bankPanelRef}
           className={cn(
-            'card-brutal space-y-3 border-l-4 border-l-teal p-5 transition-shadow',
+            'card-brutal space-y-3 border-l-4 border-l-teal p-5 transition-shadow scroll-mt-24',
             highlightBank && 'ring-2 ring-teal shadow-brutal',
           )}
         >
           <h2 className="flex items-center gap-2 font-mono text-xs font-semibold uppercase tracking-wider">
             <CreditCard size={14} /> Bank transfer
           </h2>
+          {message ? (
+            <p className="rounded-md border-2 border-teal/40 bg-teal/5 px-3 py-2 text-sm text-teal" role="status">
+              {message}
+            </p>
+          ) : null}
           <p className="text-sm text-ink-600 dark:text-muted-foreground">
             Pay to <strong>{NGO_BANK_ACCOUNT.accountName}</strong> ({NGO_BANK_ACCOUNT.bankName}){' '}
             <code className="font-mono font-bold">{NGO_BANK_ACCOUNT.accountNumber}</code>. Use this
@@ -188,11 +213,6 @@ export default function NgoServicesPage() {
         {error && (
           <p className="border-2 border-accent px-3 py-2 text-sm text-accent" role="alert">
             {error}
-          </p>
-        )}
-        {message && (
-          <p className="border-2 border-teal/40 bg-teal/5 px-3 py-2 text-sm text-teal" role="status">
-            {message}
           </p>
         )}
 
@@ -219,7 +239,13 @@ export default function NgoServicesPage() {
                 <button
                   type="button"
                   disabled={busy !== null}
-                  onClick={() => void startPayment('membership_annual')}
+                  onClick={() => {
+                    if (membershipPending) {
+                      showPendingBankAgain(membershipPending, 'membership_annual');
+                      return;
+                    }
+                    void startPayment('membership_annual');
+                  }}
                   className="btn-brutal-teal w-full min-h-[48px]"
                 >
                   {busy === 'membership_annual'
@@ -258,7 +284,13 @@ export default function NgoServicesPage() {
                 <button
                   type="button"
                   disabled={busy !== null}
-                  onClick={() => void startPayment('landing_standards_package')}
+                  onClick={() => {
+                    if (packagePending) {
+                      showPendingBankAgain(packagePending, 'landing_standards_package');
+                      return;
+                    }
+                    void startPayment('landing_standards_package');
+                  }}
                   className="btn-brutal-teal w-full min-h-[48px]"
                 >
                   {busy === 'landing_standards_package'
