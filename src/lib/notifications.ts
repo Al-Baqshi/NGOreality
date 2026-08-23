@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { SITE_URL } from '../config/site';
 import type { OutreachEmailTemplate } from '../types';
 
 export type NotificationTemplate =
@@ -13,6 +14,13 @@ function portalSignupUrl(organizationId?: string): string {
   const root = base || 'https://www.ngoreality.com';
   if (organizationId) return `${root}/ngo/signup?org=${encodeURIComponent(organizationId)}`;
   return `${root}/ngo/signup`;
+}
+
+/** Absolute URL of an organisation's public directory page (`/public/org/<slug>`). */
+export function publicProfileUrl(slug?: string | null): string | null {
+  const clean = slug?.trim();
+  if (!clean) return null;
+  return `${SITE_URL}/public/org/${encodeURIComponent(clean)}`;
 }
 
 function buildMessage(
@@ -146,9 +154,23 @@ function buildMessage(
   }
 }
 
-/** Replace placeholders when staff edits the draft before send. */
-export function personalizeOutreachDraft(text: string, organizationName: string): string {
-  return text.replace(/\{name\}/gi, organizationName).replace(/\{organizationName\}/gi, organizationName);
+/**
+ * Replace placeholders when staff edits the draft before send.
+ *  - `{name}` / `{organizationName}` → the organisation's name
+ *  - `{page}` / `{profileUrl}`       → link to its public directory page (/public/org/<slug>)
+ * The same brackets are honoured server-side by `outreach_enqueue_emails` (migration 064).
+ */
+export function personalizeOutreachDraft(
+  text: string,
+  organizationName: string,
+  profileUrl?: string | null,
+): string {
+  const page = profileUrl ?? '';
+  return text
+    .replace(/\{name\}/gi, organizationName)
+    .replace(/\{organizationName\}/gi, organizationName)
+    .replace(/\{page\}/gi, page)
+    .replace(/\{profileUrl\}/gi, page);
 }
 
 /** Queue an email for the worker / manual send from CRM. */
@@ -157,6 +179,8 @@ export async function queueNotification(input: {
   template: NotificationTemplate;
   recipientEmail: string;
   organizationName: string;
+  /** Public directory slug — lets `{page}` in a staff draft resolve to the org's profile link. */
+  organizationSlug?: string | null;
   incidentId?: string;
   extra?: Record<string, string>;
   subjectOverride?: string;
@@ -169,11 +193,12 @@ export async function queueNotification(input: {
     ...input.extra,
     organizationId: input.organizationId,
   });
+  const profileUrl = publicProfileUrl(input.organizationSlug);
   const subject = input.subjectOverride
-    ? personalizeOutreachDraft(input.subjectOverride, input.organizationName)
+    ? personalizeOutreachDraft(input.subjectOverride, input.organizationName, profileUrl)
     : built.subject;
   const body = input.bodyOverride
-    ? personalizeOutreachDraft(input.bodyOverride, input.organizationName)
+    ? personalizeOutreachDraft(input.bodyOverride, input.organizationName, profileUrl)
     : built.body;
 
   const { error } = await supabase.from('notification_events').insert({

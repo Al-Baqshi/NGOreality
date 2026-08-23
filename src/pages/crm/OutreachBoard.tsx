@@ -59,7 +59,7 @@ export default function OutreachBoard() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [sortBy, setSortBy] = useState('');
   const [sendEmailOpen, setSendEmailOpen] = useState(false);
-  const [sendEmailOrganizations, setSendEmailOrganizations] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [sendEmailOrganizations, setSendEmailOrganizations] = useState<{ id: string; name: string; email: string; slug: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [globalRefreshTick, setGlobalRefreshTick] = useState(0);
 
@@ -98,10 +98,10 @@ export default function OutreachBoard() {
       const { supabase } = await import('../../lib/supabase');
       const { data } = await supabase
         .from('organizations')
-        .select('id, name, email')
+        .select('id, name, email, slug')
         .in('id', Array.from(selectedIds));
       if (data) {
-        setSendEmailOrganizations(data as { id: string; name: string; email: string }[]);
+        setSendEmailOrganizations(data as { id: string; name: string; email: string; slug: string }[]);
         setSendEmailOpen(true);
       }
     } catch (err) {

@@ -272,7 +272,7 @@ export default function SendEmailModal({
                   <span className="label-brutal flex flex-wrap items-center gap-2">
                     Body
                     <span className="normal-case tracking-normal font-sans font-medium text-ink-400">
-                      Inserts {'{name}'} for each organisation
+                      {'{name}'} → organisation name · {'{page}'} → link to its directory page
                     </span>
                   </span>
                   <textarea

@@ -92,7 +92,7 @@ export default function OutreachWorklist() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [sendEmailOpen, setSendEmailOpen] = useState(false);
-  const [sendEmailOrganizations, setSendEmailOrganizations] = useState<Pick<Organization, 'id' | 'name' | 'email'>[]>([]);
+  const [sendEmailOrganizations, setSendEmailOrganizations] = useState<Pick<Organization, 'id' | 'name' | 'email' | 'slug'>[]>([]);
   const confirm = useConfirm();
 
   const { counts } = useOutreachSegmentCounts(refreshKey);
@@ -228,14 +228,14 @@ export default function OutreachWorklist() {
     try {
       const { data, error: fetchError } = await supabase
         .from('organizations')
-        .select('id, name, email')
+        .select('id, name, email, slug')
         .in('id', ids);
       if (fetchError) throw fetchError;
       if (!data?.length) {
         setNotice('Could not load selected organisations.');
         return;
       }
-      setSendEmailOrganizations(data as Pick<Organization, 'id' | 'name' | 'email'>[]);
+      setSendEmailOrganizations(data as Pick<Organization, 'id' | 'name' | 'email' | 'slug'>[]);
       setSendEmailOpen(true);
     } catch (e) {
       setNotice(e instanceof Error ? e.message : 'Could not open email composer.');

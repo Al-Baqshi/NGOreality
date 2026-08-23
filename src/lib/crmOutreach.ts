@@ -116,7 +116,7 @@ export type BulkEmailResult = {
 };
 
 export async function queueOutreachBulkEmail(
-  orgs: Pick<Organization, 'id' | 'name' | 'email'>[],
+  orgs: (Pick<Organization, 'id' | 'name' | 'email'> & Partial<Pick<Organization, 'slug'>>)[],
   template: OutreachEmailTemplate,
   options?: {
     incidentIdByOrg?: Record<string, string>;
@@ -145,6 +145,7 @@ export async function queueOutreachBulkEmail(
       template,
       recipientEmail: org.email,
       organizationName: org.name,
+      organizationSlug: org.slug,
       incidentId: options?.incidentIdByOrg?.[org.id],
       extra: options?.errorDetailByOrg?.[org.id]
         ? { errorDetail: options.errorDetailByOrg[org.id] }
@@ -161,7 +162,7 @@ export async function queueOutreachBulkEmail(
 
 /** Queue outreach emails for selected orgs — does not deliver until Email notifications / worker processes the queue. */
 export async function sendOutreachForColumn(
-  orgs: Pick<Organization, 'id' | 'name' | 'email' | 'outreach_status'>[],
+  orgs: (Pick<Organization, 'id' | 'name' | 'email' | 'outreach_status'> & Partial<Pick<Organization, 'slug'>>)[],
   column: OutreachStatus,
   options?: {
     incidentIdByOrg?: Record<string, string>;
@@ -179,7 +180,7 @@ export async function sendOutreachForColumn(
 
 /** Queue AND immediately send outreach emails via Monitor API (requires VITE_MONITOR_API_URL + VITE_MONITOR_API_KEY). */
 export async function sendOutreachNow(
-  orgs: Pick<Organization, 'id' | 'name' | 'email' | 'outreach_status'>[],
+  orgs: (Pick<Organization, 'id' | 'name' | 'email' | 'outreach_status'> & Partial<Pick<Organization, 'slug'>>)[],
   column: OutreachStatus,
   options?: {
     incidentIdByOrg?: Record<string, string>;
