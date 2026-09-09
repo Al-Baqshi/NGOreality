@@ -107,7 +107,7 @@ function buildMessage(
           `We are reaching out from NGOreality because ${organizationName} is listed on the New Zealand charities register and may benefit from a verified public profile, optional website support, and trust standards that funders recognise.`,
           ``,
           `Claim and onboard your organisation here (free to start):`,
-          signupUrl,
+          `{page}`,
           ``,
           `Once claimed, you can pay by bank transfer for:`,
           `• Reality Badge membership — NZD $70 / year (badge + website monitoring)`,
@@ -195,12 +195,16 @@ export async function queueNotification(input: {
     organizationId: input.organizationId,
   });
   const profileUrl = publicProfileUrl(input.organizationSlug);
-  const subject = input.subjectOverride
-    ? personalizeOutreachDraft(input.subjectOverride, input.organizationName, profileUrl)
-    : built.subject;
-  const body = input.bodyOverride
-    ? personalizeOutreachDraft(input.bodyOverride, input.organizationName, profileUrl)
-    : built.body;
+  const subject = personalizeOutreachDraft(
+    input.subjectOverride ?? built.subject,
+    input.organizationName,
+    profileUrl,
+  );
+  const body = personalizeOutreachDraft(
+    input.bodyOverride ?? built.body,
+    input.organizationName,
+    profileUrl,
+  );
 
   const { data, error } = await supabase.from('notification_events').insert({
     organization_id: input.organizationId,
