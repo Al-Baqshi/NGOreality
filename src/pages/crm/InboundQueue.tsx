@@ -63,9 +63,14 @@ export default function InboundQueue() {
       )}
 
       <div className="card-brutal overflow-hidden">
-        {loading ? (
+        {error && organizations.length > 0 ? (
+          <div className="p-4 border-b border-accent">
+            <QueryError message={error} onRetry={refetch} />
+          </div>
+        ) : null}
+        {loading && organizations.length === 0 ? (
           <p className="p-8 text-center text-sm text-ink-400">Loading…</p>
-        ) : error ? (
+        ) : error && organizations.length === 0 ? (
           <div className="p-4">
             <QueryError message={error} onRetry={refetch} />
           </div>

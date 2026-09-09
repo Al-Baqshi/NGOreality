@@ -41,8 +41,8 @@ export default function CrmNotificationInbox() {
       </p>
 
       <div className="grid grid-cols-2 gap-3 mb-6">
-        <MetricCard label="Unread" value={error ? '—' : unreadCount} sub="Waiting for you" compact accent={!error && unreadCount > 0} />
-        <MetricCard label="In inbox" value={error ? '—' : items.length} sub="Latest activity" compact />
+        <MetricCard label="Unread" value={error && items.length === 0 ? '—' : unreadCount} sub="Waiting for you" compact accent={!(error && items.length === 0) && unreadCount > 0} />
+        <MetricCard label="In inbox" value={error && items.length === 0 ? '—' : items.length} sub="Latest activity" compact />
       </div>
 
       <NotificationFeed

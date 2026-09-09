@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { captureError } from './errorReporting';
+import { captureEmptyMutation, captureError } from './errorReporting';
 import { ensurePaymentReference } from './payments';
 import { previewOutreachEmail, queueNotification } from './notifications';
 import { flushPendingNotifications } from './monitorApi';
@@ -13,11 +13,13 @@ import {
 } from '../types';
 
 export async function setOutreachStatus(orgId: string, outreach: OutreachStatus) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('organizations')
     .update({ outreach_status: outreach, updated_at: new Date().toISOString() })
-    .eq('id', orgId);
-  if (error) throw error;
+    .eq('id', orgId)
+    .select('id');
+  if (error) throw new Error(captureError(error, { where: 'setOutreachStatus' }));
+  if (!data?.length) throw new Error(captureEmptyMutation('setOutreachStatus.empty'));
   const { error: logError } = await supabase.from('activity_log').insert({
     organization_id: orgId,
     action: 'outreach_updated',
@@ -36,11 +38,20 @@ export async function bulkSetOutreachStatus(orgIds: string[], outreach: Outreach
   const CHUNK = 200;
   for (let i = 0; i < orgIds.length; i += CHUNK) {
     const slice = orgIds.slice(i, i + CHUNK);
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('organizations')
       .update({ outreach_status: outreach, updated_at: new Date().toISOString() })
-      .in('id', slice);
-    if (error) throw error;
+      .in('id', slice)
+      .select('id');
+    if (error) throw new Error(captureError(error, { where: 'bulkSetOutreachStatus' }));
+    if ((data?.length ?? 0) !== slice.length) {
+      throw new Error(
+        captureEmptyMutation(
+          'bulkSetOutreachStatus.partial',
+          `Updated ${data?.length ?? 0} of ${slice.length} organisations. Refresh and try again.`,
+        ),
+      );
+    }
 
     const { error: logError } = await supabase.from('activity_log').insert(
       slice.map((organization_id) => ({
@@ -63,7 +74,7 @@ export async function markRegisteredInbound(orgId: string) {
 
 /** Becomes a paying / active NGOreality customer */
 export async function registerAsCustomer(orgId: string) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('organizations')
     .update({
       is_customer: true,
@@ -72,37 +83,41 @@ export async function registerAsCustomer(orgId: string) {
       outreach_status: 'not_applicable',
       updated_at: new Date().toISOString(),
     })
-    .eq('id', orgId);
-  if (error) throw error;
+    .eq('id', orgId)
+    .select('id');
+  if (error) throw new Error(captureError(error, { where: 'registerAsCustomer' }));
+  if (!data?.length) throw new Error(captureEmptyMutation('registerAsCustomer.empty'));
 
   const { count, error: countError } = await supabase
     .from('service_engagements')
     .select('id', { count: 'exact', head: true })
     .eq('organization_id', orgId)
     .in('status', ['lead', 'active']);
-  if (countError) throw countError;
+  if (countError) throw new Error(captureError(countError, { where: 'registerAsCustomer.engagements' }));
 
   if (!count) {
-    const { error: engError } = await supabase.from('service_engagements').insert({
+    const { data: engRow, error: engError } = await supabase.from('service_engagements').insert({
       organization_id: orgId,
       engagement_type: 'verification',
       status: 'active',
       started_at: new Date().toISOString(),
-    });
-    if (engError) throw engError;
+    }).select('id');
+    if (engError) throw new Error(captureError(engError, { where: 'registerAsCustomer.engagementInsert' }));
+    if (!engRow?.length) throw new Error(captureEmptyMutation('registerAsCustomer.engagementInsertEmpty'));
   }
 
   const { count: criteriaCount, error: criteriaCountError } = await supabase
     .from('verification_criteria')
     .select('id', { count: 'exact', head: true })
     .eq('organization_id', orgId);
-  if (criteriaCountError) throw criteriaCountError;
+  if (criteriaCountError) throw new Error(captureError(criteriaCountError, { where: 'registerAsCustomer.criteriaCount' }));
 
   if (!criteriaCount) {
-    const { error: criteriaError } = await supabase.from('verification_criteria').insert(
+    const { data: criteriaRows, error: criteriaError } = await supabase.from('verification_criteria').insert(
       DEFAULT_CRITERIA.map((c) => ({ organization_id: orgId, ...c })),
-    );
-    if (criteriaError) throw criteriaError;
+    ).select('id');
+    if (criteriaError) throw new Error(captureError(criteriaError, { where: 'registerAsCustomer.criteriaInsert' }));
+    if (!criteriaRows?.length) throw new Error(captureEmptyMutation('registerAsCustomer.criteriaInsertEmpty'));
   }
 
   await ensurePaymentReference(orgId);
@@ -207,7 +222,19 @@ export async function sendOutreachNow(
   if (result.queued > 0) {
     try {
       const flush = await flushPendingNotifications();
-      return { ...result, flushError: flush ? null : 'No notifications to flush' };
+      if (!flush) {
+        return {
+          ...result,
+          flushError: 'Emails were queued but delivery returned no result. Open Email notifications to send them.',
+        };
+      }
+      if (flush.failed > 0) {
+        return {
+          ...result,
+          flushError: `${flush.failed} email${flush.failed === 1 ? '' : 's'} failed to send`,
+        };
+      }
+      return { ...result, flushError: null };
     } catch (e) {
       captureError(e, { where: 'sendOutreachNow.flush' });
       return { ...result, flushError: e instanceof Error ? e.message : 'Flush failed' };
@@ -235,7 +262,7 @@ export async function syncNoWebsiteLeads(limit = 100): Promise<number> {
     .in('outreach_status', ['not_contacted', 'contacted', 'follow_up'])
     .or('website_url.is.null,website_url.eq.""')
     .limit(limit);
-  if (error) throw error;
+  if (error) throw new Error(captureError(error, { where: 'syncNoWebsiteLeads' }));
   const ids = (data ?? []).map((r) => r.id);
   if (!ids.length) return 0;
   await bulkSetOutreachStatus(ids, 'no_website');
@@ -249,7 +276,7 @@ export async function syncWebsiteIssueLeads(limit = 100): Promise<number> {
     .select('organization_id')
     .is('closed_at', null)
     .limit(limit);
-  if (incErr) throw incErr;
+  if (incErr) throw new Error(captureError(incErr, { where: 'syncWebsiteIssueLeads.incidents' }));
   const orgIds = [...new Set((incidents ?? []).map((i) => i.organization_id))];
   if (!orgIds.length) return 0;
 
@@ -259,7 +286,7 @@ export async function syncWebsiteIssueLeads(limit = 100): Promise<number> {
     .in('id', orgIds)
     .eq('status', 'listed')
     .eq('is_customer', false);
-  if (orgErr) throw orgErr;
+  if (orgErr) throw new Error(captureError(orgErr, { where: 'syncWebsiteIssueLeads.orgs' }));
   const ids = (orgs ?? []).map((o) => o.id);
   if (!ids.length) return 0;
   await bulkSetOutreachStatus(ids, 'website_issues');

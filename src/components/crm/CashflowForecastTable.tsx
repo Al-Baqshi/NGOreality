@@ -398,7 +398,7 @@ export default function CashflowForecastTable({
     },
   ];
 
-  if (loading) {
+  if (loading && periods.length === 0) {
     return <p className="p-8 text-center text-sm text-ink-400">Loading…</p>;
   }
 

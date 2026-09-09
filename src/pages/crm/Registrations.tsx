@@ -29,6 +29,7 @@ export default function Registrations() {
     badgeRequestsError,
     setupRequestsError,
     loading,
+    countsReady,
     error: loadError,
     refetch,
   } = useRegistrations();
@@ -62,18 +63,18 @@ export default function Registrations() {
 
       <div className="grid grid-cols-1 min-[400px]:grid-cols-3 gap-3 mb-6">
         <div className="card-brutal p-4 text-center">
-          <div className="text-2xl font-black">{loading || loadError ? '—' : signupCounts.total}</div>
+          <div className="text-2xl font-black">{!countsReady ? '—' : signupCounts.total}</div>
           <div className="label-brutal mt-1">Portal signups</div>
         </div>
         <div className="card-brutal p-4 text-center">
           <div className="text-2xl font-black text-teal">
-            {loading || loadError ? '—' : signupCounts.fromRegistry}
+            {!countsReady ? '—' : signupCounts.fromRegistry}
           </div>
           <div className="label-brutal mt-1">From registry</div>
         </div>
         <div className="card-brutal p-4 text-center">
           <div className="text-2xl font-black text-accent">
-            {loading || loadError ? '—' : signupCounts.newSubmissions}
+            {!countsReady ? '—' : signupCounts.newSubmissions}
           </div>
           <div className="label-brutal mt-1">New submissions</div>
         </div>
@@ -106,7 +107,10 @@ export default function Registrations() {
         </div>
       )}
 
-      {loading ? (
+      {loading &&
+      signups.length === 0 &&
+      badgeRequests.length === 0 &&
+      setupRequests.length === 0 ? (
         <p className="font-mono text-sm text-ink-400">Loading registrations…</p>
       ) : (
         <div className="space-y-10">

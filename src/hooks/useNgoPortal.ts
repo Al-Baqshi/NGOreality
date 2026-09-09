@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { captureError } from '../lib/errorReporting';
+import { captureEmptyMutation, captureError } from '../lib/errorReporting';
 import { ensurePaymentReference } from '../lib/payments';
 import type {
   BadgeRequest,
@@ -174,12 +174,12 @@ export function useNgoPortal() {
       };
     }
 
-    const { error: insertError } = await supabase.from('badge_requests').insert({
+    const { data: inserted, error: insertError } = await supabase.from('badge_requests').insert({
       organization_id: organization.id,
       requested_by: user.id,
       request_type: requestType,
       notes,
-    });
+    }).select('id');
 
     if (insertError) {
       const rlsDenied =
@@ -192,17 +192,37 @@ export function useNgoPortal() {
         paymentReference: null,
       };
     }
+    if (!inserted?.length) {
+      return {
+        error: captureEmptyMutation(
+          'useNgoPortal.requestBadge.empty',
+          'The badge request was not saved. Refresh and try again.',
+        ),
+        paymentReference: null,
+      };
+    }
 
     if (requestType === 'renewal') {
-      const { error: renewError } = await supabase
+      const { data: renewRow, error: renewError } = await supabase
         .from('organization_memberships')
         .update({ status: 'pending_renewal' })
         .eq('organization_id', organization.id)
-        .eq('status', 'active');
+        .eq('status', 'active')
+        .select('id');
       if (renewError) {
         await fetchPortal();
         return {
           error: `Request submitted, but membership could not be marked pending renewal: ${captureError(renewError, { where: 'useNgoPortal.requestBadge.renewal' })}`,
+          paymentReference,
+        };
+      }
+      if (!renewRow?.length) {
+        await fetchPortal();
+        return {
+          error: captureEmptyMutation(
+            'useNgoPortal.requestBadge.renewalEmpty',
+            'Request submitted, but membership could not be marked pending renewal. Refresh and try again.',
+          ),
           paymentReference,
         };
       }

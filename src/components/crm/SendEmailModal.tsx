@@ -38,6 +38,7 @@ export default function SendEmailModal({
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [sendFailed, setSendFailed] = useState(false);
   const [showDraft, setShowDraft] = useState(true);
   const [showAllRecipients, setShowAllRecipients] = useState(false);
 
@@ -60,7 +61,7 @@ export default function SendEmailModal({
 
   const visibleRecipients = showAllRecipients ? withEmail : withEmail.slice(0, 6);
   const hiddenRecipientCount = withEmail.length - visibleRecipients.length;
-  const messageFailed = Boolean(message && /fail/i.test(message));
+  const messageFailed = sendFailed || Boolean(message && /fail|nothing was sent|error/i.test(message));
 
   useEffect(() => {
     if (open) {
@@ -69,6 +70,7 @@ export default function SendEmailModal({
       setShowDraft(true);
       setShowAllRecipients(false);
       setMessage(null);
+      setSendFailed(false);
     }
   }, [open, defaultDraft.subject, defaultDraft.body]);
 
@@ -94,6 +96,7 @@ export default function SendEmailModal({
     if (!ok) return;
     setBusy(true);
     setMessage(null);
+    setSendFailed(false);
     try {
       const result = await sendOutreachForColumn(withEmail, column as OutreachStatus, {
         subjectDraft: subject,
@@ -104,9 +107,13 @@ export default function SendEmailModal({
       if (result.skippedNoEmail) parts.push(`${result.skippedNoEmail} skipped (no email)`);
       if (result.errors.length) parts.push(result.errors.slice(0, 2).join('; '));
       setMessage(parts.join(' · '));
-      onSent();
-      setTimeout(() => onClose(), 2000);
+      setSendFailed(result.queued === 0 || result.errors.length > 0);
+      if (result.queued > 0) {
+        onSent();
+        if (!result.errors.length) setTimeout(() => onClose(), 2000);
+      }
     } catch (err) {
+      setSendFailed(true);
       setMessage(captureError(err, { where: 'SendEmailModal.queue' }));
     } finally {
       setBusy(false);
@@ -126,20 +133,35 @@ export default function SendEmailModal({
     if (!ok) return;
     setBusy(true);
     setMessage(null);
+    setSendFailed(false);
     try {
       const result = await sendOutreachNow(withEmail, column as OutreachStatus, {
         subjectDraft: subject,
         bodyDraft: body,
       });
 
-      const parts = [`Sent ${result.queued}`];
+      const parts: string[] = [];
+      if (result.flushError) {
+        parts.push(
+          result.queued > 0
+            ? `Queued ${result.queued} but delivery failed: ${result.flushError}`
+            : result.flushError,
+        );
+      } else if (result.queued > 0) {
+        parts.push(`Sent ${result.queued}`);
+      } else {
+        parts.push('Nothing was sent');
+      }
       if (result.skippedNoEmail) parts.push(`${result.skippedNoEmail} skipped (no email)`);
       if (result.errors.length) parts.push(result.errors.slice(0, 2).join('; '));
-      if (result.flushError) parts.push(`Flush: ${result.flushError}`);
       setMessage(parts.join(' · '));
-      onSent();
-      setTimeout(() => onClose(), 2000);
+      setSendFailed(Boolean(result.flushError) || result.queued === 0 || result.errors.length > 0);
+      if (result.queued > 0) onSent();
+      if (!result.flushError && result.queued > 0 && !result.errors.length) {
+        setTimeout(() => onClose(), 2000);
+      }
     } catch (err) {
+      setSendFailed(true);
       setMessage(captureError(err, { where: 'SendEmailModal.sendNow' }));
     } finally {
       setBusy(false);

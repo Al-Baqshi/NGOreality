@@ -81,8 +81,17 @@ export function useNotifications(options?: {
     }
     setFlushing(true);
     try {
-      await flushPendingNotifications();
+      const counts = await flushPendingNotifications();
       await refetch();
+      if (counts && counts.failed > 0) {
+        return captureError(
+          new Error(`${counts.failed} email${counts.failed === 1 ? '' : 's'} failed to send`),
+          { where: 'useNotifications.flush.failed' },
+        );
+      }
+      if (!counts) {
+        return captureError(new Error('Flush returned no result'), { where: 'useNotifications.flush.empty' });
+      }
       return null;
     } catch (e) {
       return captureError(e, { where: 'useNotifications.flush' });
@@ -92,19 +101,25 @@ export function useNotifications(options?: {
   };
 
   const requeue = async (id: string): Promise<string | null> => {
-    const { error: uError } = await supabase
+    const { data, error: uError } = await supabase
       .from('notification_events')
       .update({ status: 'pending', error_message: '', sent_at: null })
       .eq('id', id)
-      .eq('status', 'failed');
+      .eq('status', 'failed')
+      .select('id');
 
     if (uError) return captureError(uError, { where: 'useNotifications.requeue' });
+    if (!data?.length) {
+      return captureError(new Error('That email is no longer failed and was not requeued'), {
+        where: 'useNotifications.requeue.empty',
+      });
+    }
     await refetch();
     return null;
   };
 
   const removeFromQueue = async (id: string): Promise<string | null> => {
-    const { error: uError } = await supabase
+    const { data, error: uError } = await supabase
       .from('notification_events')
       .update({
         status: 'skipped',
@@ -112,15 +127,21 @@ export function useNotifications(options?: {
         sent_at: null,
       })
       .eq('id', id)
-      .in('status', ['pending', 'held']);
+      .in('status', ['pending', 'held'])
+      .select('id');
 
     if (uError) return captureError(uError, { where: 'useNotifications.removeFromQueue' });
+    if (!data?.length) {
+      return captureError(new Error('That email is no longer pending and was not removed'), {
+        where: 'useNotifications.removeFromQueue.empty',
+      });
+    }
     await refetch();
     return null;
   };
 
   const restoreToQueue = async (id: string): Promise<string | null> => {
-    const { error: uError } = await supabase
+    const { data, error: uError } = await supabase
       .from('notification_events')
       .update({
         status: 'pending',
@@ -129,9 +150,15 @@ export function useNotifications(options?: {
         claimed_at: null,
       })
       .eq('id', id)
-      .eq('status', 'skipped');
+      .eq('status', 'skipped')
+      .select('id');
 
     if (uError) return captureError(uError, { where: 'useNotifications.restoreToQueue' });
+    if (!data?.length) {
+      return captureError(new Error('That email is no longer cancelled and was not restored'), {
+        where: 'useNotifications.restoreToQueue.empty',
+      });
+    }
     await refetch();
     return null;
   };
@@ -158,7 +185,7 @@ export function useNotifications(options?: {
     if (rpcError) return captureError(rpcError, { where: 'useNotifications.allowEmailAgain' });
 
     if (eventId) {
-      const { error: uError } = await supabase
+      const { data, error: uError } = await supabase
         .from('notification_events')
         .update(
           requeue
@@ -171,8 +198,16 @@ export function useNotifications(options?: {
               },
         )
         .eq('id', eventId)
-        .eq('status', 'suppressed');
+        .eq('status', 'suppressed')
+        .select('id');
       if (uError) return captureError(uError, { where: 'useNotifications.allowEmailAgain.event' });
+      if (!data?.length) {
+        await refetch();
+        return captureError(
+          new Error('Address allowed again, but this send was no longer suppressed and was not updated'),
+          { where: 'useNotifications.allowEmailAgain.eventEmpty' },
+        );
+      }
     }
 
     await refetch();

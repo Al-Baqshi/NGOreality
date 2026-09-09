@@ -14,7 +14,7 @@ import { GST_PRICE_SUFFIX, MEMBERSHIP_ANNUAL_CENTS, PRICING_CURRENCY } from '../
 import { PAYMENT_STATUS_LABELS, type OrganizationPayment } from '../../../types';
 import NgoPortalPageShell from '../../../components/ngo/NgoPortalPageShell';
 import NgoBillingTopUpPanel from '../../../components/ngo/NgoBillingTopUpPanel';
-import { captureError } from '../../../lib/errorReporting';
+import { captureEmptyMutation, captureError } from '../../../lib/errorReporting';
 import { createPendingBankPayment } from '../../../lib/payments';
 import { cn } from '@/lib/utils';
 
@@ -29,6 +29,7 @@ const STATUS_STYLES = {
 export default function NgoMembershipPage() {
   const { organization, memberships, refetch, error: portalError } = useNgoPortalContext();
   const [payments, setPayments] = useState<OrganizationPayment[]>([]);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
   const [autoRenew, setAutoRenew] = useState(false);
   const [autoRenewKnown, setAutoRenewKnown] = useState(false);
   const [autoRenewLoading, setAutoRenewLoading] = useState(false);
@@ -44,11 +45,12 @@ export default function NgoMembershipPage() {
       .order('created_at', { ascending: false })
       .then(({ data, error }) => {
         if (error) {
-          setActionError((prev) =>
-            [prev, captureError(error, { where: 'NgoMembershipPage.payments' })].filter(Boolean).join(' · '),
-          );
+          const msg = captureError(error, { where: 'NgoMembershipPage.payments' });
+          setPaymentsError(msg);
+          setActionError((prev) => [prev, msg].filter(Boolean).join(' · '));
           return;
         }
+        setPaymentsError(null);
         setPayments((data ?? []) as OrganizationPayment[]);
       });
 
@@ -84,18 +86,23 @@ export default function NgoMembershipPage() {
       (p.product_type === 'membership_annual' || p.product_type === 'verification_annual') &&
       p.status === 'pending',
   );
+  const paymentsUnknown = Boolean(paymentsError) && payments.length === 0;
 
   const handleAutoRenewToggle = async (newValue: boolean) => {
     if (!organization) return;
     setAutoRenewLoading(true);
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('organizations')
       .update({ auto_renew_membership: newValue, updated_at: new Date().toISOString() })
-      .eq('id', organization.id);
+      .eq('id', organization.id)
+      .select('id');
     setAutoRenewLoading(false);
     if (error) {
       setAutoRenew(!newValue);
       setActionError(captureError(error, { where: 'NgoMembershipPage.autoRenewToggle' }));
+    } else if (!data?.length) {
+      setAutoRenew(!newValue);
+      setActionError(captureEmptyMutation('NgoMembershipPage.autoRenewToggle.empty'));
     } else {
       setActionError(null);
       setAutoRenew(newValue);
@@ -104,6 +111,18 @@ export default function NgoMembershipPage() {
 
   const handleManualRenew = async () => {
     if (!organization) return;
+    if (paymentsError) {
+      setActionError(
+        paymentsUnknown
+          ? 'Payment status could not be loaded. Refresh and try again before starting another transfer.'
+          : 'Payment status could not be refreshed. Refresh and try again before starting another transfer.',
+      );
+      return;
+    }
+    if (pendingPayment) {
+      setActionError('A membership payment is already waiting for confirmation. Do not start another transfer.');
+      return;
+    }
     const { payment, error: payError } = await createPendingBankPayment({
       organizationId: organization.id,
       productType: 'membership_annual',
@@ -259,6 +278,14 @@ export default function NgoMembershipPage() {
               </div>
 
               {(membershipStatus === 'expired' || membershipStatus === 'expiring_soon' || membershipStatus === 'none') && (
+                paymentsError && !pendingPayment ? (
+                  <div className="mt-4 p-3 border-2 border-accent bg-accent-light text-sm">
+                    <p className="font-semibold text-accent">Payment status could not be loaded</p>
+                    <p className="text-xs text-ink-700 mt-1">
+                      Refresh the page before starting another transfer so we do not queue a duplicate payment.
+                    </p>
+                  </div>
+                ) : pendingPayment ? null : (
                 <div className="mt-4 p-3 border-2 border-teal bg-teal-light text-sm">
                   <p className="font-semibold text-teal">Renew now</p>
                   <p className="text-xs text-ink-700 mt-1">
@@ -272,6 +299,7 @@ export default function NgoMembershipPage() {
                     Renew membership ({membershipPrice})
                   </button>
                 </div>
+                )
               )}
             </div>
           ) : portalError ? (

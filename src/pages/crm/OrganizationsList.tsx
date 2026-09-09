@@ -218,16 +218,17 @@ export default function OrganizationsList() {
         </div>
       </div>
 
-      {loading ? (
+      {error && <QueryError message={error} onRetry={refetch} />}
+      {loading && organizations.length === 0 ? (
         <div className="text-center py-16 font-mono text-sm text-ink-400">Loading...</div>
-      ) : error ? (
-        <QueryError message={error} onRetry={refetch} />
       ) : organizations.length === 0 ? (
+        error ? null : (
         <EmptyState
           icon={<Building2 size={48} />}
           title="No organizations found"
           description="Try different filters or search terms."
         />
+        )
       ) : view === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {organizations.map((org) => (

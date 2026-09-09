@@ -189,6 +189,13 @@ export default function NgoSetupRequestPanel({
     });
     if (!ok) return;
 
+    if (loadError && !pendingSetup) {
+      setSetupError(
+        'Existing setup requests could not be loaded. Refresh before sending another so we do not duplicate one already in progress.',
+      );
+      return;
+    }
+
     setSetupSubmitting(true);
 
     const { error } = await submitNgoSetupRequest({
@@ -245,6 +252,11 @@ export default function NgoSetupRequestPanel({
             You already have a setup request in progress (
             <span className="font-semibold">{pendingSetup.status.replace('_', ' ')}</span>
             ). Our team will contact you at {organization.email || 'your contact email'}.
+          </div>
+        ) : loadError ? (
+          <div className="border-2 border-accent bg-accent-light px-3 py-3 text-sm text-accent" role="alert">
+            Existing setup requests could not be loaded. Refresh before sending another so we do
+            not duplicate one already in progress.
           </div>
         ) : (
           <form onSubmit={submitSetup} className="space-y-4" noValidate>
@@ -496,7 +508,13 @@ export default function NgoSetupRequestPanel({
             No setup requests yet. Submit one above when you are ready.
           </p>
         ) : (
-          <ul className="divide-y-2 divide-ink-100 border-2 border-ink-100 dark:divide-border dark:border-border">
+          <>
+            {loadError ? (
+              <p className="text-sm text-accent mb-3" role="alert">
+                Previous setup requests could not be refreshed. Showing the last loaded list.
+              </p>
+            ) : null}
+            <ul className="divide-y-2 divide-ink-100 border-2 border-ink-100 dark:divide-border dark:border-border">
             {setupRequests.map((req) => (
               <li
                 key={req.id}
@@ -521,6 +539,7 @@ export default function NgoSetupRequestPanel({
               </li>
             ))}
           </ul>
+          </>
         )}
       </div>
     </div>

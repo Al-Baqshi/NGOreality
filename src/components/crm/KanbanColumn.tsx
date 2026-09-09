@@ -46,7 +46,7 @@ export async function fetchColumnLeadIds(
     if (safe) query = query.or(`name.ilike.%${safe}%,email.ilike.%${safe}%`);
   }
   const { data, error } = await query.order('name').limit(limit);
-  if (error) throw error;
+  if (error) throw new Error(captureError(error, { where: 'fetchColumnLeadIds' }));
   return (data ?? []).map((r) => r.id);
 }
 
@@ -199,18 +199,21 @@ export default function KanbanColumn({
         {actionError && (
           <p className="font-mono text-2xs text-accent break-words">{actionError}</p>
         )}
+        {error && organizations.length > 0 && (
+          <p className="font-mono text-2xs text-accent break-words">Could not refresh: {error}</p>
+        )}
         {emailError && (
           <p className="font-mono text-2xs text-accent break-words">Email status: {emailError}</p>
         )}
       </div>
 
       <div className="kanban-column-body flex-1 min-h-0 overflow-y-auto">
-        {loading ? (
+        {loading && organizations.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 p-6 text-ink-400">
             <Loader2 className="animate-spin" size={20} />
             <p className="font-mono text-2xs">Loading cards…</p>
           </div>
-        ) : error ? (
+        ) : error && organizations.length === 0 ? (
           <div className="kanban-column-empty">
             <p className="font-medium text-accent">Could not load this column</p>
             <p className="mt-1 break-words">{error}</p>

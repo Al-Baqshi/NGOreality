@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { SITE_URL } from '../config/site';
-import { captureError } from './errorReporting';
+import { captureEmptyMutation, captureError } from './errorReporting';
 import type { OutreachEmailTemplate } from '../types';
 
 export type NotificationTemplate =
@@ -202,7 +202,7 @@ export async function queueNotification(input: {
     ? personalizeOutreachDraft(input.bodyOverride, input.organizationName, profileUrl)
     : built.body;
 
-  const { error } = await supabase.from('notification_events').insert({
+  const { data, error } = await supabase.from('notification_events').insert({
     organization_id: input.organizationId,
     incident_id: input.incidentId ?? null,
     template: input.template,
@@ -210,10 +210,13 @@ export async function queueNotification(input: {
     subject,
     body_text: body,
     status: 'pending',
-  });
+  }).select('id');
 
   if (error) {
     return { error: captureError(error, { where: 'queueNotification' }) };
+  }
+  if (!data?.length) {
+    return { error: captureEmptyMutation('queueNotification.empty', 'The email was not queued. Refresh and try again.') };
   }
   return { error: null };
 }

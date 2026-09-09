@@ -151,6 +151,9 @@ async function request<T>(
     try {
       payload = JSON.parse(text);
     } catch {
+      if (response.ok) {
+        throw new CrmApiError('Response was not valid JSON', response.status);
+      }
       payload = null;
     }
   }

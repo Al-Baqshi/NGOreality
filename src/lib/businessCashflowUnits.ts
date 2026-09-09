@@ -1,12 +1,13 @@
 import { supabase } from './supabase';
+import { captureEmptyMutation, captureError } from './errorReporting';
 import { computeAllMonthFunnels } from '../config/salesFunnelModel';
 import { CASHFLOW_UNIT_ROWS } from '../config/salesFunnelModel';
 import { explainSchemaError } from './businessCashflow';
 
-function throwIfSchemaError(error: { message?: string }): void {
+function throwIfSchemaError(error: { message?: string }, where = 'fetchCashflowUnits'): void {
   const hint = explainSchemaError(error.message ?? '');
-  if (hint) throw new Error(hint);
-  throw error;
+  const logged = captureError(error, { where });
+  throw new Error(hint ?? logged);
 }
 
 export interface BusinessCashflowUnit {
@@ -24,7 +25,7 @@ export type CashflowUnitGrid = Record<string, Record<string, BusinessCashflowUni
 export async function fetchCashflowUnits(periods: string[]): Promise<BusinessCashflowUnit[]> {
   if (periods.length === 0) return [];
   const { data, error } = await supabase.from('business_cashflow_units').select('*').in('period', periods);
-  if (error) throwIfSchemaError(error);
+  if (error) throwIfSchemaError(error, 'fetchCashflowUnits');
   return (data ?? []) as BusinessCashflowUnit[];
 }
 
@@ -68,7 +69,7 @@ export async function upsertCashflowUnit(input: {
   actual_count: number;
   notes?: string;
 }): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('business_cashflow_units').upsert(
+  const { data, error } = await supabase.from('business_cashflow_units').upsert(
     {
       period: input.period,
       unit_key: input.unit_key,
@@ -79,10 +80,14 @@ export async function upsertCashflowUnit(input: {
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'period,unit_key' },
-  );
+  ).select('period');
   if (error) {
     const hint = explainSchemaError(error.message ?? '');
-    return { error: hint ?? error.message ?? 'Save failed' };
+    const msg = captureError(error, { where: 'upsertCashflowUnit' });
+    return { error: hint ?? msg };
+  }
+  if (!data?.length) {
+    return { error: captureEmptyMutation('upsertCashflowUnit.empty') };
   }
   return { error: null };
 }

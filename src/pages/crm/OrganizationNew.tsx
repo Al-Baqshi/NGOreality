@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { findRegistryDuplicate } from '../../hooks/useCrm';
-import { captureError } from '../../lib/errorReporting';
+import { captureEmptyMutation, captureError } from '../../lib/errorReporting';
 import { SectionHeader, FormField } from '../../components/ui';
 import { CATEGORIES, DEFAULT_CRITERIA } from '../../types';
 import type { OrgStatus } from '../../types';
@@ -111,11 +111,21 @@ export default function OrganizationNew() {
       organization_id: data.id,
       ...c,
     }));
-    const { error: criteriaError } = await supabase.from('verification_criteria').insert(criteriaRows);
+    const { data: criteriaInserted, error: criteriaError } = await supabase.from('verification_criteria').insert(criteriaRows).select('id');
     if (criteriaError) {
       captureError(criteriaError, { where: 'OrganizationNew.criteria' });
       setError(
         `Organisation created, but criteria could not be initialised: ${criteriaError.message}. The record is still there — open it and initialise criteria.`,
+      );
+      setCreatedOrgId(data.id);
+      return;
+    }
+    if (!criteriaInserted?.length) {
+      setError(
+        captureEmptyMutation(
+          'OrganizationNew.criteriaEmpty',
+          'Organisation created, but criteria could not be initialised. The record is still there — open it and initialise criteria.',
+        ),
       );
       setCreatedOrgId(data.id);
       return;

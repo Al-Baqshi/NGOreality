@@ -6,7 +6,7 @@ import { Award } from 'lucide-react';
 
 export default function CrmBadges() {
   const [tab, setTab] = useState<'expiring' | 'expired'>('expiring');
-  const { stats, loading: statsLoading, error: statsError } = useCrmDashboardStats();
+  const { stats, error: statsError, ready: statsReady } = useCrmDashboardStats();
   const { rows, loading, error } = useExpiringBadges(tab);
 
   return (
@@ -23,7 +23,7 @@ export default function CrmBadges() {
             tab === 'expiring' ? 'bg-ink-950 text-white' : 'bg-white text-ink-600'
           }`}
         >
-          Expiring 30d ({statsLoading || statsError ? '—' : stats.badges_expiring_30d})
+          Expiring 30d ({!statsReady ? '—' : stats.badges_expiring_30d})
         </button>
         <button
           type="button"
@@ -32,7 +32,7 @@ export default function CrmBadges() {
             tab === 'expired' ? 'bg-accent text-white' : 'bg-white text-ink-600'
           }`}
         >
-          Expired ({statsLoading || statsError ? '—' : stats.badges_expired})
+          Expired ({!statsReady ? '—' : stats.badges_expired})
         </button>
       </div>
 
@@ -43,9 +43,14 @@ export default function CrmBadges() {
             {tab === 'expiring' ? 'Call for renewal' : 'Expired — action needed'}
           </h3>
         </div>
-        {loading ? (
+        {error && rows.length > 0 ? (
+          <div className="p-4 border-b border-accent">
+            <QueryError message={error} />
+          </div>
+        ) : null}
+        {loading && rows.length === 0 ? (
           <p className="px-4 py-8 font-mono text-sm text-ink-400 text-center">Loading…</p>
-        ) : error ? (
+        ) : error && rows.length === 0 ? (
           <div className="p-4">
             <QueryError message={error} />
           </div>

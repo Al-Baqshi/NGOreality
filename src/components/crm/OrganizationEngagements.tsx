@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { captureError } from '../../lib/errorReporting';
+import { captureEmptyMutation, captureError } from '../../lib/errorReporting';
 import { useServiceEngagements, useStaffTasks } from '../../hooks/useCrm';
 import { FormField, QueryError } from '../ui';
 import {
@@ -35,7 +35,7 @@ export default function OrganizationEngagements({ organizationId }: { organizati
 
   const saveEngagement = async () => {
     setWriteError(null);
-    const { error } = await supabase.from('service_engagements').insert({
+    const { data, error } = await supabase.from('service_engagements').insert({
       organization_id: organizationId,
       engagement_type: engForm.engagement_type,
       status: engForm.status,
@@ -43,9 +43,13 @@ export default function OrganizationEngagements({ organizationId }: { organizati
       notes: engForm.notes,
       next_follow_up_at: engForm.next_follow_up_at || null,
       started_at: engForm.status === 'active' ? new Date().toISOString() : null,
-    });
+    }).select('id');
     if (error) {
       setWriteError(captureError(error, { where: 'OrganizationEngagements.save' }));
+      return;
+    }
+    if (!data?.length) {
+      setWriteError(captureEmptyMutation('OrganizationEngagements.save.empty'));
       return;
     }
     const { error: logError } = await supabase.from('activity_log').insert({
@@ -61,12 +65,16 @@ export default function OrganizationEngagements({ organizationId }: { organizati
 
   const saveTask = async () => {
     setWriteError(null);
-    const { error } = await supabase.from('staff_tasks').insert({
+    const { data, error } = await supabase.from('staff_tasks').insert({
       organization_id: organizationId,
       ...taskForm,
-    });
+    }).select('id');
     if (error) {
       setWriteError(captureError(error, { where: 'OrganizationEngagements.saveTask' }));
+      return;
+    }
+    if (!data?.length) {
+      setWriteError(captureEmptyMutation('OrganizationEngagements.saveTask.empty'));
       return;
     }
     setShowTask(false);
@@ -123,7 +131,7 @@ export default function OrganizationEngagements({ organizationId }: { organizati
           </div>
         )}
         <div className="divide-y divide-ink-100">
-          {loading ? (
+          {loading && engagements.length === 0 ? (
             <p className="px-4 py-4 font-mono text-2xs text-ink-400">Loading…</p>
           ) : error && engagements.length === 0 ? (
             <p className="px-4 py-6 text-sm text-accent text-center">Could not load engagements.</p>
@@ -177,7 +185,7 @@ export default function OrganizationEngagements({ organizationId }: { organizati
           </div>
         )}
         <div className="divide-y divide-ink-100">
-          {tasksLoading ? (
+          {tasksLoading && tasks.length === 0 ? (
             <p className="px-4 py-4 font-mono text-2xs text-ink-400">Loading…</p>
           ) : tasksError && tasks.length === 0 ? (
             <p className="px-4 py-6 text-sm text-accent text-center">Could not load tasks.</p>

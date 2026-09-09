@@ -74,7 +74,7 @@ function ago(iso: string): string {
 }
 
 export default function Dashboard() {
-  const { stats, loading, error, websitePct, monitorPct } = useCrmDashboardStats();
+  const { stats, loading, error, ready, websitePct, monitorPct } = useCrmDashboardStats();
   const counts = useCrmNavCounts();
   const { rows: recent, error: activityError } = useRecentActivity();
 
@@ -88,7 +88,7 @@ export default function Dashboard() {
     { key: 'incidents', count: stats?.incidents_open ?? 0, label: 'site down', verb: 'Check', to: '/monitoring', icon: AlertTriangle },
   ].filter((a) => a.count > 0);
 
-  const n = (v: number | undefined) => (loading || error || v === undefined ? '—' : v.toLocaleString());
+  const n = (v: number | undefined) => (!ready || v === undefined ? '—' : v.toLocaleString());
 
   return (
     <div className="page-shell">
@@ -114,9 +114,9 @@ export default function Dashboard() {
           <div className="card-brutal p-5 flex items-center gap-3">
             <CheckCircle2 size={20} className="text-teal shrink-0" />
             <p className="text-sm">
-              {loading
+              {loading && !ready
                 ? 'Checking…'
-                : error || counts.error
+                : error || counts.error || !ready
                   ? 'Queue counts could not be loaded.'
                   : 'Nothing is waiting. Everything in the queues is clear.'}
             </p>
@@ -191,8 +191,8 @@ export default function Dashboard() {
       <section className="mb-8">
         <h2 className="label-brutal mb-2">Registry coverage</h2>
         <div className="responsive-grid">
-          <MetricCard label="Listed with a website" value={loading || error ? '—' : `${websitePct}%`} />
-          <MetricCard label="Monitors reporting up" value={loading || error ? '—' : `${monitorPct}%`} />
+          <MetricCard label="Listed with a website" value={!ready ? '—' : `${websitePct}%`} />
+          <MetricCard label="Monitors reporting up" value={!ready ? '—' : `${monitorPct}%`} />
           <MetricCard label="Without a website" value={n(stats?.listed_without_website)} />
           <MetricCard label="In NZ registry" value={n(stats?.nz_registry)} />
         </div>

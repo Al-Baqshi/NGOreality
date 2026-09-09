@@ -416,7 +416,7 @@ export default function ScheduledOutreach() {
       <section className="card-brutal overflow-hidden">
         <div className="border-b-2 border-gold bg-ink-950 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-mono text-2xs uppercase tracking-wider text-gold">
-            2. Approve held · {heldTotal.toLocaleString()} waiting
+            2. Approve held · {error && held.length === 0 ? '—' : heldTotal.toLocaleString()} waiting
           </h2>
           <div className="flex flex-wrap gap-2">
             <button
@@ -446,11 +446,11 @@ export default function ScheduledOutreach() {
           </div>
         </div>
 
-        {loading ? (
+        {loading && held.length === 0 ? (
           <p className="p-6 font-mono text-2xs text-ink-400 flex items-center gap-2">
             <Loader2 size={14} className="animate-spin" /> Loading held queue…
           </p>
-        ) : held.length === 0 ? (
+        ) : held.length === 0 && error ? null : held.length === 0 ? (
           <p className="p-6 text-sm text-ink-500">No held emails. Stage a batch above.</p>
         ) : (
           <div className="overflow-x-auto">

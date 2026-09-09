@@ -1,6 +1,6 @@
 import { useInquiries } from '../../hooks/useSupabase';
 import { supabase } from '../../lib/supabase';
-import { captureError } from '../../lib/errorReporting';
+import { captureEmptyMutation, captureError } from '../../lib/errorReporting';
 import { useState } from 'react';
 import { SectionHeader, EmptyState, FormField, Modal, QueryError } from '../../components/ui';
 import { Mail, Clock, CheckCircle, XCircle } from 'lucide-react';
@@ -28,12 +28,17 @@ export default function Inquiries() {
 
   const handleStatusChange = async (id: string, newStatus: InquirySubmission['status']) => {
     setActionError(null);
-    const { error: updateError } = await supabase
+    const { data, error: updateError } = await supabase
       .from('inquiry_submissions')
       .update({ status: newStatus })
-      .eq('id', id);
+      .eq('id', id)
+      .select('id');
     if (updateError) {
       setActionError(captureError(updateError, { where: 'Inquiries.statusChange' }));
+      return;
+    }
+    if (!data?.length) {
+      setActionError(captureEmptyMutation('Inquiries.statusChange.empty'));
       return;
     }
     refetch();

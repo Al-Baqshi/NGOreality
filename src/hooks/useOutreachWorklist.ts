@@ -59,6 +59,10 @@ export interface OutreachFilters {
 
 export const OUTREACH_PAGE_SIZE = 50;
 
+function throwRpc(error: unknown, where: string): never {
+  throw new Error(captureError(error, { where }));
+}
+
 /**
  * Segment sizes for the tab badges. Deliberately a separate call from the page:
  * the counts change rarely and re-running them on every page turn would put a
@@ -78,10 +82,15 @@ export function useOutreachSegmentCounts(refreshKey = 0) {
         if (cancelled) return;
         if (error) {
           setError(captureError(error, { where: 'useOutreachSegmentCounts' }));
-          setCounts(null);
-        } else {
+        } else if (data && typeof data === 'object') {
           setCounts(data as OutreachSegmentCounts);
           setError(null);
+        } else {
+          setError(
+            captureError(new Error('Segment counts response was empty'), {
+              where: 'useOutreachSegmentCounts.empty',
+            }),
+          );
         }
         setLoading(false);
       });
@@ -117,8 +126,6 @@ export function useOutreachLeads(filters: OutreachFilters, page: number, refresh
         if (cancelled) return;
         if (error) {
           setError(captureError(error, { where: 'useOutreachLeads' }));
-          setLeads([]);
-          setTotal(0);
         } else {
           const rows = (data ?? []) as (OutreachLead & { total_count: number })[];
           setLeads(rows.map(({ total_count: _ignored, ...lead }) => lead));
@@ -161,7 +168,7 @@ export async function bulkSetOutreachByFilter(
     p_q: filters.q || null,
     p_exclude: excludedIds,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwRpc(error, 'bulkSetOutreachByFilter');
   return data as BulkResult;
 }
 
@@ -181,7 +188,7 @@ export async function bulkSetOutreachByIds(
     p_new_status: newStatus,
     p_ids: ids,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwRpc(error, 'bulkSetOutreachByIds');
   return data as BulkResult;
 }
 
@@ -222,7 +229,7 @@ export async function enqueueOutreachEmailsByFilter(
     p_max: options?.max ?? 25000,
     p_status: options?.held ? 'held' : 'pending',
   });
-  if (error) throw new Error(error.message);
+  if (error) throwRpc(error, 'enqueueOutreachEmailsByFilter');
   return data as EnqueueEmailResult;
 }
 
@@ -256,7 +263,7 @@ export async function enqueueOutreachEmailsByIds(
     p_max: options?.max ?? ids.length,
     p_status: options?.held ? 'held' : 'pending',
   });
-  if (error) throw new Error(error.message);
+  if (error) throwRpc(error, 'enqueueOutreachEmailsByIds');
   return data as EnqueueEmailResult;
 }
 
@@ -268,7 +275,10 @@ export type HeldOutreachSummary = {
 
 export async function fetchHeldOutreachSummary(): Promise<HeldOutreachSummary> {
   const { data, error } = await supabase.rpc('outreach_held_summary');
-  if (error) throw new Error(error.message);
+  if (error) throwRpc(error, 'fetchHeldOutreachSummary');
+  if (!data || typeof data !== 'object') {
+    throwRpc(new Error('Held outreach summary was empty'), 'fetchHeldOutreachSummary.empty');
+  }
   const row = data as HeldOutreachSummary;
   return {
     held: Number(row?.held ?? 0),
@@ -285,7 +295,7 @@ export async function releaseHeldOutreachEmails(options?: {
     p_limit: options?.limit ?? 100,
     p_ids: options?.ids ?? null,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwRpc(error, 'releaseHeldOutreachEmails');
   const row = data as { released: number; cap: number };
   return { released: Number(row?.released ?? 0), cap: Number(row?.cap ?? 0) };
 }
@@ -298,7 +308,7 @@ export async function cancelHeldOutreachEmails(options?: {
     p_ids: options?.ids ?? null,
     p_limit: options?.limit ?? 25000,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwRpc(error, 'cancelHeldOutreachEmails');
   const row = data as { cancelled: number };
   return { cancelled: Number(row?.cancelled ?? 0) };
 }

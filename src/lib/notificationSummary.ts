@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { captureError } from './errorReporting';
 
 export type NotificationSummaryCounts = {
   pending: number;
@@ -24,7 +25,7 @@ async function countStatus(status: string): Promise<number> {
     .select('*', { count: 'exact', head: true })
     .eq('status', status)
     .gte('created_at', since);
-  if (error) throw error;
+  if (error) throw new Error(captureError(error, { where: 'fetchNotificationSummaryFromDb' }));
   return count ?? 0;
 }
 

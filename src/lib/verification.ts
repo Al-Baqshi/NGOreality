@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { captureError } from './errorReporting';
+import { captureEmptyMutation, captureError } from './errorReporting';
 import { allPublicCriteriaPass } from './criteria';
 import { issueBadgeIfEligible } from './membershipBenefits';
 import { queueAndTrySend } from './notifications';
@@ -24,12 +24,16 @@ export async function updateCriterionStatuses(
       supabase
         .from('verification_criteria')
         .update({ status, evaluated_at: evaluatedAt })
-        .eq('id', id),
+        .eq('id', id)
+        .select('id'),
     ),
   );
   const failed = results.find((r) => r.error);
   if (failed?.error) {
     return { error: captureError(failed.error, { where: 'updateCriterionStatuses' }) };
+  }
+  if (results.some((r) => !r.data?.length)) {
+    return { error: captureEmptyMutation('updateCriterionStatuses.empty') };
   }
   return { error: null };
 }
@@ -68,9 +72,20 @@ export async function tryAutoVerifyOrganization(
   }
 
   if (Object.keys(updates).length > 1) {
-    const { error } = await supabase.from('organizations').update(updates).eq('id', organizationId);
+    const { data, error } = await supabase.from('organizations').update(updates).eq('id', organizationId).select('id');
     if (error) {
-      return { verified: false, badgeIssued: false, message: error.message };
+      return {
+        verified: false,
+        badgeIssued: false,
+        message: captureError(error, { where: 'tryAutoVerifyOrganization.update' }),
+      };
+    }
+    if (!data?.length) {
+      return {
+        verified: false,
+        badgeIssued: false,
+        message: captureEmptyMutation('tryAutoVerifyOrganization.updateEmpty'),
+      };
     }
     const { error: logError } = await supabase.from('activity_log').insert({
       organization_id: organizationId,
@@ -118,7 +133,9 @@ export async function tryAutoVerifyOrganization(
     return {
       verified: true,
       badgeIssued: false,
-      message: 'Standards met and membership active, but organization could not be reloaded for badge issue.',
+      message: captureError(new Error('Organization could not be reloaded for badge issue'), {
+        where: 'tryAutoVerifyOrganization.orgMissing',
+      }),
     };
   }
 

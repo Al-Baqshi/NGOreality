@@ -108,8 +108,8 @@ export default function NewLeadDialog({
           `${slugify(form.name)}-${Math.random().toString(36).slice(2, 7)}`,
         ));
       }
-      if (insertError) throw new Error(insertError.message);
-      if (!data) throw new Error('The lead was not created.');
+      if (insertError) throw new Error(captureError(insertError, { where: 'NewLeadDialog.insert' }));
+      if (!data) throw new Error(captureError(new Error('The lead was not created.'), { where: 'NewLeadDialog.empty' }));
 
       const { error: logError } = await supabase.from('activity_log').insert({
         organization_id: data.id,
@@ -122,7 +122,7 @@ export default function NewLeadDialog({
       onCreated(data.id);
       onClose();
     } catch (err) {
-      setError(captureError(err, { where: 'NewLeadDialog.create' }));
+      setError(err instanceof Error ? err.message : captureError(err, { where: 'NewLeadDialog.create' }));
     } finally {
       setBusy(false);
     }

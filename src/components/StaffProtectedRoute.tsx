@@ -6,7 +6,7 @@ export default function StaffProtectedRoute() {
   const { user, isStaff, loading, profileLoading, profileError, refetchProfile } = useAuth();
   const location = useLocation();
 
-  if (loading || profileLoading) {
+  if (loading || (profileLoading && !isStaff && !profileError)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface">
         <p className="font-mono text-xs uppercase tracking-wider text-ink-500">Loading…</p>

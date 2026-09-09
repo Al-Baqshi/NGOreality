@@ -8,7 +8,7 @@ import {
 } from '../config/pricing';
 import { LANDING_STANDARDS_PACKAGE_CENTS } from '../config/customerProducts';
 import { activateMembershipBenefits, isMembershipProduct } from './membershipBenefits';
-import { captureError } from './errorReporting';
+import { captureEmptyMutation, captureError } from './errorReporting';
 import type { OrganizationPayment, PaymentProductType, PaymentStatus } from '../types';
 
 export function paymentReferenceFromOrgId(orgId: string): string {
@@ -26,17 +26,27 @@ export async function ensurePaymentReference(orgId: string): Promise<string> {
     throw new Error(captureError(readError, { where: 'ensurePaymentReference.read' }));
   }
   if (!org) {
-    throw new Error('Organisation not found — cannot allocate a payment reference.');
+    throw new Error(
+      captureError(new Error('Organisation not found — cannot allocate a payment reference.'), {
+        where: 'ensurePaymentReference.missing',
+      }),
+    );
   }
   if (org.payment_reference) return org.payment_reference;
 
   const reference = paymentReferenceFromOrgId(orgId);
-  const { error: writeError } = await supabase
+  const { data: written, error: writeError } = await supabase
     .from('organizations')
     .update({ payment_reference: reference, updated_at: new Date().toISOString() })
-    .eq('id', orgId);
+    .eq('id', orgId)
+    .select('id');
   if (writeError) {
     throw new Error(captureError(writeError, { where: 'ensurePaymentReference.write' }));
+  }
+  if (!written?.length) {
+    throw new Error(
+      captureEmptyMutation('ensurePaymentReference.writeEmpty', 'Payment reference could not be saved.'),
+    );
   }
 
   return reference;
@@ -241,7 +251,11 @@ export async function createPendingBankPayment(input: {
     p_notes: input.notes ?? '',
   });
 
-  if (!rpcError && rpcRow) {
+  const rpcMissing =
+    Boolean(rpcError) &&
+    /could not find|schema cache|function .* does not exist/i.test(rpcError!.message);
+
+  if (!rpcError) {
     const payment = (Array.isArray(rpcRow) ? rpcRow[0] : rpcRow) as OrganizationPayment | undefined;
     if (payment?.id) {
       try {
@@ -257,14 +271,20 @@ export async function createPendingBankPayment(input: {
         };
       }
     }
-  }
-
-  if (rpcError && !/could not find|schema cache|function .* does not exist/i.test(rpcError.message)) {
-    captureError(rpcError, { where: 'createPendingBankPayment.rpc' });
     return {
       payment: null,
       reference: '',
-      error: rpcError.message,
+      error: captureError(new Error('Payment request returned no record. Refresh before requesting again.'), {
+        where: 'createPendingBankPayment.rpcEmpty',
+      }),
+    };
+  }
+
+  if (!rpcMissing) {
+    return {
+      payment: null,
+      reference: '',
+      error: captureError(rpcError, { where: 'createPendingBankPayment.rpc' }),
     };
   }
 

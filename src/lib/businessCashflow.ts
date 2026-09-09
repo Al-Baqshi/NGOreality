@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { captureEmptyMutation, captureError } from './errorReporting';
 import {
   buildAucklandForecastMonths,
   forecastExpectedForLine,
@@ -99,11 +100,10 @@ export function explainSchemaError(message: string): string | null {
   return null;
 }
 
-export function throwIfSchemaError(error: { message?: string }): void {
-  const msg = error.message ?? '';
-  const hint = explainSchemaError(msg);
-  if (hint) throw new Error(hint);
-  throw error;
+export function throwIfSchemaError(error: { message?: string }, where = 'cashflow'): void {
+  const hint = explainSchemaError(error.message ?? '');
+  const logged = captureError(error, { where });
+  throw new Error(hint ?? logged);
 }
 
 export async function fetchCashflowLines(periods: string[]): Promise<BusinessCashflowLine[]> {
@@ -112,7 +112,7 @@ export async function fetchCashflowLines(periods: string[]): Promise<BusinessCas
     .from('business_cashflow_lines')
     .select('*')
     .in('period', periods);
-  if (error) throwIfSchemaError(error);
+  if (error) throwIfSchemaError(error, 'fetchCashflowLines');
   return (data ?? []) as BusinessCashflowLine[];
 }
 
@@ -336,7 +336,7 @@ export async function upsertCashflowLine(input: {
   actual_cents: number;
   notes?: string;
 }): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('business_cashflow_lines').upsert(
+  const { data, error } = await supabase.from('business_cashflow_lines').upsert(
     {
       period: input.period,
       line_key: input.def.key,
@@ -348,10 +348,14 @@ export async function upsertCashflowLine(input: {
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'period,line_key' },
-  );
+  ).select('period');
   if (error) {
     const hint = explainSchemaError(error.message ?? '');
-    return { error: hint ?? error.message ?? 'Save failed' };
+    const msg = captureError(error, { where: 'upsertCashflowLine' });
+    return { error: hint ?? msg };
+  }
+  if (!data?.length) {
+    return { error: captureEmptyMutation('upsertCashflowLine.empty') };
   }
   return { error: null };
 }
@@ -418,7 +422,7 @@ export async function applyLinkedCashflowForecast(
     const unitGrid = buildUnitGrid(periods, units);
     return syncDerivedLinesFromUnitGrid(periods, unitGrid);
   } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Could not load cashflow units' };
+    return { error: captureError(err, { where: 'applyLinkedCashflowForecast.units' }) };
   }
 }
 

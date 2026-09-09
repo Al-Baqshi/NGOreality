@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle, Globe, Phone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { captureError } from '../../lib/errorReporting';
+import { captureEmptyMutation, captureError } from '../../lib/errorReporting';
 import {
   getProfileCompletionItems,
   profileCompletionPercent,
@@ -324,7 +324,7 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
       : '';
     const logo = profileForm.logo_url.trim() ? normalizeUrl(profileForm.logo_url) : '';
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('organizations')
       .update({
         mission_statement: profileForm.mission_statement.trim(),
@@ -338,11 +338,16 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
         location: fullLocation,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', organization.id);
+      .eq('id', organization.id)
+      .select('id');
 
     setProfileSaving(false);
     if (error) {
       setSaveError(captureError(error, { where: 'NgoProfilePanel.save' }));
+      return;
+    }
+    if (!data?.length) {
+      setSaveError(captureEmptyMutation('NgoProfilePanel.save.empty'));
       return;
     }
     setProfileMessage('Profile saved.');

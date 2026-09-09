@@ -69,6 +69,7 @@ export function useCrmDashboardStats() {
   const [stats, setStats] = useState<CrmDashboardStats>(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   const refetch = useCallback(async () => {
     setLoading(true);
@@ -81,6 +82,7 @@ export function useCrmDashboardStats() {
     }
     if (data && typeof data === 'object') {
       setStats({ ...EMPTY_STATS, ...(data as CrmDashboardStats) });
+      setReady(true);
     } else {
       setError(captureError(new Error('Dashboard stats response was empty'), { where: 'useCrmDashboardStats.empty' }));
     }
@@ -101,7 +103,7 @@ export function useCrmDashboardStats() {
       ? Math.round((stats.monitors_up / stats.monitors_total) * 100)
       : 0;
 
-  return { stats, loading, error, refetch, websitePct, monitorPct };
+  return { stats, loading, error, ready, refetch, websitePct, monitorPct };
 }
 
 export type OrganizationsPageFilters = {
@@ -200,8 +202,6 @@ export function useOrganizationsPage(
     const { data, error: queryError, count } = await query.range(from, to);
     if (queryError) {
       setError(captureError(queryError, { where: 'useOrganizationsPage' }));
-      setOrganizations([]);
-      setTotalCount(0);
     } else {
       setOrganizations(data ?? []);
       setTotalCount(count ?? 0);
@@ -454,7 +454,6 @@ export function useExpiringBadges(mode: 'expiring' | 'expired') {
     query.then(({ data, error: queryError }) => {
       if (queryError) {
         setError(captureError(queryError, { where: 'useExpiringBadges' }));
-        setRows([]);
       } else {
         setRows((data ?? []) as typeof rows);
       }

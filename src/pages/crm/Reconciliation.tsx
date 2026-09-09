@@ -160,7 +160,7 @@ export default function Reconciliation() {
           </h2>
         </div>
 
-        {loading ? (
+        {loading && pending.length === 0 ? (
           <p className="p-8 text-center text-sm text-ink-400">Loading…</p>
         ) : listError && pending.length === 0 ? (
           <p className="p-8 text-center text-sm text-accent">Could not load pending payments.</p>

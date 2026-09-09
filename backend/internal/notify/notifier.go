@@ -48,7 +48,9 @@ func (n *Notifier) ProcessPending(ctx context.Context, st *store.Store, batchSiz
 
 	for _, e := range events {
 		if err := n.resend.Send(ctx, e.RecipientEmail, e.Subject, e.BodyText); err != nil {
-			_ = st.MarkNotificationFailed(ctx, e.ID, err.Error())
+			if markErr := st.MarkNotificationFailed(ctx, e.ID, err.Error()); markErr != nil {
+				n.log.Error("mark notification failed", "id", e.ID, "send_err", err, "err", markErr)
+			}
 			result.Failed++
 			n.log.Warn("notification send failed", "id", e.ID, "template", e.Template, "err", err)
 			continue

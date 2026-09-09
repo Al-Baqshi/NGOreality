@@ -73,7 +73,7 @@ export default function OutreachSendPanel({
       if (result.skippedNoEmail) parts.push(`${result.skippedNoEmail} skipped (no email)`);
       if (result.errors.length) parts.push(result.errors.slice(0, 2).join('; '));
       onMessage(parts.join(' · '));
-      onSent();
+      if (result.queued > 0) onSent();
     } catch (err) {
       onMessage(captureError(err, { where: 'OutreachSendPanel.queue' }));
     } finally {
@@ -100,12 +100,22 @@ export default function OutreachSendPanel({
         bodyDraft: body,
       });
 
-      const parts = [`Sent ${result.queued}`];
+      const parts: string[] = [];
+      if (result.flushError) {
+        parts.push(
+          result.queued > 0
+            ? `Queued ${result.queued} but delivery failed: ${result.flushError}`
+            : result.flushError,
+        );
+      } else if (result.queued > 0) {
+        parts.push(`Sent ${result.queued}`);
+      } else {
+        parts.push('Nothing was sent');
+      }
       if (result.skippedNoEmail) parts.push(`${result.skippedNoEmail} skipped (no email)`);
       if (result.errors.length) parts.push(result.errors.slice(0, 2).join('; '));
-      if (result.flushError) parts.push(`Flush: ${result.flushError}`);
       onMessage(parts.join(' · '));
-      onSent();
+      if (result.queued > 0) onSent();
     } catch (err) {
       onMessage(captureError(err, { where: 'OutreachSendPanel.sendNow' }));
     } finally {

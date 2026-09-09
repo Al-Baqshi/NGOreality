@@ -6,7 +6,7 @@ import { QueryError } from '../ui';
 export default function NgoPortalGate() {
   const portal = useNgoPortalGate();
 
-  if (portal.loading) {
+  if (portal.loading && !portal.hasOrganization && !portal.isLinked && !portal.error) {
     return (
       <p className="font-mono text-xs uppercase tracking-wider text-ink-500 text-center py-16">
         Loading your portal…

@@ -238,9 +238,14 @@ export default function OrganizationPayments({
       </div>
 
       <div className="divide-y divide-ink-100">
-        {loading ? (
+        {error && payments.length > 0 ? (
+          <div className="p-4 border-b border-accent">
+            <QueryError message={error} onRetry={refetch} />
+          </div>
+        ) : null}
+        {loading && payments.length === 0 ? (
           <p className="p-4 font-mono text-2xs text-ink-400">Loading payments…</p>
-        ) : error ? (
+        ) : error && payments.length === 0 ? (
           <div className="p-4">
             <QueryError message={error} onRetry={refetch} />
           </div>

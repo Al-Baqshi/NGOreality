@@ -10,22 +10,27 @@ import {
 } from '../../types';
 import { Calendar, Award, AlertTriangle, Phone, CheckCircle2, Sparkles } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { captureError } from '../../lib/errorReporting';
+import { captureEmptyMutation, captureError } from '../../lib/errorReporting';
 
 export default function WorkQueue() {
-  const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useCrmDashboardStats();
+  const { stats, error: statsError, ready: statsReady, refetch: refetchStats } = useCrmDashboardStats();
   const { followUps, tasks, badgeRequests, setupRequests, incidents, followUpsError, tasksError, badgeRequestsError, setupRequestsError, incidentsError, loading, error, refetch } = useWorkQueue();
 
   const [taskError, setTaskError] = useState<string | null>(null);
 
   const completeTask = async (taskId: string) => {
     setTaskError(null);
-    const { error: updateError } = await supabase
+    const { data, error: updateError } = await supabase
       .from('staff_tasks')
       .update({ status: 'done', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq('id', taskId);
+      .eq('id', taskId)
+      .select('id');
     if (updateError) {
       setTaskError(captureError(updateError, { where: 'WorkQueue.completeTask' }));
+      return;
+    }
+    if (!data?.length) {
+      setTaskError(captureEmptyMutation('WorkQueue.completeTask.empty'));
       return;
     }
     refetch();
@@ -40,23 +45,23 @@ export default function WorkQueue() {
 
       <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3 mb-8 lg:grid-cols-4">
         <div className="card-brutal p-4 text-center">
-          <div className="text-2xl font-black">{statsLoading || statsError ? '—' : stats.outreach_due}</div>
+          <div className="text-2xl font-black">{!statsReady ? '—' : stats.outreach_due}</div>
           <div className="label-brutal mt-1">Outreach due</div>
         </div>
         <div className="card-brutal p-4 text-center">
-          <div className="text-2xl font-black">{statsLoading || statsError ? '—' : stats.follow_ups_due}</div>
+          <div className="text-2xl font-black">{!statsReady ? '—' : stats.follow_ups_due}</div>
           <div className="label-brutal mt-1">Follow-ups</div>
         </div>
         <div className="card-brutal p-4 text-center">
-          <div className="text-2xl font-black">{statsLoading || statsError ? '—' : stats.badge_requests_pending}</div>
+          <div className="text-2xl font-black">{!statsReady ? '—' : stats.badge_requests_pending}</div>
           <div className="label-brutal mt-1">Badge requests</div>
         </div>
         <div className="card-brutal p-4 text-center">
-          <div className="text-2xl font-black">{statsLoading || statsError ? '—' : stats.ngo_setup_requests_pending ?? 0}</div>
+          <div className="text-2xl font-black">{!statsReady ? '—' : stats.ngo_setup_requests_pending ?? 0}</div>
           <div className="label-brutal mt-1">NGO setup</div>
         </div>
         <div className="card-brutal p-4 text-center">
-          <div className="text-2xl font-black text-accent">{statsLoading || statsError ? '—' : stats.incidents_open}</div>
+          <div className="text-2xl font-black text-accent">{!statsReady ? '—' : stats.incidents_open}</div>
           <div className="label-brutal mt-1">Sites down</div>
         </div>
       </div>
@@ -65,7 +70,12 @@ export default function WorkQueue() {
       {error && <QueryError message={error} onRetry={refetch} />}
       {taskError && <QueryError message={taskError} />}
 
-      {loading ? (
+      {loading &&
+      followUps.length === 0 &&
+      tasks.length === 0 &&
+      badgeRequests.length === 0 &&
+      setupRequests.length === 0 &&
+      incidents.length === 0 ? (
         <p className="font-mono text-sm text-ink-400">Loading queue…</p>
       ) : (
         <div className="space-y-8">

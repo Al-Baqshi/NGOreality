@@ -80,6 +80,9 @@ function SandboxPaymentTester() {
       window.open(result.payment_url, '_blank', 'noopener,noreferrer');
     } catch (err) {
       if (err instanceof CrmApiError) {
+        if (err.status !== 403) {
+          captureError(err, { where: 'Pricing.sandboxPayment', detail: { status: err.status } });
+        }
         setError(
           err.status === 403
             ? 'Refused: PAYMARK_ENV is not "sandbox". This button never touches production.'
@@ -90,8 +93,7 @@ function SandboxPaymentTester() {
                 : err.message,
         );
       } else {
-        setError(err instanceof Error ? err.message : 'Could not start the payment.');
-        captureError(err, { where: 'Pricing.sandboxPayment' });
+        setError(captureError(err, { where: 'Pricing.sandboxPayment' }));
       }
     } finally {
       setBusy(false);

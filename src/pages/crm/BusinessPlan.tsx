@@ -12,6 +12,7 @@ import {
 import { MSD_FLEXIWAGE_CHECKLIST } from '../../config/businessPlanRef';
 import { MSD_CHECKLIST_ANSWERS } from '../../config/businessPlanNarrative';
 import { downloadElementAsPdf } from '../../lib/businessPlanPdf';
+import { captureError } from '../../lib/errorReporting';
 
 const MSD_REVIEW_KEY = 'ngoreality_msd_reviewed_v1';
 
@@ -44,7 +45,7 @@ export default function BusinessPlan() {
       const date = new Date().toISOString().slice(0, 10);
       await downloadElementAsPdf(el, `NGOreality-business-plan-${date}.pdf`);
     } catch (err) {
-      setPdfError(err instanceof Error ? err.message : 'PDF export failed');
+      setPdfError(captureError(err, { where: 'BusinessPlan.pdfExport' }));
     } finally {
       setPdfLoading(false);
     }

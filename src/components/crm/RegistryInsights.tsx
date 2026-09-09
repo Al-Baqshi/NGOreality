@@ -44,7 +44,12 @@ export default function RegistryInsights({
       if (cancelled) return;
       if (rpcError) {
         setError(captureError(rpcError, { where: 'RegistryInsights' }));
-        setStats(null);
+      } else if (!data || typeof data !== 'object') {
+        setError(
+          captureError(new Error('Registry insights response was empty'), {
+            where: 'RegistryInsights.empty',
+          }),
+        );
       } else {
         setStats(data as RegistryReadinessStats);
       }
@@ -55,13 +60,13 @@ export default function RegistryInsights({
     };
   }, [country]);
 
-  if (loading) {
+  if (loading && !stats) {
     return (
       <p className="font-mono text-2xs text-ink-400 py-4">Loading registry insights…</p>
     );
   }
 
-  if (error) {
+  if (error && !stats) {
     return (
       <p className="text-xs text-accent border-2 border-accent px-3 py-2">
         Registry insights unavailable: {error}. Apply migration 018.
@@ -75,6 +80,11 @@ export default function RegistryInsights({
 
   return (
     <div className="space-y-4">
+      {error ? (
+        <p className="text-xs text-accent border-2 border-accent px-3 py-2">
+          Registry insights could not be refreshed. Showing the last loaded numbers.
+        </p>
+      ) : null}
       <p className="text-xs text-ink-500 leading-relaxed">
         Passive monitoring runs on listed {country} charities (weekly checks) for outreach. Use these
         numbers in calls: who has no site, whose site is down, and who already meets public trust standards.

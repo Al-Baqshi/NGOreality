@@ -14,7 +14,7 @@ export default function NgoSignup() {
   const prefillOrgId = searchParams.get('org');
   const loggedIn = Boolean(user);
 
-  if (authLoading || (loggedIn && portalLoading)) {
+  if (authLoading || (loggedIn && portalLoading && !hasOrganization && !error && !isLinked)) {
     return (
       <>
         <SEO

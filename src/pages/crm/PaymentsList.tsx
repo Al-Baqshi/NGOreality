@@ -83,6 +83,8 @@ export default function PaymentsList() {
     };
   }, [payments]);
 
+  const ledgerUnknown = Boolean(error) && payments.length === 0;
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
@@ -133,19 +135,19 @@ export default function PaymentsList() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <MetricCard
           label="Paid"
-          value={loading || error ? '—' : formatMoney(summary.paidCents, summary.currency)}
-          sub={error ? 'Could not load' : loading ? 'Loading…' : `${summary.paidCount} recorded`}
-          currency={!error && !loading}
+          value={ledgerUnknown || (loading && payments.length === 0) ? '—' : formatMoney(summary.paidCents, summary.currency)}
+          sub={ledgerUnknown ? 'Could not load' : loading && payments.length === 0 ? 'Loading…' : `${summary.paidCount} recorded`}
+          currency={!ledgerUnknown && !(loading && payments.length === 0)}
           compact
           accent
         />
         <MetricCard
           label="Awaiting bank"
-          value={loading || error ? '—' : summary.pendingCount}
+          value={ledgerUnknown || (loading && payments.length === 0) ? '—' : summary.pendingCount}
           sub={
-            error
+            ledgerUnknown
               ? 'Could not load'
-              : loading
+              : loading && payments.length === 0
                 ? 'Loading…'
                 : summary.pendingCount
                   ? `${formatMoney(summary.pendingCents, summary.currency)} outstanding`
@@ -229,9 +231,14 @@ export default function PaymentsList() {
             {copyError}
           </p>
         ) : null}
-        {loading ? (
+        {error && payments.length > 0 ? (
+          <div className="p-4 border-b border-accent">
+            <QueryError message={error} onRetry={refetch} />
+          </div>
+        ) : null}
+        {loading && payments.length === 0 ? (
           <p className="p-8 text-center text-sm text-ink-400">Loading…</p>
-        ) : error ? (
+        ) : error && payments.length === 0 ? (
           <div className="p-4">
             <QueryError message={error} onRetry={refetch} />
           </div>

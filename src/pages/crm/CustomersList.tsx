@@ -59,15 +59,20 @@ export default function CustomersList() {
           <Copy size={16} /> {copied ? 'Copied!' : `Copy emails on this page (${emails.length})`}
         </button>
         <p className="font-mono text-2xs text-ink-400 self-center">
-          Full customer count: {loading ? '…' : error ? '—' : totalCount.toLocaleString()}
+          Full customer count: {loading && organizations.length === 0 ? '…' : error && organizations.length === 0 ? '—' : totalCount.toLocaleString()}
         </p>
       </div>
       {copyError && <QueryError message={copyError} />}
 
       <div className="card-brutal overflow-hidden">
-        {loading ? (
+        {error && organizations.length > 0 ? (
+          <div className="p-4 border-b border-accent">
+            <QueryError message={error} onRetry={refetch} />
+          </div>
+        ) : null}
+        {loading && organizations.length === 0 ? (
           <p className="p-8 text-center text-sm text-ink-400">Loading…</p>
-        ) : error ? (
+        ) : error && organizations.length === 0 ? (
           <div className="p-4">
             <QueryError message={error} onRetry={refetch} />
           </div>

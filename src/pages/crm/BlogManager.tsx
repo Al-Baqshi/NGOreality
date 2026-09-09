@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { captureError } from '../../lib/errorReporting';
+import { captureEmptyMutation, captureError } from '../../lib/errorReporting';
 import type { BlogPost } from '../../types';
 import { FileText, Plus, Pencil, Trash2, Eye, EyeOff, Search, Calendar, User } from 'lucide-react';
 import { QueryError } from '../../components/ui';
@@ -53,9 +53,13 @@ export default function BlogManager() {
     });
     if (!ok) return;
     setError(null);
-    const { error: deleteError } = await supabase.from('blog_posts').delete().eq('id', id);
+    const { data, error: deleteError } = await supabase.from('blog_posts').delete().eq('id', id).select('id');
     if (deleteError) {
       setError(captureError(deleteError, { where: 'BlogManager.delete' }));
+      return;
+    }
+    if (!data?.length) {
+      setError(captureEmptyMutation('BlogManager.delete.empty', 'The post was not deleted. Refresh and try again.'));
       return;
     }
     fetchPosts();
@@ -68,9 +72,13 @@ export default function BlogManager() {
       updates.published_at = new Date().toISOString();
     }
     setError(null);
-    const { error: updateError } = await supabase.from('blog_posts').update(updates).eq('id', post.id);
+    const { data, error: updateError } = await supabase.from('blog_posts').update(updates).eq('id', post.id).select('id');
     if (updateError) {
       setError(captureError(updateError, { where: 'BlogManager.togglePublish' }));
+      return;
+    }
+    if (!data?.length) {
+      setError(captureEmptyMutation('BlogManager.togglePublish.empty'));
       return;
     }
     fetchPosts();
@@ -80,8 +88,9 @@ export default function BlogManager() {
     setSaving(true);
     setError(null);
     let writeError: { message: string } | null = null;
+    let wrote = false;
     if (post.id) {
-      const { error: updateError } = await supabase.from('blog_posts').update({
+      const { data, error: updateError } = await supabase.from('blog_posts').update({
         title: post.title,
         slug: post.slug,
         excerpt: post.excerpt,
@@ -90,10 +99,11 @@ export default function BlogManager() {
         author: post.author,
         status: post.status,
         updated_at: new Date().toISOString(),
-      }).eq('id', post.id);
+      }).eq('id', post.id).select('id');
       writeError = updateError;
+      wrote = Boolean(data?.length);
     } else {
-      const { error: insertError } = await supabase.from('blog_posts').insert({
+      const { data, error: insertError } = await supabase.from('blog_posts').insert({
         title: post.title,
         slug: post.slug,
         excerpt: post.excerpt || '',
@@ -101,12 +111,17 @@ export default function BlogManager() {
         featured_image_url: post.featured_image_url || '',
         author: post.author || '',
         status: post.status || 'draft',
-      });
+      }).select('id');
       writeError = insertError;
+      wrote = Boolean(data?.length);
     }
     setSaving(false);
     if (writeError) {
       setError(captureError(writeError, { where: 'BlogManager.save' }));
+      return;
+    }
+    if (!wrote) {
+      setError(captureEmptyMutation(post.id ? 'BlogManager.save.updateEmpty' : 'BlogManager.save.insertEmpty'));
       return;
     }
     setEditing(null);

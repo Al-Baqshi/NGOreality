@@ -4,7 +4,7 @@ import { SectionHeader, QueryError } from '../../components/ui';
 import { Activity, Globe } from 'lucide-react';
 
 export default function Monitoring() {
-  const { stats, loading, error: statsError, websitePct, monitorPct, refetch } = useCrmDashboardStats();
+  const { stats, error: statsError, ready: statsReady, websitePct, monitorPct, refetch } = useCrmDashboardStats();
   const { incidents, loading: incLoading, incidentsError, refetch: refetchIncidents } = useWorkQueue();
 
   return (
@@ -15,19 +15,19 @@ export default function Monitoring() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         <div className="card-brutal p-5 text-center">
-          <div className="text-3xl font-black">{loading || statsError ? '—' : `${websitePct}%`}</div>
+          <div className="text-3xl font-black">{!statsReady ? '—' : `${websitePct}%`}</div>
           <div className="label-brutal mt-1">Listed w/ website</div>
         </div>
         <div className="card-brutal p-5 text-center">
-          <div className="text-3xl font-black text-teal">{loading || statsError ? '—' : `${monitorPct}%`}</div>
+          <div className="text-3xl font-black text-teal">{!statsReady ? '—' : `${monitorPct}%`}</div>
           <div className="label-brutal mt-1">Monitors up</div>
         </div>
         <div className="card-brutal p-5 text-center">
-          <div className="text-3xl font-black text-accent">{loading || statsError ? '—' : stats.monitors_down}</div>
+          <div className="text-3xl font-black text-accent">{!statsReady ? '—' : stats.monitors_down}</div>
           <div className="label-brutal mt-1">Down now</div>
         </div>
         <div className="card-brutal p-5 text-center">
-          <div className="text-3xl font-black">{loading || statsError ? '—' : stats.incidents_open}</div>
+          <div className="text-3xl font-black">{!statsReady ? '—' : stats.incidents_open}</div>
           <div className="label-brutal mt-1">Open incidents</div>
         </div>
       </div>
@@ -41,7 +41,7 @@ export default function Monitoring() {
           <Activity size={14} />
           <h3 className="font-mono text-xs uppercase tracking-wider font-semibold">Open incidents</h3>
         </div>
-        {incLoading ? (
+        {incLoading && incidents.length === 0 ? (
           <p className="p-6 text-sm text-ink-400 text-center">Loading…</p>
         ) : incidentsError && incidents.length === 0 ? (
           <div className="p-4">

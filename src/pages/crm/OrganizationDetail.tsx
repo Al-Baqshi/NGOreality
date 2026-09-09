@@ -25,7 +25,7 @@ import { hasRegistryProvenance, OUTREACH_KANBAN_STATUSES } from '../../types';
 import OrgOriginChip from '../../components/crm/OrgOriginChip';
 import RegistryMatchCheck from '../../components/crm/RegistryMatchCheck';
 import { markRegisteredInbound, registerAsCustomer, setOutreachStatus } from '../../lib/crmOutreach';
-import { captureError } from '../../lib/errorReporting';
+import { captureEmptyMutation, captureError } from '../../lib/errorReporting';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { FINANCIAL_VERIFICATION_ENABLED } from '../../config/features';
 import FinancialComingSoon from '../../components/FinancialComingSoon';
@@ -71,11 +71,15 @@ export default function OrganizationDetail() {
   const handleSave = async () => {
     if (!editForm || !id) return;
     setActionError(null);
-    const { error } = await supabase.from('organizations').update({
+    const { data, error } = await supabase.from('organizations').update({
       ...editForm,
       updated_at: new Date().toISOString(),
-    }).eq('id', id);
+    }).eq('id', id).select('id');
     if (reportWrite(error, 'OrganizationDetail.save')) return;
+    if (!data?.length) {
+      setActionError(captureEmptyMutation('OrganizationDetail.save.empty'));
+      return;
+    }
     setEditing(false);
     await refetchOrganization();
   };
@@ -85,11 +89,16 @@ export default function OrganizationDetail() {
     setActionError(null);
     const { status, verification_level } = trustStageToFields(stage);
     const label = getTrustStageLabel(stage);
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('organizations')
       .update({ status, verification_level, updated_at: new Date().toISOString() })
-      .eq('id', id);
+      .eq('id', id)
+      .select('id');
     if (reportWrite(error, 'OrganizationDetail.trustStage')) return;
+    if (!data?.length) {
+      setActionError(captureEmptyMutation('OrganizationDetail.trustStage.empty'));
+      return;
+    }
     const { error: logError } = await supabase.from('activity_log').insert({
       organization_id: id,
       action: 'trust_stage_change',
@@ -151,19 +160,27 @@ export default function OrganizationDetail() {
     });
     if (!ok) return;
     setActionError(null);
-    const { error } = await supabase.from('organizations').delete().eq('id', id);
+    const { data, error } = await supabase.from('organizations').delete().eq('id', id).select('id');
     if (reportWrite(error, 'OrganizationDetail.delete')) return;
+    if (!data?.length) {
+      setActionError(captureEmptyMutation('OrganizationDetail.delete.empty', 'The organisation was not deleted. Refresh and try again.'));
+      return;
+    }
     window.location.href = '/organizations';
   };
 
   const handleAddContact = async () => {
     if (!id) return;
     setActionError(null);
-    const { error } = await supabase.from('contacts').insert({
+    const { data, error } = await supabase.from('contacts').insert({
       organization_id: id,
       ...contactForm,
-    });
+    }).select('id');
     if (reportWrite(error, 'OrganizationDetail.addContact')) return;
+    if (!data?.length) {
+      setActionError(captureEmptyMutation('OrganizationDetail.addContact.empty', 'The contact was not saved. Refresh and try again.'));
+      return;
+    }
     setContactModal(false);
     setContactForm({ name: '', role: '', email: '', phone: '', is_primary: false, notes: '' });
     window.location.reload();
@@ -171,8 +188,12 @@ export default function OrganizationDetail() {
 
   const handleDeleteContact = async (contactId: string) => {
     setActionError(null);
-    const { error } = await supabase.from('contacts').delete().eq('id', contactId);
+    const { data, error } = await supabase.from('contacts').delete().eq('id', contactId).select('id');
     if (reportWrite(error, 'OrganizationDetail.deleteContact')) return;
+    if (!data?.length) {
+      setActionError(captureEmptyMutation('OrganizationDetail.deleteContact.empty', 'The contact was not deleted. Refresh and try again.'));
+      return;
+    }
     window.location.reload();
   };
 
@@ -241,8 +262,12 @@ export default function OrganizationDetail() {
       organization_id: id,
       ...c,
     }));
-    const { error } = await supabase.from('verification_criteria').insert(rows);
+    const { data, error } = await supabase.from('verification_criteria').insert(rows).select('id');
     if (reportWrite(error, 'OrganizationDetail.initCriteria')) return;
+    if (!data?.length) {
+      setActionError(captureEmptyMutation('OrganizationDetail.initCriteria.empty'));
+      return;
+    }
     await refetchCriteria();
   };
 
@@ -253,8 +278,12 @@ export default function OrganizationDetail() {
       organization_id: id,
       ...c,
     }));
-    const { error } = await supabase.from('verification_criteria').insert(rows);
+    const { data, error } = await supabase.from('verification_criteria').insert(rows).select('id');
     if (reportWrite(error, 'OrganizationDetail.initFinancialCriteria')) return;
+    if (!data?.length) {
+      setActionError(captureEmptyMutation('OrganizationDetail.initFinancialCriteria.empty'));
+      return;
+    }
     await refetchCriteria();
   };
 
@@ -268,8 +297,12 @@ export default function OrganizationDetail() {
     });
     if (!ok) return;
     setActionError(null);
-    const { error: revokeError } = await supabase.from('verification_badges').update({ is_active: false }).eq('id', badgeId);
+    const { data: revoked, error: revokeError } = await supabase.from('verification_badges').update({ is_active: false }).eq('id', badgeId).select('id');
     if (reportWrite(revokeError, 'OrganizationDetail.revokeBadge')) return;
+    if (!revoked?.length) {
+      setActionError(captureEmptyMutation('OrganizationDetail.revokeBadge.empty'));
+      return;
+    }
     const { count: activeCount, error: countError } = await supabase
       .from('verification_badges')
       .select('id', { count: 'exact', head: true })
@@ -278,11 +311,16 @@ export default function OrganizationDetail() {
     if (reportWrite(countError, 'OrganizationDetail.revokeBadgeCount')) return;
     if ((activeCount ?? 0) === 0) {
       const nextStatus = organization.source_registry ? 'listed' : 'onboarding';
-      const { error: statusError } = await supabase
+      const { data: statusRow, error: statusError } = await supabase
         .from('organizations')
         .update({ verification_level: 'none', status: nextStatus })
-        .eq('id', id);
+        .eq('id', id)
+        .select('id');
       if (reportWrite(statusError, 'OrganizationDetail.revokeBadgeStatus')) return;
+      if (!statusRow?.length) {
+        setActionError(captureEmptyMutation('OrganizationDetail.revokeBadgeStatus.empty'));
+        return;
+      }
     }
     const { error: logError } = await supabase.from('activity_log').insert({
       organization_id: id,

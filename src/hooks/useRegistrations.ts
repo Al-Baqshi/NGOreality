@@ -46,6 +46,7 @@ export function useRegistrations() {
   const [setupRequestsError, setSetupRequestsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [countsReady, setCountsReady] = useState(false);
 
   const refetch = useCallback(async () => {
     setLoading(true);
@@ -100,6 +101,7 @@ export function useRegistrations() {
       const total = totalCount.count ?? 0;
       const fromRegistry = registryCount.count ?? 0;
       setSignupCounts({ total, fromRegistry, newSubmissions: Math.max(0, total - fromRegistry) });
+      setCountsReady(true);
     }
     // PostgREST types the embedded to-one relation as an array; cast via unknown.
     if (badge.error) {
@@ -136,6 +138,7 @@ export function useRegistrations() {
     setupRequestsError,
     loading,
     error,
+    countsReady,
     refetch,
   };
 }

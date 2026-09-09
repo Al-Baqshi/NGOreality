@@ -117,7 +117,7 @@ export default function CashFlow() {
       try {
         const res = await applyLinkedCashflowForecast(periods, unitsStored);
         if (res.error) {
-          setError(captureError(new Error(res.error), { where: 'CashFlow.applyForecast' }));
+          setError(res.error);
         } else {
           await refresh({ showSpinner: false });
         }
@@ -142,7 +142,7 @@ export default function CashFlow() {
       notes: newExpense.notes,
     });
     setSavingExpense(false);
-    if (err) setError(captureError(new Error(err), { where: 'CashFlow.insertExpense' }));
+    if (err) setError(err);
     else {
       setNewExpense({
         incurred_on: new Date().toISOString().slice(0, 10),
@@ -157,7 +157,7 @@ export default function CashFlow() {
 
   const handleDeleteExpense = async (id: string) => {
     const { error: err } = await deleteExpense(id);
-    if (err) setError(captureError(new Error(err), { where: 'CashFlow.deleteExpense' }));
+    if (err) setError(err);
     else {
       setExpenses((prev) => prev.filter((e) => e.id !== id));
     }
@@ -214,7 +214,7 @@ export default function CashFlow() {
       notes,
     });
     if (err) {
-      setError(captureError(new Error(err), { where: 'CashFlow.upsertLine' }));
+      setError(err);
       void refresh({ showSpinner: false });
     }
   };
@@ -258,14 +258,14 @@ export default function CashFlow() {
       notes: row?.notes,
     });
     if (unitErr.error) {
-      setError(captureError(new Error(unitErr.error), { where: 'CashFlow.upsertUnit' }));
+      setError(unitErr.error);
       void refresh({ showSpinner: false });
       return;
     }
     if (field === 'expected') {
       const syncErr = await syncDerivedLinesForPeriod(period, monthIndex, nextUnitGrid);
       if (syncErr.error) {
-        setError(captureError(new Error(syncErr.error), { where: 'CashFlow.syncDerived' }));
+        setError(syncErr.error);
         void refresh({ showSpinner: false });
       }
     }
@@ -276,7 +276,7 @@ export default function CashFlow() {
     try {
       const res = await applyLinkedCashflowForecast(periods, unitsStored);
       if (res.error) {
-        setError(captureError(new Error(res.error), { where: 'CashFlow.applyForecast' }));
+        setError(res.error);
       } else {
         await refresh({ showSpinner: false });
       }
@@ -358,26 +358,26 @@ export default function CashFlow() {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-8">
         <MetricCard
           label="12-mo receipts (expected)"
-          value={pageLoading || error ? '—' : formatNzCurrency(yearRollup.receiptsExp)}
+          value={pageLoading || worksheetUnknown ? '—' : formatNzCurrency(yearRollup.receiptsExp)}
           sub="From volume units → green lines"
           currency
           accent
         />
         <MetricCard
           label="Operating profit (expected)"
-          value={pageLoading || error ? '—' : formatNzCurrency(yearRollup.opExp)}
+          value={pageLoading || worksheetUnknown ? '—' : formatNzCurrency(yearRollup.opExp)}
           sub="(A) − (C) trading result"
           currency
         />
         <MetricCard
           label="12-mo net cashflow (expected)"
-          value={pageLoading || error ? '—' : formatNzCurrency(yearRollup.netExp)}
+          value={pageLoading || worksheetUnknown ? '—' : formatNzCurrency(yearRollup.netExp)}
           sub={yearRollup.netExp >= 0 ? 'Profit after reserves' : 'Loss — review costs'}
           currency
         />
         <MetricCard
           label="Closing bank (month 12 exp)"
-          value={pageLoading || error ? '—' : formatNzCurrency(yearRollup.closingExp)}
+          value={pageLoading || worksheetUnknown ? '—' : formatNzCurrency(yearRollup.closingExp)}
           sub="End balance in bank"
           currency
         />

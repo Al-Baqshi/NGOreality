@@ -423,14 +423,14 @@ export default function OutreachWorklist() {
               </tr>
             </thead>
             <tbody>
-              {loading && (
+              {loading && leads.length === 0 && (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-ink-500">
                     <Loader2 className="animate-spin inline mr-2" size={16} /> Loading…
                   </td>
                 </tr>
               )}
-              {!loading && leads.map((lead) => {
+              {leads.map((lead) => {
                 const checked = isRowSelected(selection, lead.id);
                 return (
                   <tr key={lead.id} className={`border-t-2 border-ink-200 dark:border-border ${checked ? 'bg-teal/10' : ''}`}>

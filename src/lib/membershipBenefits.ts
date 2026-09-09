@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { captureError } from './errorReporting';
+import { captureEmptyMutation, captureError } from './errorReporting';
 import { allPublicCriteriaPass } from './criteria';
 import { queueAndTrySend } from './notifications';
 import type { Organization, VerificationCriterion } from '../types';
@@ -33,20 +33,37 @@ export async function extendOrganizationMembership(
   expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
   if (latest?.expires_at && new Date(latest.expires_at) > start) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('organization_memberships')
       .update({ expires_at: expiresAt.toISOString(), status: 'active' })
       .eq('organization_id', organizationId)
-      .eq('expires_at', latest.expires_at);
+      .eq('expires_at', latest.expires_at)
+      .select('id');
     if (error) return { error: captureError(error, { where: 'extendOrganizationMembership.update' }) };
+    if (!data?.length) {
+      return {
+        error: captureEmptyMutation(
+          'extendOrganizationMembership.updateEmpty',
+          'Membership expiry could not be updated. Refresh and try again.',
+        ),
+      };
+    }
   } else {
-    const { error } = await supabase.from('organization_memberships').insert({
+    const { data, error } = await supabase.from('organization_memberships').insert({
       organization_id: organizationId,
       started_at: start.toISOString(),
       expires_at: expiresAt.toISOString(),
       status: 'active',
-    });
+    }).select('id');
     if (error) return { error: captureError(error, { where: 'extendOrganizationMembership.insert' }) };
+    if (!data?.length) {
+      return {
+        error: captureEmptyMutation(
+          'extendOrganizationMembership.insertEmpty',
+          'Membership could not be created. Refresh and try again.',
+        ),
+      };
+    }
   }
 
   return { error: null };
@@ -184,19 +201,27 @@ export async function issueBadgeIfEligible(
 
   for (let attempt = 0; attempt < 5; attempt++) {
     verificationId = await nextVerificationId(organizationId, attempt);
-    const { error } = await supabase.from('verification_badges').insert({
+    const { data, error } = await supabase.from('verification_badges').insert({
       organization_id: organizationId,
       verification_id: verificationId,
       level,
       issued_at: now,
       expires_at: expiresAt.toISOString(),
       is_active: true,
-    });
+    }).select('id');
 
-    if (!error) {
+    if (!error && data?.length) {
       lastError = null;
       break;
     }
+    if (!error && !data?.length) {
+      return {
+        issued: false,
+        verificationId: null,
+        error: captureEmptyMutation('issueBadgeIfEligible.insertEmpty', 'The badge was not issued. Refresh and try again.'),
+      };
+    }
+    if (!error) continue;
     if (!isUniqueViolation(error.message)) {
       return {
         issued: false,
@@ -277,12 +302,15 @@ export async function activateMembershipBenefits(input: {
     }
     let statusNote = '';
     if (Object.keys(updates).length > 1) {
-      const { error: orgUpdateError } = await supabase
+      const { data: orgRow, error: orgUpdateError } = await supabase
         .from('organizations')
         .update(updates)
-        .eq('id', input.organizationId);
+        .eq('id', input.organizationId)
+        .select('id');
       if (orgUpdateError) {
         statusNote = ` Directory status could not be updated: ${captureError(orgUpdateError, { where: 'activateMembershipBenefits.orgStatus' })}`;
+      } else if (!orgRow?.length) {
+        statusNote = ` Directory status could not be updated: ${captureEmptyMutation('activateMembershipBenefits.orgStatusEmpty')}`;
       }
     }
 

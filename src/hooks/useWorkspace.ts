@@ -6,7 +6,7 @@
  * the boundary that keeps beneficiary records out of the public registry.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as crm from '../lib/crmApi';
 import { captureError } from '../lib/errorReporting';
 import type {
@@ -75,15 +75,27 @@ export function useWorkspaceStats(from?: string, to?: string) {
     loading: true,
     error: null,
   });
+  const loadedKey = useRef<string | null>(null);
+  const paramsKey = `${from ?? ''}|${to ?? ''}`;
 
   const refetch = useCallback(async () => {
-    setState((s) => ({ ...s, loading: true, error: null }));
+    setState((s) => ({
+      data: loadedKey.current === paramsKey ? s.data : null,
+      loading: true,
+      error: null,
+    }));
     try {
-      setState({ data: await crm.getStats(from, to), loading: false, error: null });
+      const data = await crm.getStats(from, to);
+      loadedKey.current = paramsKey;
+      setState({ data, loading: false, error: null });
     } catch (err) {
-      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useWorkspaceStats') }));
+      setState((s) => ({
+        data: loadedKey.current === paramsKey ? s.data : null,
+        loading: false,
+        error: messageOf(err, 'useWorkspaceStats'),
+      }));
     }
-  }, [from, to]);
+  }, [from, to, paramsKey]);
 
   useEffect(() => {
     void refetch();
@@ -104,16 +116,27 @@ export function useClients(params: crm.ClientListParams) {
   });
 
   const { search, status, limit, offset } = params;
+  const paramsKey = `${search ?? ''}|${status ?? ''}|${limit}|${offset}`;
+  const loadedKey = useRef<string | null>(null);
 
   const refetch = useCallback(async () => {
-    setState((s) => ({ ...s, loading: true, error: null }));
+    setState((s) => ({
+      data: loadedKey.current === paramsKey ? s.data : null,
+      loading: true,
+      error: null,
+    }));
     try {
       const data = await crm.listClients({ search, status, limit, offset });
+      loadedKey.current = paramsKey;
       setState({ data, loading: false, error: null });
     } catch (err) {
-      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useClients') }));
+      setState((s) => ({
+        data: loadedKey.current === paramsKey ? s.data : null,
+        loading: false,
+        error: messageOf(err, 'useClients'),
+      }));
     }
-  }, [search, status, limit, offset]);
+  }, [search, status, limit, offset, paramsKey]);
 
   useEffect(() => {
     void refetch();
@@ -130,12 +153,23 @@ export function useClient(id: string | undefined) {
   });
 
   const refetch = useCallback(async () => {
-    if (!id) return;
-    setState((s) => ({ ...s, loading: true, error: null }));
+    if (!id) {
+      setState({ data: null, loading: false, error: null });
+      return;
+    }
+    setState((s) => ({
+      data: s.data?.id === id ? s.data : null,
+      loading: true,
+      error: null,
+    }));
     try {
       setState({ data: await crm.getClient(id), loading: false, error: null });
     } catch (err) {
-      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useClient') }));
+      setState((s) => ({
+        data: s.data?.id === id ? s.data : null,
+        loading: false,
+        error: messageOf(err, 'useClient'),
+      }));
     }
   }, [id]);
 
@@ -154,9 +188,15 @@ export function useCases(params: crm.CaseListParams) {
   });
 
   const { client_id: clientId, status, assigned_to: assignedTo, search, limit, offset } = params;
+  const paramsKey = `${clientId ?? ''}|${status ?? ''}|${assignedTo ?? ''}|${search ?? ''}|${limit}|${offset}`;
+  const loadedKey = useRef<string | null>(null);
 
   const refetch = useCallback(async () => {
-    setState((s) => ({ ...s, loading: true, error: null }));
+    setState((s) => ({
+      data: loadedKey.current === paramsKey ? s.data : null,
+      loading: true,
+      error: null,
+    }));
     try {
       const data = await crm.listCases({
         client_id: clientId,
@@ -166,11 +206,16 @@ export function useCases(params: crm.CaseListParams) {
         limit,
         offset,
       });
+      loadedKey.current = paramsKey;
       setState({ data, loading: false, error: null });
     } catch (err) {
-      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useCases') }));
+      setState((s) => ({
+        data: loadedKey.current === paramsKey ? s.data : null,
+        loading: false,
+        error: messageOf(err, 'useCases'),
+      }));
     }
-  }, [clientId, status, assignedTo, search, limit, offset]);
+  }, [clientId, status, assignedTo, search, limit, offset, paramsKey]);
 
   useEffect(() => {
     void refetch();
@@ -187,12 +232,23 @@ export function useCase(id: string | undefined) {
   });
 
   const refetch = useCallback(async () => {
-    if (!id) return;
-    setState((s) => ({ ...s, loading: true, error: null }));
+    if (!id) {
+      setState({ data: null, loading: false, error: null });
+      return;
+    }
+    setState((s) => ({
+      data: s.data?.id === id ? s.data : null,
+      loading: true,
+      error: null,
+    }));
     try {
       setState({ data: await crm.getCase(id), loading: false, error: null });
     } catch (err) {
-      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useCase') }));
+      setState((s) => ({
+        data: s.data?.id === id ? s.data : null,
+        loading: false,
+        error: messageOf(err, 'useCase'),
+      }));
     }
   }, [id]);
 
@@ -209,15 +265,29 @@ export function useCaseNotes(caseId: string | undefined) {
     loading: Boolean(caseId),
     error: null,
   });
+  const loadedId = useRef<string | null>(null);
 
   const refetch = useCallback(async () => {
-    if (!caseId) return;
-    setState((s) => ({ ...s, loading: true, error: null }));
+    if (!caseId) {
+      loadedId.current = null;
+      setState({ data: null, loading: false, error: null });
+      return;
+    }
+    setState((s) => ({
+      data: loadedId.current === caseId ? s.data : null,
+      loading: true,
+      error: null,
+    }));
     try {
       const { items } = await crm.listCaseNotes(caseId);
+      loadedId.current = caseId;
       setState({ data: items, loading: false, error: null });
     } catch (err) {
-      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useCaseNotes') }));
+      setState((s) => ({
+        data: loadedId.current === caseId ? s.data : null,
+        loading: false,
+        error: messageOf(err, 'useCaseNotes'),
+      }));
     }
   }, [caseId]);
 
@@ -236,9 +306,15 @@ export function useSessions(params: crm.SessionListParams) {
   });
 
   const { client_id: clientId, case_id: caseId, from, to, limit, offset } = params;
+  const paramsKey = `${clientId ?? ''}|${caseId ?? ''}|${from ?? ''}|${to ?? ''}|${limit}|${offset}`;
+  const loadedKey = useRef<string | null>(null);
 
   const refetch = useCallback(async () => {
-    setState((s) => ({ ...s, loading: true, error: null }));
+    setState((s) => ({
+      data: loadedKey.current === paramsKey ? s.data : null,
+      loading: true,
+      error: null,
+    }));
     try {
       const data = await crm.listSessions({
         client_id: clientId,
@@ -248,11 +324,16 @@ export function useSessions(params: crm.SessionListParams) {
         limit,
         offset,
       });
+      loadedKey.current = paramsKey;
       setState({ data, loading: false, error: null });
     } catch (err) {
-      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useSessions') }));
+      setState((s) => ({
+        data: loadedKey.current === paramsKey ? s.data : null,
+        loading: false,
+        error: messageOf(err, 'useSessions'),
+      }));
     }
-  }, [clientId, caseId, from, to, limit, offset]);
+  }, [clientId, caseId, from, to, limit, offset, paramsKey]);
 
   useEffect(() => {
     void refetch();

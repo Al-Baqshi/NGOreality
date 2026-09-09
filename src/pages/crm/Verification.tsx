@@ -30,11 +30,12 @@ export default function Verification() {
 
       <div className="mb-8">
         <h3 className="font-mono text-xs uppercase tracking-wider font-semibold text-ink-500 mb-4 flex items-center gap-2">
-          <Shield size={14} /> Awaiting review ({queueLoading || queueError ? '—' : `${queue.length}+`})
+          <Shield size={14} /> Awaiting review ({queueLoading && queue.length === 0 ? '…' : queueError && queue.length === 0 ? '—' : `${queue.length}+`})
         </h3>
-        {queueLoading ? (
+        {queueError && queue.length > 0 ? <QueryError message={queueError} /> : null}
+        {queueLoading && queue.length === 0 ? (
           <div className="card-brutal p-8 text-center text-sm text-ink-400">Loading...</div>
-        ) : queueError ? (
+        ) : queueError && queue.length === 0 ? (
           <QueryError message={queueError} />
         ) : queue.length === 0 ? (
           <div className="card-brutal p-8 text-center">
@@ -81,14 +82,17 @@ export default function Verification() {
 
       <div className="mb-8">
         <h3 className="font-mono text-xs uppercase tracking-wider font-semibold text-teal mb-1 flex items-center gap-2">
-          <Shield size={14} /> NGOreality verified ({verifiedLoading || verifiedError ? '…' : `${verified.length}+`} on this page)
+          <Shield size={14} /> NGOreality verified ({verifiedLoading && verified.length === 0 ? '…' : verifiedError && verified.length === 0 ? '—' : `${verified.length}+`} on this page)
         </h3>
         <p className="font-mono text-2xs text-ink-400 mb-4 uppercase tracking-wider">
           Public trust badge issued — includes standards passed with badge
         </p>
-        {verifiedError ? (
+        {verifiedError && verified.length > 0 ? <QueryError message={verifiedError} /> : null}
+        {verifiedLoading && verified.length === 0 ? (
+          <div className="card-brutal p-8 text-center text-sm text-ink-400">Loading...</div>
+        ) : verifiedError && verified.length === 0 ? (
           <QueryError message={verifiedError} />
-        ) : verified.length === 0 && !verifiedLoading ? (
+        ) : verified.length === 0 ? (
           <div className="card-brutal p-8 text-center">
             <p className="text-sm text-ink-400">No organisations with the public badge yet</p>
           </div>

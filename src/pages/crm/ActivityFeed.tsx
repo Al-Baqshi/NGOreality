@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, Trash2, CheckSquare, Square,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { captureError } from '../../lib/errorReporting';
+import { captureEmptyMutation, captureError } from '../../lib/errorReporting';
 import { EmptyState, QueryError } from '../../components/ui';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
@@ -252,13 +252,30 @@ export default function ActivityFeed() {
 
     setDeleteBusy(true);
     try {
-      const { error: deleteError } = await supabase.from('activity_log').delete().in('id', idsToDelete);
+      const { data, error: deleteError } = await supabase.from('activity_log').delete().in('id', idsToDelete).select('id');
       if (deleteError) throw deleteError;
-      const deleted = new Set(idsToDelete);
+      if (!data?.length) {
+        setError(
+          captureEmptyMutation(
+            'ActivityFeed.bulkDelete.empty',
+            'No activity entries were deleted. Refresh and try again.',
+          ),
+        );
+        return;
+      }
+      const deleted = new Set(data.map((r) => r.id));
       setRows((prev) => prev.filter((r) => !deleted.has(r.id)));
-      setTotal((t) => Math.max(0, t - idsToDelete.length));
+      setTotal((t) => Math.max(0, t - deleted.size));
       clearSelection();
       setSelectionMode(false);
+      if (data.length !== idsToDelete.length) {
+        setError(
+          captureEmptyMutation(
+            'ActivityFeed.bulkDelete.partial',
+            `Deleted ${data.length} of ${idsToDelete.length}. Refresh and try again.`,
+          ),
+        );
+      }
     } catch (e) {
       setError(captureError(e, { where: 'ActivityFeed.bulkDelete' }));
     } finally {
@@ -286,8 +303,6 @@ export default function ActivityFeed() {
       if (cancelled) return;
       if (error) {
         setError(captureError(error, { where: 'ActivityFeed.list' }));
-        setRows([]);
-        setTotal(0);
       } else {
         setRows((data ?? []) as unknown as ActivityRow[]);
         setTotal(count ?? 0);
@@ -375,13 +390,15 @@ export default function ActivityFeed() {
         <p className="font-mono text-2xs uppercase tracking-wider text-ink-500">
           {!loading && total > 0
             ? `${total.toLocaleString()} entr${total === 1 ? 'y' : 'ies'}`
-            : loading
+            : loading && rows.length === 0
               ? 'Loading…'
-              : error
+              : error && rows.length === 0
                 ? 'Could not load'
-                : 'No entries'}
+                : rows.length === 0
+                  ? 'No entries'
+                  : `${total.toLocaleString()} entr${total === 1 ? 'y' : 'ies'}`}
         </p>
-        {!loading && grouped.length > 0 && (
+        {grouped.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -463,7 +480,7 @@ export default function ActivityFeed() {
         </section>
       )}
 
-      {loading && (
+      {loading && rows.length === 0 && (
         <div className="card-brutal p-8 text-center text-ink-500">
           <Loader2 className="animate-spin inline mr-2" size={16} /> Loading…
         </div>
@@ -473,7 +490,7 @@ export default function ActivityFeed() {
         <EmptyState icon={<History size={28} />} title="Nothing here yet" description="No activity matches this filter." />
       )}
 
-      {!loading && grouped.map((group) => {
+      {grouped.map((group) => {
         const expanded = isDayExpanded(group.key);
         const { allSelected, someSelected, selectedCount } = daySelectionState(group.items);
         return (

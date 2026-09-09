@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { captureError } from '../lib/errorReporting';
+import { captureEmptyMutation, captureError } from '../lib/errorReporting';
 import type { PortalNotification, PortalNotificationAudience } from '../types';
 
 export function usePortalNotifications(audience: PortalNotificationAudience, limit = 80) {
@@ -55,13 +55,17 @@ export function usePortalNotifications(audience: PortalNotificationAudience, lim
   const unreadCount = items.filter((n) => !n.read_at).length;
 
   const markRead = async (id: string): Promise<string | null> => {
-    const { error: uError } = await supabase
+    const { data, error: uError } = await supabase
       .from('portal_notifications')
       .update({ read_at: new Date().toISOString() })
       .eq('id', id)
-      .is('read_at', null);
+      .is('read_at', null)
+      .select('id');
 
     if (uError) return captureError(uError, { where: 'usePortalNotifications.markRead' });
+    if (!data?.length) {
+      return captureEmptyMutation('usePortalNotifications.markRead.empty', 'That notification could not be marked read.');
+    }
     setItems((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)),
     );
@@ -72,13 +76,20 @@ export function usePortalNotifications(audience: PortalNotificationAudience, lim
     const unreadIds = items.filter((n) => !n.read_at).map((n) => n.id);
     if (unreadIds.length === 0) return null;
 
-    const { error: uError } = await supabase
+    const { data, error: uError } = await supabase
       .from('portal_notifications')
       .update({ read_at: new Date().toISOString() })
       .in('id', unreadIds)
-      .is('read_at', null);
+      .is('read_at', null)
+      .select('id');
 
     if (uError) return captureError(uError, { where: 'usePortalNotifications.markAllRead' });
+    if (!data?.length) {
+      return captureEmptyMutation(
+        'usePortalNotifications.markAllRead.empty',
+        'Notifications could not be marked read. Refresh and try again.',
+      );
+    }
     await refetch();
     return null;
   };

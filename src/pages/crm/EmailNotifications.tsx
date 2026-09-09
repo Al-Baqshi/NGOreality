@@ -171,7 +171,7 @@ export default function EmailNotifications() {
     if (!ok) return;
     showAction(null);
     const err = await flushNow();
-    showAction(err ?? 'Pending emails sent (or none in queue).', Boolean(err));
+    showAction(err ?? 'Pending emails sent.', Boolean(err));
   };
 
   const handleRequeue = async (id: string) => {

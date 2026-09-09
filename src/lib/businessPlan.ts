@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { captureEmptyMutation, captureError } from './errorReporting';
 import type {
   BusinessExpense,
   BusinessPlanActual,
@@ -79,7 +80,7 @@ export async function fetchTargets(periods: string[]): Promise<BusinessPlanTarge
     .from('business_plan_targets')
     .select('*')
     .in('period', periods);
-  if (error) throw error;
+  if (error) throw new Error(captureError(error, { where: 'fetchTargets' }));
   return (data ?? []) as BusinessPlanTarget[];
 }
 
@@ -89,7 +90,7 @@ export async function fetchActuals(periods: string[]): Promise<BusinessPlanActua
     .from('business_plan_actuals')
     .select('*')
     .in('period', periods);
-  if (error) throw error;
+  if (error) throw new Error(captureError(error, { where: 'fetchActuals' }));
   return (data ?? []) as BusinessPlanActual[];
 }
 
@@ -99,7 +100,7 @@ export async function fetchRecentExpenses(limit = 50): Promise<BusinessExpense[]
     .select('*')
     .order('incurred_on', { ascending: false })
     .limit(limit);
-  if (error) throw error;
+  if (error) throw new Error(captureError(error, { where: 'fetchRecentExpenses' }));
   return (data ?? []) as BusinessExpense[];
 }
 
@@ -109,7 +110,7 @@ export async function upsertTarget(input: {
   expected_value: number;
   notes?: string;
 }): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('business_plan_targets').upsert(
+  const { data, error } = await supabase.from('business_plan_targets').upsert(
     {
       period: input.period,
       metric: input.metric,
@@ -118,8 +119,14 @@ export async function upsertTarget(input: {
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'period,metric' },
-  );
-  return { error: error?.message ?? null };
+  ).select('period');
+  if (error) {
+    return { error: captureError(error, { where: 'upsertTarget' }) };
+  }
+  if (!data?.length) {
+    return { error: captureEmptyMutation('upsertTarget.empty') };
+  }
+  return { error: null };
 }
 
 export async function insertExpense(input: {
@@ -129,17 +136,29 @@ export async function insertExpense(input: {
   vendor?: string;
   notes?: string;
 }): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('business_expenses').insert({
+  const { data, error } = await supabase.from('business_expenses').insert({
     incurred_on: input.incurred_on,
     category: input.category.trim(),
     amount_cents: Math.round(input.amount_cents),
     vendor: input.vendor?.trim() ?? '',
     notes: input.notes?.trim() ?? '',
-  });
-  return { error: error?.message ?? null };
+  }).select('id');
+  if (error) {
+    return { error: captureError(error, { where: 'insertExpense' }) };
+  }
+  if (!data?.length) {
+    return { error: captureEmptyMutation('insertExpense.empty') };
+  }
+  return { error: null };
 }
 
 export async function deleteExpense(id: string): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('business_expenses').delete().eq('id', id);
-  return { error: error?.message ?? null };
+  const { data, error } = await supabase.from('business_expenses').delete().eq('id', id).select('id');
+  if (error) {
+    return { error: captureError(error, { where: 'deleteExpense' }) };
+  }
+  if (!data?.length) {
+    return { error: captureEmptyMutation('deleteExpense.empty', 'The expense was not deleted. Refresh and try again.') };
+  }
+  return { error: null };
 }

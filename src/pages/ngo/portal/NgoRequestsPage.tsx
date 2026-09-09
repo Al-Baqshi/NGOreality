@@ -176,6 +176,11 @@ export default function NgoRequestsPage() {
         ) : badgeRequests.length > 0 ? (
           <div className="border-t border-ink-100 pt-6">
             <h3 className="text-sm font-black uppercase tracking-tight mb-3">Your past requests</h3>
+            {error ? (
+              <p className="text-sm text-accent mb-3" role="alert">
+                Past requests could not be refreshed. Showing the last loaded list.
+              </p>
+            ) : null}
             <ul className="space-y-3">
               {badgeRequests.map((req) => (
                 <li

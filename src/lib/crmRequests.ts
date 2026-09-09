@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { captureError } from './errorReporting';
+import { captureEmptyMutation, captureError } from './errorReporting';
 import type { BadgeRequestStatus, NgoSetupRequestStatus } from '../types';
 
 /**
@@ -13,11 +13,13 @@ export async function updateBadgeRequestStatus(
   organizationId: string,
   status: BadgeRequestStatus,
 ): Promise<string | null> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('badge_requests')
     .update({ status, updated_at: new Date().toISOString() })
-    .eq('id', requestId);
+    .eq('id', requestId)
+    .select('id');
   if (error) return captureError(error, { where: 'updateBadgeRequestStatus' });
+  if (!data?.length) return captureEmptyMutation('updateBadgeRequestStatus.empty');
 
   const { error: logError } = await supabase.from('activity_log').insert({
     organization_id: organizationId,
@@ -35,11 +37,13 @@ export async function updateSetupRequestStatus(
   organizationId: string,
   status: NgoSetupRequestStatus,
 ): Promise<string | null> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('ngo_setup_requests')
     .update({ status, updated_at: new Date().toISOString() })
-    .eq('id', requestId);
+    .eq('id', requestId)
+    .select('id');
   if (error) return captureError(error, { where: 'updateSetupRequestStatus' });
+  if (!data?.length) return captureEmptyMutation('updateSetupRequestStatus.empty');
 
   const { error: logError } = await supabase.from('activity_log').insert({
     organization_id: organizationId,

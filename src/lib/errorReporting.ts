@@ -113,6 +113,17 @@ export function captureError(err: unknown, ctx: ErrorContext): string {
 }
 
 /**
+ * PostgREST PATCH/INSERT often returns 200 with an empty array when RLS or the
+ * filter matched nothing. Callers that only check `error` then look successful.
+ */
+export function captureEmptyMutation(
+  where: string,
+  message = 'The record was not updated. Refresh and try again.',
+): string {
+  return captureError(new Error(message), { where });
+}
+
+/**
  * Catch what never reaches a try/catch: errors thrown outside React's tree and
  * promise rejections nobody awaited.
  */
