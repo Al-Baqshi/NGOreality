@@ -181,6 +181,38 @@ export function EmptyState({ icon: Icon, title, description }: { icon: ReactNode
   );
 }
 
+/**
+ * Distinct from EmptyState on purpose. A failed query used to render the same
+ * empty list as a genuine zero, so a broken CRM page looked like "nothing to do".
+ */
+export function QueryError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="card-brutal border-accent p-4 mb-4" role="alert">
+      <p className="text-sm font-semibold text-accent">
+        Could not load this data. This is a fault on our side, not an empty list.
+      </p>
+      <p className="font-mono text-2xs text-ink-600 dark:text-muted-foreground mt-1 break-words">
+        {message}
+      </p>
+      {onRetry ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="btn-brutal-outline text-xs min-h-[40px] mt-3"
+        >
+          Try again
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
   if (!open) return null;
   return (
