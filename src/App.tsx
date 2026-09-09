@@ -56,6 +56,7 @@ const CrmBadges = lazy(() => import('./pages/crm/CrmBadges'));
 const Monitoring = lazy(() => import('./pages/crm/Monitoring'));
 const CrmNotificationInbox = lazy(() => import('./pages/crm/CrmNotificationInbox'));
 const EmailNotifications = lazy(() => import('./pages/crm/EmailNotifications'));
+const ScheduledOutreach = lazy(() => import('./pages/crm/ScheduledOutreach'));
 
 // NGO Portal
 const NgoLogin = lazy(() => import('./pages/ngo/NgoLogin'));
@@ -124,6 +125,7 @@ export default function App() {
                   moving the handful of live conversations between stages. */}
               <Route path="/outreach" element={<OutreachWorklist />} />
               <Route path="/outreach/board" element={<OutreachBoard />} />
+              <Route path="/outreach/scheduled" element={<ScheduledOutreach />} />
               <Route path="/activity" element={<ActivityFeed />} />
               <Route path="/inbound" element={<InboundQueue />} />
               <Route path="/customers" element={<CustomersList />} />

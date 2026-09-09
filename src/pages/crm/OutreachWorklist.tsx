@@ -13,10 +13,11 @@ import {
   type OutreachSegment, type OutreachFilters, type OutreachLead,
 } from '../../hooks/useOutreachWorklist';
 import { OUTREACH_KANBAN_STATUSES, OUTREACH_STATUS_LABELS, OUTREACH_EMAIL_BY_COLUMN, type Organization, type OutreachStatus } from '../../types';
-import { EmptyState } from '../../components/ui';
+import { EmptyState, QueryError } from '../../components/ui';
 import OutreachBatchCommand from '../../components/crm/OutreachBatchCommand';
 import SendEmailModal from '../../components/crm/SendEmailModal';
 import { supabase } from '../../lib/supabase';
+import { captureError } from '../../lib/errorReporting';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
 /**
@@ -95,7 +96,7 @@ export default function OutreachWorklist() {
   const [sendEmailOrganizations, setSendEmailOrganizations] = useState<Pick<Organization, 'id' | 'name' | 'email' | 'slug'>[]>([]);
   const confirm = useConfirm();
 
-  const { counts } = useOutreachSegmentCounts(refreshKey);
+  const { counts, error: countsError } = useOutreachSegmentCounts(refreshKey);
   const { leads, total, loading, error } = useOutreachLeads(filters, page, refreshKey);
   const { selection, clear, selectAllMatching, toggle, selectIds } = useOutreachSelection();
 
@@ -142,8 +143,7 @@ export default function OutreachWorklist() {
       clear();
       setRefreshKey((k) => k + 1);
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : 'Could not apply the change.');
-      throw e;
+      setNotice(captureError(e, { where: 'OutreachWorklist.bulkMove' }));
     } finally {
       setBusy(false);
     }
@@ -187,7 +187,7 @@ export default function OutreachWorklist() {
         clear();
         setRefreshKey((k) => k + 1);
       } catch (e) {
-        setNotice(e instanceof Error ? e.message : 'Could not queue emails.');
+        setNotice(captureError(e, { where: 'OutreachWorklist.enqueueByFilter' }));
       } finally {
         setBusy(false);
       }
@@ -216,7 +216,7 @@ export default function OutreachWorklist() {
         clear();
         setRefreshKey((k) => k + 1);
       } catch (e) {
-        setNotice(e instanceof Error ? e.message : 'Could not queue emails.');
+        setNotice(captureError(e, { where: 'OutreachWorklist.enqueueByIds' }));
       } finally {
         setBusy(false);
       }
@@ -238,7 +238,7 @@ export default function OutreachWorklist() {
       setSendEmailOrganizations(data as Pick<Organization, 'id' | 'name' | 'email' | 'slug'>[]);
       setSendEmailOpen(true);
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : 'Could not open email composer.');
+      setNotice(captureError(e, { where: 'OutreachWorklist.openComposer' }));
     } finally {
       setBusy(false);
     }
@@ -264,6 +264,9 @@ export default function OutreachWorklist() {
           <Link to="/outreach/board" className="btn-brutal-outline text-sm inline-flex items-center gap-2 min-h-[44px]">
             <Kanban size={16} /> Board view
           </Link>
+          <Link to="/outreach/scheduled" className="btn-brutal-outline text-sm inline-flex items-center gap-2 min-h-[44px]">
+            Scheduled
+          </Link>
         </div>
       </div>
 
@@ -274,7 +277,12 @@ export default function OutreachWorklist() {
         initialStage={filters.outreach || 'not_contacted'}
       />
 
-      {/* Segments */}
+      {countsError && (
+        <p className="mb-3 font-mono text-2xs text-accent" role="status">
+          Segment counts could not be loaded. You can still work the list.
+        </p>
+      )}
+
       <div className="flex flex-wrap gap-2 mb-4">
         {SEGMENTS.map((seg) => {
           const Icon = seg.icon;
@@ -350,9 +358,7 @@ export default function OutreachWorklist() {
       {notice && (
         <div className="card-brutal p-3 mb-4 text-sm bg-paper dark:bg-muted/20">{notice}</div>
       )}
-      {error && (
-        <div className="card-brutal p-3 mb-4 text-sm border-accent text-accent">{error}</div>
-      )}
+      {error && <QueryError message={error} />}
 
       {selected > 0 && selection.mode === 'ids' && pageAllSelected && total > leads.length && (
         <div className="mb-2 flex flex-wrap items-center gap-2 border-3 border-ink-200 bg-paper px-3 py-1.5 text-sm dark:border-border dark:bg-muted/20">
@@ -470,7 +476,7 @@ export default function OutreachWorklist() {
                   </tr>
                 );
               })}
-              {!loading && !leads.length && (
+              {!loading && !error && !leads.length && (
                 <tr>
                   <td colSpan={6} className="p-0">
                     <EmptyState

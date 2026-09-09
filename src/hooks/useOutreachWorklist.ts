@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { captureError } from '../lib/errorReporting';
 import type { OutreachStatus } from '../types';
 
 /**
@@ -75,8 +76,10 @@ export function useOutreachSegmentCounts(refreshKey = 0) {
       .rpc('outreach_segment_counts')
       .then(({ data, error }) => {
         if (cancelled) return;
-        if (error) setError(error.message);
-        else {
+        if (error) {
+          setError(captureError(error, { where: 'useOutreachSegmentCounts' }));
+          setCounts(null);
+        } else {
           setCounts(data as OutreachSegmentCounts);
           setError(null);
         }
@@ -113,7 +116,7 @@ export function useOutreachLeads(filters: OutreachFilters, page: number, refresh
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) {
-          setError(error.message);
+          setError(captureError(error, { where: 'useOutreachLeads' }));
           setLeads([]);
           setTotal(0);
         } else {
@@ -204,7 +207,7 @@ export async function enqueueOutreachEmailsByFilter(
   filters: OutreachFilters,
   template: string,
   excludedIds: string[],
-  options?: { subject?: string; body?: string; max?: number },
+  options?: { subject?: string; body?: string; max?: number; held?: boolean },
 ): Promise<EnqueueEmailResult> {
   const { data, error } = await supabase.rpc('outreach_enqueue_emails', {
     p_template: template,
@@ -217,6 +220,7 @@ export async function enqueueOutreachEmailsByFilter(
     p_subject: options?.subject ?? null,
     p_body: options?.body ?? null,
     p_max: options?.max ?? 25000,
+    p_status: options?.held ? 'held' : 'pending',
   });
   if (error) throw new Error(error.message);
   return data as EnqueueEmailResult;
@@ -226,7 +230,7 @@ export async function enqueueOutreachEmailsByFilter(
 export async function enqueueOutreachEmailsByIds(
   ids: string[],
   template: string,
-  options?: { subject?: string; body?: string },
+  options?: { subject?: string; body?: string; max?: number; held?: boolean },
 ): Promise<EnqueueEmailResult> {
   if (!ids.length) {
     return {
@@ -249,9 +253,54 @@ export async function enqueueOutreachEmailsByIds(
     p_site_url: siteBaseUrl(),
     p_subject: options?.subject ?? null,
     p_body: options?.body ?? null,
+    p_max: options?.max ?? ids.length,
+    p_status: options?.held ? 'held' : 'pending',
   });
   if (error) throw new Error(error.message);
   return data as EnqueueEmailResult;
+}
+
+export type HeldOutreachSummary = {
+  held: number;
+  staged_today: number;
+  released_today: number;
+};
+
+export async function fetchHeldOutreachSummary(): Promise<HeldOutreachSummary> {
+  const { data, error } = await supabase.rpc('outreach_held_summary');
+  if (error) throw new Error(error.message);
+  const row = data as HeldOutreachSummary;
+  return {
+    held: Number(row?.held ?? 0),
+    staged_today: Number(row?.staged_today ?? 0),
+    released_today: Number(row?.released_today ?? 0),
+  };
+}
+
+export async function releaseHeldOutreachEmails(options?: {
+  limit?: number;
+  ids?: string[];
+}): Promise<{ released: number; cap: number }> {
+  const { data, error } = await supabase.rpc('outreach_release_held_emails', {
+    p_limit: options?.limit ?? 100,
+    p_ids: options?.ids ?? null,
+  });
+  if (error) throw new Error(error.message);
+  const row = data as { released: number; cap: number };
+  return { released: Number(row?.released ?? 0), cap: Number(row?.cap ?? 0) };
+}
+
+export async function cancelHeldOutreachEmails(options?: {
+  ids?: string[];
+  limit?: number;
+}): Promise<{ cancelled: number }> {
+  const { data, error } = await supabase.rpc('outreach_cancel_held_emails', {
+    p_ids: options?.ids ?? null,
+    p_limit: options?.limit ?? 25000,
+  });
+  if (error) throw new Error(error.message);
+  const row = data as { cancelled: number };
+  return { cancelled: Number(row?.cancelled ?? 0) };
 }
 
 /* ---------------------------------------------------------------------- */

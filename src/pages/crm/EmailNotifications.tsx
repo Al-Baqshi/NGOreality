@@ -16,7 +16,7 @@ import {
   Trash2,
   UserCheck,
 } from 'lucide-react';
-import { SectionHeader, MetricCard } from '../../components/ui';
+import { SectionHeader, MetricCard, QueryError } from '../../components/ui';
 import { NOTIFICATION_PAGE_SIZE, useNotifications } from '../../hooks/useNotifications';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import {
@@ -37,6 +37,7 @@ function StatusBadge({ status }: { status: NotificationEvent['status'] }) {
     failed: 'border-accent bg-accent-light text-accent',
     skipped: 'border-ink-200 bg-ink-50 text-ink-500',
     suppressed: 'border-ink-300 bg-ink-100 text-ink-600',
+    held: 'border-violet-400 bg-violet-50 text-violet-900',
   };
   return (
     <span
@@ -49,6 +50,7 @@ function StatusBadge({ status }: { status: NotificationEvent['status'] }) {
 
 const FILTER_OPTIONS: { id: StatusFilter; label: string }[] = [
   { id: 'all', label: 'All' },
+  { id: 'held', label: 'Held' },
   { id: 'pending', label: 'Pending' },
   { id: 'failed', label: 'Failed to send' },
   { id: 'sent', label: 'Sent' },
@@ -65,7 +67,8 @@ export default function EmailNotifications() {
     statusParam === 'failed' ||
     statusParam === 'skipped' ||
     statusParam === 'suppressed' ||
-    statusParam === 'sending'
+    statusParam === 'sending' ||
+    statusParam === 'held'
       ? statusParam
       : 'all';
   const pageFromUrl = Math.max(1, Number(searchParams.get('page')) || 1);
@@ -155,6 +158,10 @@ export default function EmailNotifications() {
   };
 
   const handleFlush = async () => {
+    if (!summary) {
+      showAction('Queue counts could not be loaded. Refresh and try again.', true);
+      return;
+    }
     const pendingCount = summary.pending ?? 0;
     const ok = await confirm({
       title: 'Send pending emails?',
@@ -199,7 +206,11 @@ export default function EmailNotifications() {
   };
 
   const handleAllowEmailAgain = async (email: string, subject: string, eventId: string) => {
-    const info = await getSuppressionInfo(email);
+    const { info, error: infoError } = await getSuppressionInfo(email);
+    if (infoError) {
+      showAction(infoError, true);
+      return;
+    }
     const reason = info?.reason ?? 'unknown';
     const isRisky = reason === 'bounce' || reason === 'complaint';
     const reasonLine =
@@ -228,7 +239,11 @@ export default function EmailNotifications() {
   };
 
   const handleAllowAndRequeue = async (email: string, subject: string, eventId: string) => {
-    const info = await getSuppressionInfo(email);
+    const { info, error: infoError } = await getSuppressionInfo(email);
+    if (infoError) {
+      showAction(infoError, true);
+      return;
+    }
     const reason = info?.reason ?? 'unknown';
     const isRisky = reason === 'bounce' || reason === 'complaint';
 
@@ -291,6 +306,11 @@ export default function EmailNotifications() {
       <p className="font-mono text-2xs text-ink-500 -mt-4 mb-6 max-w-2xl leading-relaxed">
         Outbound mail for outreach, membership welcome, badges, and site-down alerts. Queued here, then sent via
         Resend when you click Send pending or when the worker runs.{' '}
+        <strong className="text-ink-800 dark:text-foreground">Held</strong> emails wait for approval on{' '}
+        <Link to="/outreach/scheduled" className="underline font-semibold text-ink-800 dark:text-foreground">
+          Scheduled outreach
+        </Link>
+        .{' '}
         <strong className="text-ink-800 dark:text-foreground">Failed</strong> is a send error, not an inbox bounce.{' '}
         <strong className="text-ink-800 dark:text-foreground">Cancelled</strong> was removed by staff.{' '}
         <strong className="text-ink-800 dark:text-foreground">Unsubscribed</strong> opted out. In-app alerts live on{' '}
@@ -301,15 +321,35 @@ export default function EmailNotifications() {
       </p>
 
       {error && (
-        <p className="text-accent text-sm border-2 border-accent px-3 py-2 mb-4" role="alert">
-          {error}
-          {error.includes('notification_events') && (
-            <span className="block font-mono text-2xs mt-1">Apply migration 018 on Supabase.</span>
-          )}
-        </p>
+        <QueryError
+          message={
+            error.includes('notification_events')
+              ? `${error} Apply migration 018 on Supabase.`
+              : error
+          }
+        />
       )}
 
-      {(summary.skipped ?? 0) > 0 && filter !== 'skipped' && (
+      {(summary?.held ?? 0) > 0 && filter !== 'held' && summary && (
+        <div
+          className="mb-4 flex flex-wrap items-start gap-2 border-2 border-violet-300 bg-violet-50/80 px-3 py-2 dark:border-violet-700 dark:bg-violet-950/30"
+          role="status"
+        >
+          <Mail size={16} className="text-violet-700 shrink-0 mt-0.5" aria-hidden />
+          <p className="text-sm text-ink-800 dark:text-foreground flex-1 min-w-0">
+            <strong>{summary.held}</strong> outreach email{summary.held === 1 ? '' : 's'} held awaiting your approval.
+            Release them from Scheduled outreach — cron will not send held mail.
+          </p>
+          <Link
+            to="/outreach/scheduled"
+            className="btn-brutal-outline text-2xs min-h-[36px] px-3 shrink-0 inline-flex items-center"
+          >
+            Open scheduled
+          </Link>
+        </div>
+      )}
+
+      {(summary?.skipped ?? 0) > 0 && filter !== 'skipped' && summary && (
         <div
           className="mb-4 flex flex-wrap items-start gap-2 border-2 border-ink-200 bg-ink-50/80 px-3 py-2 dark:border-border dark:bg-muted/30"
           role="status"
@@ -329,7 +369,7 @@ export default function EmailNotifications() {
         </div>
       )}
 
-      {(summary.suppressed ?? 0) > 0 && filter !== 'suppressed' && (
+      {(summary?.suppressed ?? 0) > 0 && filter !== 'suppressed' && summary && (
         <div
           className="mb-4 flex flex-wrap items-start gap-2 border-2 border-ink-300 bg-ink-100/60 px-3 py-2 dark:border-border dark:bg-muted/30"
           role="status"
@@ -349,7 +389,7 @@ export default function EmailNotifications() {
         </div>
       )}
 
-      {summary.failed > 0 && (
+      {summary && summary.failed > 0 && (
         <div
           className="mb-4 border-2 border-accent bg-accent-light/40 dark:bg-accent/10 px-3 py-2 flex flex-wrap items-start gap-2"
           role="status"
@@ -369,21 +409,24 @@ export default function EmailNotifications() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        <button type="button" onClick={() => setFilterAndUrl('held')} className="h-full min-h-[44px] text-left">
+          <MetricCard compact label="Held" value={summary ? summary.held ?? 0 : '—'} sub="Awaiting approval" />
+        </button>
         <button type="button" onClick={() => setFilterAndUrl('pending')} className="h-full min-h-[44px] text-left">
-          <MetricCard compact label="Pending" value={summary.pending ?? 0} sub="In queue" />
+          <MetricCard compact label="Pending" value={summary ? summary.pending ?? 0 : '—'} sub="In queue" />
         </button>
         <button type="button" onClick={() => setFilterAndUrl('sent')} className="h-full min-h-[44px] text-left">
-          <MetricCard compact label="Sent" value={summary.sent ?? 0} sub="Last 30 days" accent />
+          <MetricCard compact label="Sent" value={summary ? summary.sent ?? 0 : '—'} sub="Last 30 days" accent />
         </button>
         <button type="button" onClick={() => setFilterAndUrl('failed')} className="h-full min-h-[44px] text-left">
-          <MetricCard compact label="Failed" value={summary.failed ?? 0} sub="Last 30 days" />
+          <MetricCard compact label="Failed" value={summary ? summary.failed ?? 0 : '—'} sub="Last 30 days" />
         </button>
         <button type="button" onClick={() => setFilterAndUrl('skipped')} className="h-full min-h-[44px] text-left">
-          <MetricCard compact label="Cancelled" value={summary.skipped ?? 0} sub="Last 30 days" />
+          <MetricCard compact label="Cancelled" value={summary ? summary.skipped ?? 0 : '—'} sub="Last 30 days" />
         </button>
         <button type="button" onClick={() => setFilterAndUrl('suppressed')} className="h-full min-h-[44px] text-left">
-          <MetricCard compact label="Unsubscribed" value={summary.suppressed ?? 0} sub="Last 30 days" />
+          <MetricCard compact label="Unsubscribed" value={summary ? summary.suppressed ?? 0 : '—'} sub="Last 30 days" />
         </button>
       </div>
 
@@ -397,7 +440,7 @@ export default function EmailNotifications() {
         </p>
       )}
 
-      {filter === 'skipped' && (summary.skipped ?? 0) > 0 && (
+      {filter === 'skipped' && (summary?.skipped ?? 0) > 0 && (
         <p className="mb-4 text-sm text-ink-600 dark:text-muted-foreground">
           These were removed from the queue and will not send until you click{' '}
           <strong className="text-ink-800 dark:text-foreground">Restore to queue</strong> on each row.
@@ -467,10 +510,10 @@ export default function EmailNotifications() {
                 }`}
               >
                 {opt.label}
-                {opt.id === 'pending' && (summary.pending ?? 0) > 0 ? ` (${summary.pending})` : ''}
-                {opt.id === 'failed' && (summary.failed ?? 0) > 0 ? ` (${summary.failed})` : ''}
-                {opt.id === 'skipped' && (summary.skipped ?? 0) > 0 ? ` (${summary.skipped})` : ''}
-                {opt.id === 'suppressed' && (summary.suppressed ?? 0) > 0 ? ` (${summary.suppressed})` : ''}
+                {opt.id === 'pending' && (summary?.pending ?? 0) > 0 ? ` (${summary?.pending})` : ''}
+                {opt.id === 'failed' && (summary?.failed ?? 0) > 0 ? ` (${summary?.failed})` : ''}
+                {opt.id === 'skipped' && (summary?.skipped ?? 0) > 0 ? ` (${summary?.skipped})` : ''}
+                {opt.id === 'suppressed' && (summary?.suppressed ?? 0) > 0 ? ` (${summary?.suppressed})` : ''}
               </button>
             ))}
             {templatesInQueue.length > 1 && (
@@ -496,8 +539,10 @@ export default function EmailNotifications() {
           </div>
         </div>
 
-        {loading ? (
+        {loading && events.length === 0 ? (
           <p className="p-6 text-sm text-ink-400">Loading…</p>
+        ) : events.length === 0 && error ? (
+          <p className="p-6 text-sm text-ink-400">Could not load the email queue.</p>
         ) : filteredEvents.length === 0 ? (
           <p className="p-6 text-sm text-ink-400">{emptyMessage}</p>
         ) : (
@@ -562,6 +607,16 @@ export default function EmailNotifications() {
                     >
                       <Trash2 size={12} aria-hidden />
                       Remove from queue
+                    </button>
+                  )}
+                  {e.status === 'held' && (
+                    <button
+                      type="button"
+                      onClick={() => void handleRemoveFromQueue(e.id, e.subject)}
+                      className="inline-flex min-h-[36px] items-center gap-1 text-accent underline hover:no-underline"
+                    >
+                      <Trash2 size={12} aria-hidden />
+                      Cancel held
                     </button>
                   )}
                   {e.status === 'skipped' && (

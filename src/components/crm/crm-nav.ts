@@ -4,6 +4,7 @@ import {
   Award,
   Bell,
   Building2,
+  CalendarClock,
   CreditCard,
   FileText,
   History,
@@ -55,6 +56,10 @@ export type CrmNavGroup = { label: string; items: CrmNavItem[] };
 export function isCrmNavActive(pathname: string, to: string): boolean {
   if (to === '/dashboard') return pathname === '/dashboard';
   if (to === '/public') return pathname.startsWith('/public');
+  // Outreach worklist + board share the Outreach item; scheduled is its own nav entry.
+  if (to === '/outreach') {
+    return pathname === '/outreach' || pathname.startsWith('/outreach/board');
+  }
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
@@ -80,6 +85,7 @@ export const CRM_NAV_GROUPS: CrmNavGroup[] = [
     label: 'Growth',
     items: [
       { to: '/outreach', icon: Send, label: 'Outreach', countKey: 'outreachDue' },
+      { to: '/outreach/scheduled', icon: CalendarClock, label: 'Scheduled outreach' },
       { to: '/registrations', icon: UserPlus, label: 'Sign-ups', countKey: 'registrations', urgent: true },
       { to: '/inbound', icon: Mail, label: 'Inbound' },
       { to: '/customers', icon: UserCheck, label: 'Customers' },

@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { SITE_URL } from '../config/site';
+import { captureError } from './errorReporting';
 import type { OutreachEmailTemplate } from '../types';
 
 export type NotificationTemplate =
@@ -211,7 +212,10 @@ export async function queueNotification(input: {
     status: 'pending',
   });
 
-  return { error: error?.message ?? null };
+  if (error) {
+    return { error: captureError(error, { where: 'queueNotification' }) };
+  }
+  return { error: null };
 }
 
 /** After queueing, try immediate send via Go API when configured. */
@@ -227,6 +231,7 @@ export async function queueAndTrySend(input: Parameters<typeof queueNotification
     await flushPendingNotifications();
     return { error: null, flushError: null };
   } catch (e) {
+    captureError(e, { where: 'queueAndTrySend.flush' });
     return {
       error: null,
       flushError: e instanceof Error ? e.message : 'Could not flush notifications',

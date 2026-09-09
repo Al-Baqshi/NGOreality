@@ -23,6 +23,12 @@ export function outreachEmailBadge(status?: OrgEmailStatus): OutreachEmailBadge 
         label: 'Queued',
         className: 'bg-amber-50 text-amber-800 border-amber-200',
       };
+    case 'held':
+      return {
+        label: 'Held',
+        className: 'bg-violet-50 text-violet-800 border-violet-200',
+        title: 'Staged for send — waiting for staff approval',
+      };
     case 'failed':
       return {
         label: 'Failed',

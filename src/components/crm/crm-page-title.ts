@@ -7,6 +7,7 @@ const EXTRA_TITLES: Record<string, string> = {
   // Without this, prefix matching on '/outreach' would title the board
   // "Outreach" too, and the two views would be indistinguishable in the header.
   '/outreach/board': 'Outreach board',
+  '/outreach/scheduled': 'Scheduled outreach',
 };
 
 export function getCrmPageTitle(pathname: string): string {

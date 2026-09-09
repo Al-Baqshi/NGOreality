@@ -101,7 +101,14 @@ export type NotificationTemplate =
   | 'membership_welcome'
   | 'badge_request_received'
   | OutreachEmailTemplate;
-export type NotificationStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'skipped' | 'suppressed';
+export type NotificationStatus =
+  | 'pending'
+  | 'sending'
+  | 'sent'
+  | 'failed'
+  | 'skipped'
+  | 'suppressed'
+  | 'held';
 
 export interface NotificationEvent {
   id: string;
@@ -171,6 +178,7 @@ export const NOTIFICATION_STATUS_LABELS: Record<NotificationStatus, string> = {
   failed: 'Failed',
   skipped: 'Cancelled',
   suppressed: 'Unsubscribed',
+  held: 'Held — awaiting approval',
 };
 
 export type OrgStatus =

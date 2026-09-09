@@ -6,6 +6,7 @@ export type NotificationSummaryCounts = {
   failed: number;
   skipped: number;
   suppressed: number;
+  held: number;
 };
 
 const SUMMARY_SINCE_DAYS = 30;
@@ -29,12 +30,13 @@ async function countStatus(status: string): Promise<number> {
 
 /** Queue counts for the last 30 days (matches Go API summary). */
 export async function fetchNotificationSummaryFromDb(): Promise<NotificationSummaryCounts> {
-  const [pending, sent, failed, skipped, suppressed] = await Promise.all([
+  const [pending, sent, failed, skipped, suppressed, held] = await Promise.all([
     countStatus('pending'),
     countStatus('sent'),
     countStatus('failed'),
     countStatus('skipped'),
     countStatus('suppressed'),
+    countStatus('held'),
   ]);
-  return { pending, sent, failed, skipped, suppressed };
+  return { pending, sent, failed, skipped, suppressed, held };
 }

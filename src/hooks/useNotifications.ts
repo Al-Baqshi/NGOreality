@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { fetchNotificationSummaryFromDb } from '../lib/notificationSummary';
+import { captureError } from '../lib/errorReporting';
+import { fetchNotificationSummaryFromDb, type NotificationSummaryCounts } from '../lib/notificationSummary';
 import { fetchNotificationSummary, flushPendingNotifications, isMonitorApiConfigured } from '../lib/monitorApi';
 import type { NotificationEvent, NotificationStatus } from '../types';
 
@@ -19,7 +20,7 @@ export function useNotifications(options?: {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [summary, setSummary] = useState({ pending: 0, sent: 0, failed: 0, skipped: 0, suppressed: 0 });
+  const [summary, setSummary] = useState<NotificationSummaryCounts | null>(null);
   const [flushing, setFlushing] = useState(false);
 
   const refetch = useCallback(async () => {
@@ -42,25 +43,29 @@ export function useNotifications(options?: {
     const { data, error: qError, count } = await query;
 
     if (qError) {
-      setError(qError.message);
-      setEvents([]);
-      setTotal(0);
+      setError(captureError(qError, { where: 'useNotifications.list' }));
     } else {
       setEvents((data ?? []) as NotificationEvent[]);
       setTotal(count ?? 0);
     }
 
     try {
+      const dbSum = await fetchNotificationSummaryFromDb();
       if (isMonitorApiConfigured()) {
-        const apiSum = await fetchNotificationSummary();
-        const dbSum = await fetchNotificationSummaryFromDb();
-        if (apiSum) setSummary({ ...apiSum, skipped: dbSum.skipped, suppressed: dbSum.suppressed });
-        else setSummary(dbSum);
+        try {
+          const apiSum = await fetchNotificationSummary();
+          if (apiSum) setSummary({ ...apiSum, skipped: dbSum.skipped, suppressed: dbSum.suppressed, held: dbSum.held });
+          else setSummary(dbSum);
+        } catch (e) {
+          captureError(e, { where: 'useNotifications.summaryApi' });
+          setSummary(dbSum);
+        }
       } else {
-        setSummary(await fetchNotificationSummaryFromDb());
+        setSummary(dbSum);
       }
-    } catch {
-      /* keep previous summary */
+    } catch (e) {
+      captureError(e, { where: 'useNotifications.summary' });
+      /* keep last-good counts; stay null on first failure so the UI does not show 0 */
     }
 
     setLoading(false);
@@ -80,7 +85,7 @@ export function useNotifications(options?: {
       await refetch();
       return null;
     } catch (e) {
-      return e instanceof Error ? e.message : 'Flush failed';
+      return captureError(e, { where: 'useNotifications.flush' });
     } finally {
       setFlushing(false);
     }
@@ -93,7 +98,7 @@ export function useNotifications(options?: {
       .eq('id', id)
       .eq('status', 'failed');
 
-    if (uError) return uError.message;
+    if (uError) return captureError(uError, { where: 'useNotifications.requeue' });
     await refetch();
     return null;
   };
@@ -107,9 +112,9 @@ export function useNotifications(options?: {
         sent_at: null,
       })
       .eq('id', id)
-      .eq('status', 'pending');
+      .in('status', ['pending', 'held']);
 
-    if (uError) return uError.message;
+    if (uError) return captureError(uError, { where: 'useNotifications.removeFromQueue' });
     await refetch();
     return null;
   };
@@ -126,18 +131,22 @@ export function useNotifications(options?: {
       .eq('id', id)
       .eq('status', 'skipped');
 
-    if (uError) return uError.message;
+    if (uError) return captureError(uError, { where: 'useNotifications.restoreToQueue' });
     await refetch();
     return null;
   };
 
   type SuppressionInfo = { reason: string; detail: string; suppressed_at: string };
 
-  const getSuppressionInfo = async (email: string): Promise<SuppressionInfo | null> => {
+  const getSuppressionInfo = async (
+    email: string,
+  ): Promise<{ info: SuppressionInfo | null; error: string | null }> => {
     const { data, error: rpcError } = await supabase.rpc('email_suppression_info', { p_email: email });
-    if (rpcError) return null;
+    if (rpcError) {
+      return { info: null, error: captureError(rpcError, { where: 'useNotifications.suppressionInfo' }) };
+    }
     const row = (Array.isArray(data) ? data[0] : data) as SuppressionInfo | undefined;
-    return row?.reason ? row : null;
+    return { info: row?.reason ? row : null, error: null };
   };
 
   const allowEmailAgain = async (
@@ -146,7 +155,7 @@ export function useNotifications(options?: {
     requeue = false,
   ): Promise<string | null> => {
     const { error: rpcError } = await supabase.rpc('unsuppress_email', { p_email: email });
-    if (rpcError) return rpcError.message;
+    if (rpcError) return captureError(rpcError, { where: 'useNotifications.allowEmailAgain' });
 
     if (eventId) {
       const { error: uError } = await supabase
@@ -163,7 +172,7 @@ export function useNotifications(options?: {
         )
         .eq('id', eventId)
         .eq('status', 'suppressed');
-      if (uError) return uError.message;
+      if (uError) return captureError(uError, { where: 'useNotifications.allowEmailAgain.event' });
     }
 
     await refetch();

@@ -16,6 +16,8 @@ import SendEmailModal from '../../components/crm/SendEmailModal';
 import NewLeadDialog from '../../components/crm/NewLeadDialog';
 import { OutreachBatchManager } from '../../components/crm/OutreachBulkToolbar';
 import RegistryInsights from '../../components/crm/RegistryInsights';
+import { captureError } from '../../lib/errorReporting';
+import { QueryError } from '../../components/ui';
 import { bulkSetOutreachStatus } from '../../lib/crmOutreach';
 
 function CollapsibleSection({
@@ -48,7 +50,7 @@ function CollapsibleSection({
 }
 
 export default function OutreachBoard() {
-  const { stats } = useCrmDashboardStats();
+  const { stats, error: statsError } = useCrmDashboardStats();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
@@ -61,6 +63,7 @@ export default function OutreachBoard() {
   const [sendEmailOpen, setSendEmailOpen] = useState(false);
   const [sendEmailOrganizations, setSendEmailOrganizations] = useState<{ id: string; name: string; email: string; slug: string }[]>([]);
   const [busy, setBusy] = useState(false);
+  const [boardError, setBoardError] = useState<string | null>(null);
   const [globalRefreshTick, setGlobalRefreshTick] = useState(0);
 
   const bump = useCallback(() => {
@@ -94,18 +97,25 @@ export default function OutreachBoard() {
   const handleSendEmail = async () => {
     if (selectedIds.size === 0) return;
     setBusy(true);
+    setBoardError(null);
     try {
       const { supabase } = await import('../../lib/supabase');
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('organizations')
         .select('id, name, email, slug')
         .in('id', Array.from(selectedIds));
-      if (data) {
-        setSendEmailOrganizations(data as { id: string; name: string; email: string; slug: string }[]);
-        setSendEmailOpen(true);
+      if (error) {
+        setBoardError(captureError(error, { where: 'OutreachBoard.sendEmailFetch' }));
+        return;
       }
+      if (!data?.length) {
+        setBoardError('Could not load selected organisations.');
+        return;
+      }
+      setSendEmailOrganizations(data as { id: string; name: string; email: string; slug: string }[]);
+      setSendEmailOpen(true);
     } catch (err) {
-      console.error('Failed to fetch organizations:', err);
+      setBoardError(captureError(err, { where: 'OutreachBoard.sendEmailFetch' }));
     } finally {
       setBusy(false);
     }
@@ -114,13 +124,13 @@ export default function OutreachBoard() {
   const handleBulkMove = async (status: OutreachStatus) => {
     if (selectedIds.size === 0) return;
     setBusy(true);
+    setBoardError(null);
     try {
       await bulkSetOutreachStatus(Array.from(selectedIds), status);
       bump();
       clearSelection();
     } catch (err) {
-      console.error('Failed to move organizations:', err);
-      throw err;
+      setBoardError(captureError(err, { where: 'OutreachBoard.bulkMove' }));
     } finally {
       setBusy(false);
     }
@@ -167,6 +177,9 @@ export default function OutreachBoard() {
           totalCount={totalLeads}
         />
       </div>
+
+      {statsError && <QueryError message={statsError} />}
+      {boardError && <QueryError message={boardError} />}
 
       {busy && selectedIds.size === 0 && (
         <Loader2 size={15} className="animate-spin text-ink-500 mb-4" aria-label="Processing…" />
