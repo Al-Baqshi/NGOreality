@@ -16,7 +16,7 @@ import NgoBillingTopUpPanel from '../../../components/ngo/NgoBillingTopUpPanel';
 
 export default function NgoRequestsPage() {
   const confirm = useConfirm();
-  const { organization, badgeRequests, badges, submitBadgeRequest, isSteward } =
+  const { organization, badgeRequests, badges, submitBadgeRequest, isSteward, error } =
     useNgoPortalContext();
   const hasActiveBadge = badges.some((b) => b.is_active);
   const [requestType, setRequestType] = useState<BadgeRequestType>(
@@ -167,7 +167,13 @@ export default function NgoRequestsPage() {
           />
         ) : null}
 
-        {badgeRequests.length > 0 && (
+        {error && badgeRequests.length === 0 ? (
+          <div className="border-t border-ink-100 pt-6">
+            <p className="text-sm text-accent" role="alert">
+              Past requests could not be loaded.
+            </p>
+          </div>
+        ) : badgeRequests.length > 0 ? (
           <div className="border-t border-ink-100 pt-6">
             <h3 className="text-sm font-black uppercase tracking-tight mb-3">Your past requests</h3>
             <ul className="space-y-3">
@@ -190,7 +196,7 @@ export default function NgoRequestsPage() {
               ))}
             </ul>
           </div>
-        )}
+        ) : null}
       </div>
     </NgoPortalPageShell>
   );

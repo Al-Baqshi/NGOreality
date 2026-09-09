@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 type NgoSetupRequestPanelProps = {
   organization: Organization;
   setupRequests: NgoSetupRequest[];
+  loadError?: string | null;
   onUpdated: () => void;
 };
 
@@ -73,6 +74,7 @@ const STATUS_STYLES: Record<string, string> = {
 export default function NgoSetupRequestPanel({
   organization,
   setupRequests,
+  loadError,
   onUpdated,
 }: NgoSetupRequestPanelProps) {
   const { user, isAuthenticated } = useAuth();
@@ -485,7 +487,11 @@ export default function NgoSetupRequestPanel({
           <h2 className="text-lg font-black uppercase tracking-tight">Previous requests</h2>
         </div>
 
-        {setupRequests.length === 0 ? (
+        {loadError && setupRequests.length === 0 ? (
+          <p className="text-sm text-accent" role="alert">
+            Previous setup requests could not be loaded.
+          </p>
+        ) : setupRequests.length === 0 ? (
           <p className="text-sm text-ink-500">
             No setup requests yet. Submit one above when you are ready.
           </p>

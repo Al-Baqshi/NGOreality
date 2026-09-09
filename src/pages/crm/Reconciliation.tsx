@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, Check, Landmark, Search } from 'lucide-react';
-import { SectionHeader } from '../../components/ui';
+import { QueryError, SectionHeader } from '../../components/ui';
 import {
   listPendingPayments,
   matchReference,
@@ -11,6 +11,7 @@ import {
 } from '../../lib/reconciliation';
 import { PAYMENT_PRODUCT_LABELS } from '../../types';
 import { NGO_BANK_ACCOUNT } from '../../config/billing';
+import { captureError } from '../../lib/errorReporting';
 
 function money(cents: number, currency: string) {
   return new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(cents / 100);
@@ -35,10 +36,18 @@ export default function Reconciliation() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [listError, setListError] = useState<string | null>(null);
+
   const refetch = useCallback(async () => {
     setLoading(true);
-    setPending(await listPendingPayments(200));
-    setLoading(false);
+    try {
+      setPending(await listPendingPayments(200));
+      setListError(null);
+    } catch (err) {
+      setListError(captureError(err, { where: 'Reconciliation.list' }));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -130,8 +139,9 @@ export default function Reconciliation() {
           <span>{error}</span>
         </div>
       )}
+      {listError && <QueryError message={listError} onRetry={() => void refetch()} />}
 
-      {query.trim() && matches.length === 0 && !loading && (
+      {query.trim() && matches.length === 0 && !loading && !listError && (
         <div className="card-brutal mb-4 p-4 text-sm">
           <p className="font-medium">No pending payment matches that reference.</p>
           <p className="mt-1 text-ink-600">
@@ -144,12 +154,16 @@ export default function Reconciliation() {
       <div className="card-brutal overflow-hidden">
         <div className="border-b-3 border-ink-950 p-3">
           <h2 className="font-mono text-2xs uppercase tracking-wider">
-            {query.trim() ? `Matches (${matches.length})` : `Awaiting payment (${pending.length})`}
+            {query.trim()
+              ? `Matches (${listError && pending.length === 0 ? '—' : matches.length})`
+              : `Awaiting payment (${listError && pending.length === 0 ? '—' : pending.length})`}
           </h2>
         </div>
 
         {loading ? (
           <p className="p-8 text-center text-sm text-ink-400">Loading…</p>
+        ) : listError && pending.length === 0 ? (
+          <p className="p-8 text-center text-sm text-accent">Could not load pending payments.</p>
         ) : rows.length === 0 ? (
           <p className="p-8 text-center text-sm text-ink-400">
             Nothing outstanding — every membership payment is reconciled.

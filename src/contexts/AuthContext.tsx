@@ -43,6 +43,8 @@ interface AuthContextValue {
   isStaff: boolean;
   loading: boolean;
   profileLoading: boolean;
+  profileError: string | null;
+  refetchProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signInAsStaff: (username: string, password: string) => Promise<{ error: string | null }>;
   signUp: (
@@ -67,17 +69,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const loadProfile = useCallback(async (userId: string | undefined) => {
     if (!userId) {
       setProfile(null);
+      setProfileError(null);
       setProfileLoading(false);
       return;
     }
     setProfileLoading(true);
-    const next = await fetchUserProfile(userId);
-    setProfile(next);
-    setProfileLoading(false);
+    try {
+      const next = await fetchUserProfile(userId);
+      setProfile(next);
+      setProfileError(null);
+    } catch (err) {
+      // A failed lookup is not "this person is not staff". Keep the last good
+      // profile so a transient PostgREST error cannot boot someone out of CRM.
+      setProfileError(err instanceof Error ? err.message : 'Could not load your profile.');
+    } finally {
+      setProfileLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -176,7 +188,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) return { error: error.message };
 
-      const staffProfile = await fetchUserProfile(data.user.id);
+      let staffProfile: UserProfile | null;
+      try {
+        staffProfile = await fetchUserProfile(data.user.id);
+      } catch (err) {
+        await supabase.auth.signOut();
+        setProfile(null);
+        return { error: err instanceof Error ? err.message : 'Could not load staff profile.' };
+      }
       if (!staffProfile?.is_staff) {
         await supabase.auth.signOut();
         setProfile(null);
@@ -231,11 +250,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await Promise.allSettled([supabase.auth.signOut(), centralSignOut()]);
     setProfile(null);
+    setProfileError(null);
     setCentralUser(null);
   }, []);
 
   const isStaff = profile?.is_staff ?? false;
   const isAuthenticated = Boolean(user || centralUser);
+  const refetchProfile = useCallback(async () => {
+    await loadProfile(user?.id);
+  }, [loadProfile, user?.id]);
 
   const value = useMemo(
     () => ({
@@ -247,6 +270,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isStaff,
       loading,
       profileLoading,
+      profileError,
+      refetchProfile,
       signIn,
       signInAsStaff,
       signUp,
@@ -254,7 +279,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [
       user, session, centralUser, isAuthenticated, profile, isStaff,
-      loading, profileLoading, signIn, signInAsStaff, signUp, signOut,
+      loading, profileLoading, profileError, refetchProfile, signIn, signInAsStaff, signUp, signOut,
     ],
   );
 

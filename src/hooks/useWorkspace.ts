@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import * as crm from '../lib/crmApi';
+import { captureError } from '../lib/errorReporting';
 import type {
   WorkspaceCase,
   WorkspaceCaseNote,
@@ -22,10 +23,8 @@ type AsyncState<T> = {
   error: string | null;
 };
 
-function messageOf(err: unknown): string {
-  if (err instanceof crm.CrmApiError) return err.message;
-  if (err instanceof Error) return err.message;
-  return 'Something went wrong';
+function messageOf(err: unknown, where = 'useWorkspace'): string {
+  return captureError(err, { where });
 }
 
 /**
@@ -59,7 +58,7 @@ export function useWorkspaceIdentity() {
         setState({ data: null, loading: false, error: null });
         return;
       }
-      setState({ data: null, loading: false, error: messageOf(err) });
+      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useWorkspaceIdentity') }));
     }
   }, []);
 
@@ -82,7 +81,7 @@ export function useWorkspaceStats(from?: string, to?: string) {
     try {
       setState({ data: await crm.getStats(from, to), loading: false, error: null });
     } catch (err) {
-      setState({ data: null, loading: false, error: messageOf(err) });
+      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useWorkspaceStats') }));
     }
   }, [from, to]);
 
@@ -112,7 +111,7 @@ export function useClients(params: crm.ClientListParams) {
       const data = await crm.listClients({ search, status, limit, offset });
       setState({ data, loading: false, error: null });
     } catch (err) {
-      setState({ data: null, loading: false, error: messageOf(err) });
+      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useClients') }));
     }
   }, [search, status, limit, offset]);
 
@@ -136,7 +135,7 @@ export function useClient(id: string | undefined) {
     try {
       setState({ data: await crm.getClient(id), loading: false, error: null });
     } catch (err) {
-      setState({ data: null, loading: false, error: messageOf(err) });
+      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useClient') }));
     }
   }, [id]);
 
@@ -169,7 +168,7 @@ export function useCases(params: crm.CaseListParams) {
       });
       setState({ data, loading: false, error: null });
     } catch (err) {
-      setState({ data: null, loading: false, error: messageOf(err) });
+      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useCases') }));
     }
   }, [clientId, status, assignedTo, search, limit, offset]);
 
@@ -193,7 +192,7 @@ export function useCase(id: string | undefined) {
     try {
       setState({ data: await crm.getCase(id), loading: false, error: null });
     } catch (err) {
-      setState({ data: null, loading: false, error: messageOf(err) });
+      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useCase') }));
     }
   }, [id]);
 
@@ -218,7 +217,7 @@ export function useCaseNotes(caseId: string | undefined) {
       const { items } = await crm.listCaseNotes(caseId);
       setState({ data: items, loading: false, error: null });
     } catch (err) {
-      setState({ data: null, loading: false, error: messageOf(err) });
+      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useCaseNotes') }));
     }
   }, [caseId]);
 
@@ -251,7 +250,7 @@ export function useSessions(params: crm.SessionListParams) {
       });
       setState({ data, loading: false, error: null });
     } catch (err) {
-      setState({ data: null, loading: false, error: messageOf(err) });
+      setState((s) => ({ data: s.data, loading: false, error: messageOf(err, 'useSessions') }));
     }
   }, [clientId, caseId, from, to, limit, offset]);
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { captureError } from '../../lib/errorReporting';
 import { MetricCard } from '../ui';
 
 export interface RegistryReadinessStats {
@@ -42,7 +43,7 @@ export default function RegistryInsights({
       });
       if (cancelled) return;
       if (rpcError) {
-        setError(rpcError.message);
+        setError(captureError(rpcError, { where: 'RegistryInsights' }));
         setStats(null);
       } else {
         setStats(data as RegistryReadinessStats);

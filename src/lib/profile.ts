@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { captureError } from './errorReporting';
 
 export interface UserProfile {
   id: string;
@@ -13,6 +14,8 @@ export async function fetchUserProfile(userId: string): Promise<UserProfile | nu
     .eq('id', userId)
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error) {
+    throw new Error(captureError(error, { where: 'fetchUserProfile' }));
+  }
   return data;
 }

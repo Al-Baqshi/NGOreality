@@ -38,7 +38,18 @@ export async function loadCashflowYearSnapshot(monthCount = 12): Promise<Omit<Ca
   const hasUnits = units.length >= periods.length * 5;
 
   if (lines.length < expectedLineCount * 0.4 || !hasUnits) {
-    await applyLinkedCashflowForecast(periods, units);
+    const applied = await applyLinkedCashflowForecast(periods, units);
+    if (applied.error) {
+      return {
+        periods,
+        totalsByPeriod: {},
+        yearReceiptsExpected: 0,
+        yearOperatingExpected: 0,
+        yearNetExpected: 0,
+        month12ClosingExpected: 0,
+        error: applied.error,
+      };
+    }
     const [lines2, units2] = await Promise.all([fetchCashflowLines(periods), fetchCashflowUnits(periods)]);
     unitGrid = buildUnitGrid(periods, units2);
     const grid = buildCashflowGrid(periods, lines2, actualMap, unitGrid);

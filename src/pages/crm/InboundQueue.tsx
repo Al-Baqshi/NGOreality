@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useOrganizationsPage } from '../../hooks/useCrm';
-import { SectionHeader } from '../../components/ui';
+import { SectionHeader, QueryError } from '../../components/ui';
 import { registerAsCustomer } from '../../lib/crmOutreach';
+import { captureError } from '../../lib/errorReporting';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import PipelineGuide from '../../components/crm/PipelineGuide';
 import { ArrowLeft, UserPlus, Mail } from 'lucide-react';
@@ -10,7 +11,8 @@ import { ArrowLeft, UserPlus, Mail } from 'lucide-react';
 export default function InboundQueue() {
   const confirm = useConfirm();
   const [page, setPage] = useState(1);
-  const { organizations, totalCount, totalPages, loading, refetch } = useOrganizationsPage(
+  const [actionError, setActionError] = useState<string | null>(null);
+  const { organizations, totalCount, totalPages, loading, error, refetch } = useOrganizationsPage(
     { inboundOnly: true },
     page,
     50,
@@ -23,8 +25,13 @@ export default function InboundQueue() {
       confirmLabel: 'Register',
     });
     if (!ok) return;
-    await registerAsCustomer(orgId);
-    refetch();
+    setActionError(null);
+    try {
+      await registerAsCustomer(orgId);
+      refetch();
+    } catch (err) {
+      setActionError(captureError(err, { where: 'InboundQueue.registerCustomer' }));
+    }
   };
 
   const withEmail = organizations.filter((o) => o.email?.trim());
@@ -41,6 +48,8 @@ export default function InboundQueue() {
       <SectionHeader>Inbound queue</SectionHeader>
       <PipelineGuide variant="inbound" />
 
+      {actionError && <QueryError message={actionError} />}
+
       {withEmail.length > 0 && (
         <div className="mb-6 card-brutal p-4">
           <p className="text-sm text-ink-600 mb-2">
@@ -56,6 +65,10 @@ export default function InboundQueue() {
       <div className="card-brutal overflow-hidden">
         {loading ? (
           <p className="p-8 text-center text-sm text-ink-400">Loading…</p>
+        ) : error ? (
+          <div className="p-4">
+            <QueryError message={error} onRetry={refetch} />
+          </div>
         ) : organizations.length === 0 ? (
           <p className="p-8 text-center text-sm text-ink-400">No inbound leads yet. Move contacted NGOs to Registered on the outreach board.</p>
         ) : (

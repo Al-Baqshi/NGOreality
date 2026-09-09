@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { findRegistryDuplicate } from '../../hooks/useCrm';
+import { captureError } from '../../lib/errorReporting';
 import { SectionHeader, FormField } from '../../components/ui';
 import { CATEGORIES, DEFAULT_CRITERIA } from '../../types';
 import type { OrgStatus } from '../../types';
@@ -12,6 +13,7 @@ export default function OrganizationNew() {
   const navigate = useNavigate();
   const [duplicate, setDuplicate] = useState<{ id: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [createdOrgId, setCreatedOrgId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '',
     slug: '',
@@ -38,23 +40,34 @@ export default function OrganizationNew() {
       setDuplicate(null);
       return;
     }
-    const existing = await findRegistryDuplicate(form.source_registry, form.external_id);
-    if (existing) {
-      setDuplicate({ id: existing.id, name: existing.name });
-    } else {
+    try {
+      const existing = await findRegistryDuplicate(form.source_registry, form.external_id);
+      if (existing) {
+        setDuplicate({ id: existing.id, name: existing.name });
+      } else {
+        setDuplicate(null);
+      }
+    } catch (err) {
       setDuplicate(null);
+      setError(captureError(err, { where: 'OrganizationNew.duplicateCheck' }));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setCreatedOrgId(null);
 
     if (form.source_registry.trim() && form.external_id.trim()) {
-      const existing = await findRegistryDuplicate(form.source_registry, form.external_id);
-      if (existing) {
-        setDuplicate({ id: existing.id, name: existing.name });
-        setError('This registry record already exists in the CRM.');
+      try {
+        const existing = await findRegistryDuplicate(form.source_registry, form.external_id);
+        if (existing) {
+          setDuplicate({ id: existing.id, name: existing.name });
+          setError('This registry record already exists in the CRM.');
+          return;
+        }
+      } catch (err) {
+        setError(captureError(err, { where: 'OrganizationNew.duplicateCheck' }));
         return;
       }
     }
@@ -81,24 +94,40 @@ export default function OrganizationNew() {
     const { data, error: insertError } = await supabase.from('organizations').insert(payload).select().maybeSingle();
 
     if (insertError) {
-      setError(insertError.message);
+      setError(captureError(insertError, { where: 'OrganizationNew.insert' }));
       return;
     }
 
-    if (data) {
-      const criteriaRows = DEFAULT_CRITERIA.map((c) => ({
-        organization_id: data.id,
-        ...c,
-      }));
-      await supabase.from('verification_criteria').insert(criteriaRows);
-      await supabase.from('activity_log').insert({
-        organization_id: data.id,
-        action: 'created',
-        description: 'Organization created manually',
-        performed_by: 'staff',
-      });
-      navigate(`/organizations/${data.id}`);
+    if (!data) {
+      setError(
+        captureError(new Error('Organisation was saved but the new record could not be loaded'), {
+          where: 'OrganizationNew.insertEmpty',
+        }),
+      );
+      return;
     }
+
+    const criteriaRows = DEFAULT_CRITERIA.map((c) => ({
+      organization_id: data.id,
+      ...c,
+    }));
+    const { error: criteriaError } = await supabase.from('verification_criteria').insert(criteriaRows);
+    if (criteriaError) {
+      captureError(criteriaError, { where: 'OrganizationNew.criteria' });
+      setError(
+        `Organisation created, but criteria could not be initialised: ${criteriaError.message}. The record is still there — open it and initialise criteria.`,
+      );
+      setCreatedOrgId(data.id);
+      return;
+    }
+    const { error: logError } = await supabase.from('activity_log').insert({
+      organization_id: data.id,
+      action: 'created',
+      description: 'Organization created manually',
+      performed_by: 'staff',
+    });
+    if (logError) captureError(logError, { where: 'OrganizationNew.activityLog' });
+    navigate(`/organizations/${data.id}`);
   };
 
   return (
@@ -128,7 +157,17 @@ export default function OrganizationNew() {
       )}
 
       {error && (
-        <div className="mb-4 border-3 border-accent bg-accent-light px-4 py-3 text-sm text-accent">{error}</div>
+        <div className="mb-4 border-3 border-accent bg-accent-light px-4 py-3 text-sm text-accent">
+          {error}
+          {createdOrgId && (
+            <>
+              {' '}
+              <Link to={`/organizations/${createdOrgId}`} className="underline font-semibold">
+                Open the organisation
+              </Link>
+            </>
+          )}
+        </div>
       )}
 
       <form onSubmit={handleSubmit} className="card-brutal p-6 space-y-4">

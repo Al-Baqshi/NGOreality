@@ -1,31 +1,33 @@
 import { Link } from 'react-router-dom';
 import { useCrmDashboardStats, useWorkQueue } from '../../hooks/useCrm';
-import { SectionHeader } from '../../components/ui';
+import { SectionHeader, QueryError } from '../../components/ui';
 import { Activity, Globe } from 'lucide-react';
 
 export default function Monitoring() {
-  const { stats, loading, websitePct, monitorPct } = useCrmDashboardStats();
-  const { incidents, loading: incLoading } = useWorkQueue();
+  const { stats, loading, error: statsError, websitePct, monitorPct, refetch } = useCrmDashboardStats();
+  const { incidents, loading: incLoading, incidentsError, refetch: refetchIncidents } = useWorkQueue();
 
   return (
     <div className="max-w-4xl mx-auto">
       <SectionHeader>Website monitoring</SectionHeader>
 
+      {statsError && <QueryError message={statsError} onRetry={refetch} />}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         <div className="card-brutal p-5 text-center">
-          <div className="text-3xl font-black">{loading ? '—' : `${websitePct}%`}</div>
+          <div className="text-3xl font-black">{loading || statsError ? '—' : `${websitePct}%`}</div>
           <div className="label-brutal mt-1">Listed w/ website</div>
         </div>
         <div className="card-brutal p-5 text-center">
-          <div className="text-3xl font-black text-teal">{loading ? '—' : `${monitorPct}%`}</div>
+          <div className="text-3xl font-black text-teal">{loading || statsError ? '—' : `${monitorPct}%`}</div>
           <div className="label-brutal mt-1">Monitors up</div>
         </div>
         <div className="card-brutal p-5 text-center">
-          <div className="text-3xl font-black text-accent">{loading ? '—' : stats.monitors_down}</div>
+          <div className="text-3xl font-black text-accent">{loading || statsError ? '—' : stats.monitors_down}</div>
           <div className="label-brutal mt-1">Down now</div>
         </div>
         <div className="card-brutal p-5 text-center">
-          <div className="text-3xl font-black">{loading ? '—' : stats.incidents_open}</div>
+          <div className="text-3xl font-black">{loading || statsError ? '—' : stats.incidents_open}</div>
           <div className="label-brutal mt-1">Open incidents</div>
         </div>
       </div>
@@ -41,10 +43,19 @@ export default function Monitoring() {
         </div>
         {incLoading ? (
           <p className="p-6 text-sm text-ink-400 text-center">Loading…</p>
+        ) : incidentsError && incidents.length === 0 ? (
+          <div className="p-4">
+            <QueryError message={incidentsError} onRetry={refetchIncidents} />
+          </div>
         ) : incidents.length === 0 ? (
           <p className="p-6 text-sm text-ink-400 text-center">No open incidents</p>
         ) : (
           <div className="divide-y divide-ink-100">
+            {incidentsError && (
+              <div className="p-4 border-b border-ink-100">
+                <QueryError message={incidentsError} onRetry={refetchIncidents} />
+              </div>
+            )}
             {incidents.map((inc) => (
               <Link
                 key={inc.id}

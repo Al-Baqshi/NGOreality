@@ -7,7 +7,8 @@ import {
 import { useCrmDashboardStats } from '../../hooks/useCrm';
 import { useCrmNavCounts } from '../../hooks/useCrmNavCounts';
 import { supabase } from '../../lib/supabase';
-import { MetricCard } from '../../components/ui';
+import { captureError } from '../../lib/errorReporting';
+import { MetricCard, QueryError } from '../../components/ui';
 import RegistryInsights from '../../components/crm/RegistryInsights';
 
 /**
@@ -43,6 +44,7 @@ interface RecentActivity {
 
 function useRecentActivity(limit = 8) {
   const [rows, setRows] = useState<RecentActivity[]>([]);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     supabase
@@ -50,12 +52,18 @@ function useRecentActivity(limit = 8) {
       .select('id, organization_id, action, description, created_at, organizations(name)')
       .order('created_at', { ascending: false })
       .limit(limit)
-      .then(({ data }) => {
-        if (!cancelled) setRows((data ?? []) as unknown as RecentActivity[]);
+      .then(({ data, error: queryError }) => {
+        if (cancelled) return;
+        if (queryError) {
+          setError(captureError(queryError, { where: 'Dashboard.recentActivity' }));
+        } else {
+          setError(null);
+          setRows((data ?? []) as unknown as RecentActivity[]);
+        }
       });
     return () => { cancelled = true; };
   }, [limit]);
-  return rows;
+  return { rows, error };
 }
 
 function ago(iso: string): string {
@@ -68,7 +76,7 @@ function ago(iso: string): string {
 export default function Dashboard() {
   const { stats, loading, error, websitePct, monitorPct } = useCrmDashboardStats();
   const counts = useCrmNavCounts();
-  const recent = useRecentActivity();
+  const { rows: recent, error: activityError } = useRecentActivity();
 
   const actions: ActionItem[] = [
     { key: 'inquiries', count: counts.inquiries, label: 'new enquiry', verb: 'Reply', to: '/inquiries', icon: Inbox, urgent: true },
@@ -80,7 +88,7 @@ export default function Dashboard() {
     { key: 'incidents', count: stats?.incidents_open ?? 0, label: 'site down', verb: 'Check', to: '/monitoring', icon: AlertTriangle },
   ].filter((a) => a.count > 0);
 
-  const n = (v: number | undefined) => (loading || v === undefined ? '—' : v.toLocaleString());
+  const n = (v: number | undefined) => (loading || error || v === undefined ? '—' : v.toLocaleString());
 
   return (
     <div className="page-shell">
@@ -96,11 +104,8 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {error && (
-        <div className="card-brutal border-accent p-3 mb-4 text-sm text-accent">
-          Stats unavailable: {error}
-        </div>
-      )}
+      {error && <QueryError message={error} />}
+      {!error && counts.error && <QueryError message={counts.error} />}
 
       {/* 1. What needs a human */}
       <section className="mb-8">
@@ -109,7 +114,11 @@ export default function Dashboard() {
           <div className="card-brutal p-5 flex items-center gap-3">
             <CheckCircle2 size={20} className="text-teal shrink-0" />
             <p className="text-sm">
-              {loading ? 'Checking…' : 'Nothing is waiting. Everything in the queues is clear.'}
+              {loading
+                ? 'Checking…'
+                : error || counts.error
+                  ? 'Queue counts could not be loaded.'
+                  : 'Nothing is waiting. Everything in the queues is clear.'}
             </p>
           </div>
         ) : (
@@ -182,8 +191,8 @@ export default function Dashboard() {
       <section className="mb-8">
         <h2 className="label-brutal mb-2">Registry coverage</h2>
         <div className="responsive-grid">
-          <MetricCard label="Listed with a website" value={loading ? '—' : `${websitePct}%`} />
-          <MetricCard label="Monitors reporting up" value={loading ? '—' : `${monitorPct}%`} />
+          <MetricCard label="Listed with a website" value={loading || error ? '—' : `${websitePct}%`} />
+          <MetricCard label="Monitors reporting up" value={loading || error ? '—' : `${monitorPct}%`} />
           <MetricCard label="Without a website" value={n(stats?.listed_without_website)} />
           <MetricCard label="In NZ registry" value={n(stats?.nz_registry)} />
         </div>
@@ -194,7 +203,10 @@ export default function Dashboard() {
         <section>
           <h2 className="label-brutal mb-2">Latest activity</h2>
           <div className="card-brutal divide-y-2 divide-ink-200 dark:divide-border">
-            {recent.length === 0 && (
+            {activityError && (
+              <p className="p-4 text-sm text-accent">Could not load activity: {activityError}</p>
+            )}
+            {!activityError && recent.length === 0 && (
               <p className="p-4 text-sm text-ink-500 dark:text-muted-foreground">Nothing recorded yet.</p>
             )}
             {recent.map((row) => (

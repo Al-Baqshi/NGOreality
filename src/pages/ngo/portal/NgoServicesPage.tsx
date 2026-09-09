@@ -17,6 +17,7 @@ import {
 import { NGO_BANK_ACCOUNT } from '../../../config/billing';
 import { PAYMENT_PRODUCT_LABELS, type OrganizationPayment, type PaymentProductType } from '../../../types';
 import { supabase } from '../../../lib/supabase';
+import { captureError } from '../../../lib/errorReporting';
 import { cn } from '@/lib/utils';
 
 function money(cents: number) {
@@ -29,6 +30,7 @@ export default function NgoServicesPage() {
   const { user, centralUser, isAuthenticated } = useAuth();
   const { organization, refetch } = useNgoPortalContext();
   const [payments, setPayments] = useState<OrganizationPayment[]>([]);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
   const [reference, setReference] = useState('');
   const [busy, setBusy] = useState<PaymentProductType | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -38,15 +40,35 @@ export default function NgoServicesPage() {
 
   useEffect(() => {
     if (!organization?.id) return;
-    void ensurePaymentReference(organization.id).then(setReference);
-    void supabase
-      .from('organization_payments')
-      .select('*')
-      .eq('organization_id', organization.id)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        if (data) setPayments(data as OrganizationPayment[]);
-      });
+    let cancelled = false;
+    setError(null);
+    void (async () => {
+      const failures: string[] = [];
+      try {
+        const ref = await ensurePaymentReference(organization.id);
+        if (!cancelled) setReference(ref);
+      } catch (err) {
+        failures.push(captureError(err, { where: 'NgoServicesPage.paymentReference' }));
+      }
+      const { data, error: listError } = await supabase
+        .from('organization_payments')
+        .select('*')
+        .eq('organization_id', organization.id)
+        .order('created_at', { ascending: false });
+      if (cancelled) return;
+      if (listError) {
+        const msg = captureError(listError, { where: 'NgoServicesPage.payments' });
+        failures.push(msg);
+        setPaymentsError(msg);
+      } else {
+        setPaymentsError(null);
+        setPayments((data ?? []) as OrganizationPayment[]);
+      }
+      setError(failures.length ? failures.join(' · ') : null);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [organization?.id]);
 
   if (!organization) return null;
@@ -67,14 +89,22 @@ export default function NgoServicesPage() {
   const packagePending = payments.find(
     (p) => p.product_type === 'landing_standards_package' && p.status === 'pending',
   );
+  const paymentsUnknown = Boolean(paymentsError) && payments.length === 0;
 
   const refreshPayments = async () => {
-    const { data } = await supabase
+    const { data, error: listError } = await supabase
       .from('organization_payments')
       .select('*')
       .eq('organization_id', organization.id)
       .order('created_at', { ascending: false });
-    if (data) setPayments(data as OrganizationPayment[]);
+    if (listError) {
+      const msg = captureError(listError, { where: 'NgoServicesPage.refreshPayments' });
+      setPaymentsError(msg);
+      setError(msg);
+      return;
+    }
+    setPaymentsError(null);
+    setPayments((data ?? []) as OrganizationPayment[]);
     await refetch();
   };
 
@@ -135,7 +165,7 @@ export default function NgoServicesPage() {
       }
 
       if (productType === 'landing_standards_package' && user?.id) {
-        const { data: existingSetup } = await supabase
+        const { data: existingSetup, error: setupLookupError } = await supabase
           .from('ngo_setup_requests')
           .select('id')
           .eq('organization_id', organization.id)
@@ -144,7 +174,11 @@ export default function NgoServicesPage() {
           .limit(1)
           .maybeSingle();
 
-        if (!existingSetup) {
+        if (setupLookupError) {
+          setError(
+            `Payment ready, but we could not check existing setup requests: ${captureError(setupLookupError, { where: 'NgoServicesPage.setupLookup' })}`,
+          );
+        } else if (!existingSetup) {
           const { error: setupError } = await submitNgoSetupRequest({
             organizationId: organization.id,
             userId: user.id,
@@ -175,7 +209,7 @@ export default function NgoServicesPage() {
       );
       await refreshPayments();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not prepare payment instructions.');
+      setError(captureError(err, { where: 'NgoServicesPage.startPayment' }));
     } finally {
       setBusy(null);
     }
@@ -235,6 +269,10 @@ export default function NgoServicesPage() {
                 <p className="inline-flex min-h-[48px] items-center gap-2 text-sm font-semibold text-teal">
                   <CheckCircle size={16} /> Membership paid
                 </p>
+              ) : paymentsUnknown ? (
+                <p className="min-h-[48px] text-sm text-accent" role="status">
+                  Payment status could not be loaded.
+                </p>
               ) : (
                 <button
                   type="button"
@@ -279,6 +317,10 @@ export default function NgoServicesPage() {
               {packagePaid ? (
                 <p className="inline-flex min-h-[48px] items-center gap-2 text-sm font-semibold text-teal">
                   <CheckCircle size={16} /> Package paid — our team will fulfill
+                </p>
+              ) : paymentsUnknown ? (
+                <p className="min-h-[48px] text-sm text-accent" role="status">
+                  Payment status could not be loaded.
                 </p>
               ) : (
                 <button

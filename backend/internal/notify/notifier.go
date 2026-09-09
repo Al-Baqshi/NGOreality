@@ -2,6 +2,7 @@ package notify
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"ngoreality/backend/internal/config"
@@ -33,8 +34,8 @@ type ProcessResult struct {
 func (n *Notifier) ProcessPending(ctx context.Context, st *store.Store, batchSize int) (ProcessResult, error) {
 	var result ProcessResult
 	if !n.resend.Enabled() {
-		n.log.Debug("notify: RESEND_API_KEY or NOTIFY_FROM_EMAIL not set — skipping send")
-		return result, nil
+		n.log.Error("notify: RESEND_API_KEY or NOTIFY_FROM_EMAIL not set — not sending")
+		return result, fmt.Errorf("email sending is not configured: set RESEND_API_KEY and NOTIFY_FROM_EMAIL")
 	}
 
 	events, err := st.ListPendingNotifications(ctx, batchSize)

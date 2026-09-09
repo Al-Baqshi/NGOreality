@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { captureError } from './errorReporting';
 import type { BadgeRequestStatus, NgoSetupRequestStatus } from '../types';
 
 /**
@@ -16,15 +17,16 @@ export async function updateBadgeRequestStatus(
     .from('badge_requests')
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', requestId);
-  if (error) return error.message;
+  if (error) return captureError(error, { where: 'updateBadgeRequestStatus' });
 
-  await supabase.from('activity_log').insert({
+  const { error: logError } = await supabase.from('activity_log').insert({
     organization_id: organizationId,
     action: 'badge_request_status',
     description: `Badge request marked ${status.replace('_', ' ')}`,
     performed_by: 'staff',
     metadata: { badge_request_id: requestId, status },
   });
+  if (logError) captureError(logError, { where: 'updateBadgeRequestStatus.activityLog' });
   return null;
 }
 
@@ -37,14 +39,15 @@ export async function updateSetupRequestStatus(
     .from('ngo_setup_requests')
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', requestId);
-  if (error) return error.message;
+  if (error) return captureError(error, { where: 'updateSetupRequestStatus' });
 
-  await supabase.from('activity_log').insert({
+  const { error: logError } = await supabase.from('activity_log').insert({
     organization_id: organizationId,
     action: 'setup_request_status',
     description: `Setup request marked ${status.replace('_', ' ')}`,
     performed_by: 'staff',
     metadata: { setup_request_id: requestId, status },
   });
+  if (logError) captureError(logError, { where: 'updateSetupRequestStatus.activityLog' });
   return null;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Save, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { captureError } from '../../lib/errorReporting';
 import { FormField } from '../ui';
 import {
   CATEGORIES,
@@ -110,17 +111,18 @@ export default function NewLeadDialog({
       if (insertError) throw new Error(insertError.message);
       if (!data) throw new Error('The lead was not created.');
 
-      await supabase.from('activity_log').insert({
+      const { error: logError } = await supabase.from('activity_log').insert({
         organization_id: data.id,
         action: 'created',
         description: `Lead added manually — starts in "${OUTREACH_STATUS_LABELS[stage]}"`,
         performed_by: 'staff',
       });
+      if (logError) captureError(logError, { where: 'NewLeadDialog.activityLog' });
 
       onCreated(data.id);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create the lead.');
+      setError(captureError(err, { where: 'NewLeadDialog.create' }));
     } finally {
       setBusy(false);
     }

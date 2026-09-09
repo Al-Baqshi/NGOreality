@@ -8,7 +8,7 @@ interface Props {
 }
 
 export default function OutreachHeader({ onNewLead, onNavigateWorklist }: Props) {
-  const { count: outreachFailedCount } = useOutreachFailedCount();
+  const { count: outreachFailedCount, error: failedCountError } = useOutreachFailedCount();
 
   return (
     <div className="flex flex-col gap-2">
@@ -61,6 +61,18 @@ export default function OutreachHeader({ onNewLead, onNavigateWorklist }: Props)
             <span className="block font-mono text-2xs text-ink-400">Outreach + system email queue</span>
           </span>
         </Link>
+        {failedCountError && (
+          <Link
+            to="/email-notifications?status=failed"
+            className="card-brutal-hover px-4 py-3 flex items-center gap-2 text-sm min-h-[44px] border-2 border-accent"
+          >
+            <AlertTriangle size={16} className="text-accent shrink-0" aria-hidden />
+            <span>
+              <strong className="text-accent">Could not load failed-send count</strong>
+              <span className="block font-mono text-2xs text-ink-400">Open the email queue to check</span>
+            </span>
+          </Link>
+        )}
         {outreachFailedCount > 0 && (
           <Link
             to="/email-notifications?status=failed"

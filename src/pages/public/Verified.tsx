@@ -5,9 +5,10 @@ import { CATEGORIES } from '../../types';
 import SEO, { BreadcrumbJsonLd } from '../../components/SEO';
 import { FINANCIAL_VERIFICATION_ENABLED } from '../../config/features';
 import FinancialComingSoon from '../../components/FinancialComingSoon';
+import { QueryError } from '../../components/ui';
 
 export default function Verified() {
-  const { organizations, loading } = usePublicOrganizations();
+  const { organizations, loading, error } = usePublicOrganizations();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [tierFilter, setTierFilter] = useState<'all' | 'verified'>('all');
@@ -52,14 +53,14 @@ export default function Verified() {
               <div className="flex items-center gap-2">
                 <Shield size={16} className="text-teal" />
                 <span className="font-mono text-xs uppercase tracking-wider text-ink-300">
-                  {verifiedCount} Reality Badge
+                  {error && organizations.length === 0 ? '—' : verifiedCount} Reality Badge
                 </span>
               </div>
               {FINANCIAL_VERIFICATION_ENABLED && (
                 <div className="flex items-center gap-2">
                   <Landmark size={16} className="text-accent" />
                   <span className="font-mono text-xs uppercase tracking-wider text-ink-300">
-                    {financialCount} Transparent Financial
+                    {error && organizations.length === 0 ? '—' : financialCount} Transparent Financial
                   </span>
                 </div>
               )}
@@ -130,19 +131,22 @@ export default function Verified() {
       <section className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6">
           <span className="font-mono text-xs uppercase tracking-wider text-ink-500">
-            {filtered.length} organization{filtered.length !== 1 ? 's' : ''} found
+            {error && organizations.length === 0
+              ? 'Listing counts could not be loaded'
+              : `${filtered.length} organization${filtered.length !== 1 ? 's' : ''} found`}
           </span>
         </div>
 
-        {loading ? (
+        {error ? <QueryError message={error} /> : null}
+        {loading && organizations.length === 0 ? (
           <div className="text-center py-16 font-mono text-sm text-ink-400">Loading...</div>
-        ) : filtered.length === 0 ? (
+        ) : filtered.length === 0 && !error ? (
           <div className="text-center py-16">
             <Shield size={48} className="text-ink-200 mx-auto mb-4" />
             <h3 className="text-lg font-bold text-ink-700 mb-2">No organizations found</h3>
             <p className="text-sm text-ink-400">Try adjusting your search or filters.</p>
           </div>
-        ) : (
+        ) : filtered.length === 0 ? null : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtered.map((org) => (
               <div key={org.id} className="card-brutal-hover p-6">

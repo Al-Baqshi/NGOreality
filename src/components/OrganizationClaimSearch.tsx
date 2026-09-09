@@ -80,7 +80,7 @@ export default function OrganizationClaimSearch({ selected, onSelect, onRegister
           {loading && (
             <p className="px-4 py-3 font-mono text-2xs text-ink-400 uppercase tracking-wider">Searching…</p>
           )}
-          {!loading && searched && results.length === 0 && (
+          {!loading && searched && !searchError && results.length === 0 && (
             <div className="px-4 py-4 text-center">
               <p className="text-sm text-ink-600 mb-3">No match in our directory.</p>
               <button type="button" onClick={onRegisterNew} className="btn-brutal-outline text-2xs min-h-[44px] px-4">

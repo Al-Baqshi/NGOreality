@@ -6,7 +6,8 @@ import {
   ChevronDown, ChevronUp, Trash2, CheckSquare, Square,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { EmptyState } from '../../components/ui';
+import { captureError } from '../../lib/errorReporting';
+import { EmptyState, QueryError } from '../../components/ui';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
 /**
@@ -259,7 +260,7 @@ export default function ActivityFeed() {
       clearSelection();
       setSelectionMode(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      setError(captureError(e, { where: 'ActivityFeed.bulkDelete' }));
     } finally {
       setDeleteBusy(false);
     }
@@ -284,7 +285,7 @@ export default function ActivityFeed() {
     query.then(({ data, error, count }) => {
       if (cancelled) return;
       if (error) {
-        setError(error.message);
+        setError(captureError(error, { where: 'ActivityFeed.list' }));
         setRows([]);
         setTotal(0);
       } else {
@@ -368,7 +369,7 @@ export default function ActivityFeed() {
         )}
       </form>
 
-      {error && <div className="card-brutal p-3 mb-4 text-sm border-accent text-accent">{error}</div>}
+      {error && <QueryError message={error} />}
 
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <p className="font-mono text-2xs uppercase tracking-wider text-ink-500">
@@ -376,7 +377,9 @@ export default function ActivityFeed() {
             ? `${total.toLocaleString()} entr${total === 1 ? 'y' : 'ies'}`
             : loading
               ? 'Loading…'
-              : 'No entries'}
+              : error
+                ? 'Could not load'
+                : 'No entries'}
         </p>
         {!loading && grouped.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
@@ -466,7 +469,7 @@ export default function ActivityFeed() {
         </div>
       )}
 
-      {!loading && !rows.length && (
+      {!loading && !error && !rows.length && (
         <EmptyState icon={<History size={28} />} title="Nothing here yet" description="No activity matches this filter." />
       )}
 

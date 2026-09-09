@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FileSpreadsheet, Loader2 } from 'lucide-react';
 import CashflowYearOutlook from './CashflowYearOutlook';
 import { loadCashflowYearSnapshot } from '../../lib/businessCashflowSnapshot';
+import { captureError } from '../../lib/errorReporting';
 import { NZ_GST_RATE_LABEL } from '../../config/nzCashflowGuide';
 import { formatNzCurrency } from '../../lib/formatMoney';
 
@@ -23,7 +24,7 @@ export default function BusinessPlanFinancialSnapshot() {
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load cashflow');
+        if (!cancelled) setError(captureError(err, { where: 'BusinessPlanFinancialSnapshot' }));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

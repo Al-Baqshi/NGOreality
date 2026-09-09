@@ -19,9 +19,10 @@ function badgeEmbedSnippet(organizationName: string): string {
 }
 
 export default function NgoBadgePage() {
-  const { badges, organization, memberships, criteria } = useNgoPortalContext();
+  const { badges, organization, memberships, criteria, error } = useNgoPortalContext();
   const activeBadge = badges.find((b) => b.is_active);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   const membershipStatus = getMembershipDisplayStatus(getLatestMembership(memberships));
   const hasActiveMembership =
@@ -38,9 +39,10 @@ export default function NgoBadgePage() {
     try {
       await navigator.clipboard.writeText(embedCode);
       setCopied(true);
+      setCopyError(null);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard unavailable — the user can select the text manually.
+      setCopyError('Could not copy. Select the snippet and copy it yourself.');
     }
   };
 
@@ -76,6 +78,8 @@ export default function NgoBadgePage() {
                 )}
               </dl>
             </div>
+          ) : error ? (
+            <p className="text-sm text-ink-500">Badge status could not be loaded.</p>
           ) : (
             <div className="space-y-3">
               <p className="text-sm text-ink-700 leading-relaxed">
@@ -125,6 +129,11 @@ export default function NgoBadgePage() {
               <pre className="overflow-x-auto border-2 border-ink-950 bg-ink-50 p-3 font-mono text-2xs leading-relaxed dark:bg-muted">
                 {embedCode}
               </pre>
+              {copyError ? (
+                <p className="mt-2 text-xs text-accent" role="alert">
+                  {copyError}
+                </p>
+              ) : null}
             </div>
           </div>
         )}

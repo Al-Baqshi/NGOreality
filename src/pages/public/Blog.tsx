@@ -1,10 +1,11 @@
 import { useBlogPosts } from '../../hooks/useSupabase';
 import { Link } from 'react-router-dom';
 import { Calendar, User, ArrowRight, FileText } from 'lucide-react';
+import { QueryError } from '../../components/ui';
 import SEO, { BreadcrumbJsonLd } from '../../components/SEO';
 
 export default function Blog() {
-  const { posts, loading } = useBlogPosts();
+  const { posts, loading, error } = useBlogPosts();
 
   return (
     <>
@@ -35,8 +36,11 @@ export default function Blog() {
 
         {/* Posts */}
         <section className="max-w-7xl mx-auto px-6 py-16 md:py-24">
-          {loading ? (
+          {error && posts.length > 0 ? <QueryError message={error} /> : null}
+          {loading && posts.length === 0 ? (
             <div className="text-center py-16 font-mono text-sm text-ink-400">Loading posts...</div>
+          ) : error && posts.length === 0 ? (
+            <QueryError message={error} />
           ) : posts.length === 0 ? (
             <div className="text-center py-16">
               <FileText size={48} className="text-ink-200 mx-auto mb-4" />

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle, Globe, Phone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { captureError } from '../../lib/errorReporting';
 import {
   getProfileCompletionItems,
   profileCompletionPercent,
@@ -341,7 +342,7 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
 
     setProfileSaving(false);
     if (error) {
-      setSaveError(error.message);
+      setSaveError(captureError(error, { where: 'NgoProfilePanel.save' }));
       return;
     }
     setProfileMessage('Profile saved.');

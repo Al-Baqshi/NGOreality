@@ -56,6 +56,22 @@ func TestTokensAreUnpredictableAndHashed(t *testing.T) {
 	}
 }
 
+func TestInviteWouldExceedLeavesRoomForTheFirstTeammate(t *testing.T) {
+	// Owner is not billable. DEFAULT seats_purchased=1 must allow the first invite.
+	if inviteWouldExceed(0, 0, 1) {
+		t.Fatal("owner-only workspace with 1 extra seat must accept the first invite")
+	}
+	if !inviteWouldExceed(0, 1, 1) {
+		t.Fatal("a pending invite should reserve the only extra seat")
+	}
+	if !inviteWouldExceed(1, 0, 1) {
+		t.Fatal("one extra teammate already seated should block another invite")
+	}
+	if inviteWouldExceed(1, 0, 2) {
+		t.Fatal("two purchased extra seats should still have room after one teammate")
+	}
+}
+
 func TestNormaliseEmail(t *testing.T) {
 	cases := map[string]string{
 		"  Person@Example.ORG ": "person@example.org",

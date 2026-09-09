@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { captureError } from './errorReporting';
 import { ensurePaymentReference } from './payments';
 import { previewOutreachEmail, queueNotification } from './notifications';
 import { flushPendingNotifications } from './monitorApi';
@@ -17,12 +18,13 @@ export async function setOutreachStatus(orgId: string, outreach: OutreachStatus)
     .update({ outreach_status: outreach, updated_at: new Date().toISOString() })
     .eq('id', orgId);
   if (error) throw error;
-  await supabase.from('activity_log').insert({
+  const { error: logError } = await supabase.from('activity_log').insert({
     organization_id: orgId,
     action: 'outreach_updated',
     description: `Outreach: ${OUTREACH_STATUS_LABELS[outreach]}`,
     performed_by: 'staff',
   });
+  if (logError) captureError(logError, { where: 'setOutreachStatus.activityLog' });
 }
 
 export async function bulkSetOutreachStatus(orgIds: string[], outreach: OutreachStatus) {
@@ -40,7 +42,7 @@ export async function bulkSetOutreachStatus(orgIds: string[], outreach: Outreach
       .in('id', slice);
     if (error) throw error;
 
-    await supabase.from('activity_log').insert(
+    const { error: logError } = await supabase.from('activity_log').insert(
       slice.map((organization_id) => ({
         organization_id,
         action: 'outreach_updated',
@@ -48,6 +50,7 @@ export async function bulkSetOutreachStatus(orgIds: string[], outreach: Outreach
         performed_by: 'staff',
       })),
     );
+    if (logError) captureError(logError, { where: 'bulkSetOutreachStatus.activityLog' });
   }
 
   return { updated: orgIds.length };
@@ -72,40 +75,45 @@ export async function registerAsCustomer(orgId: string) {
     .eq('id', orgId);
   if (error) throw error;
 
-  const { count } = await supabase
+  const { count, error: countError } = await supabase
     .from('service_engagements')
     .select('id', { count: 'exact', head: true })
     .eq('organization_id', orgId)
     .in('status', ['lead', 'active']);
+  if (countError) throw countError;
 
   if (!count) {
-    await supabase.from('service_engagements').insert({
+    const { error: engError } = await supabase.from('service_engagements').insert({
       organization_id: orgId,
       engagement_type: 'verification',
       status: 'active',
       started_at: new Date().toISOString(),
     });
+    if (engError) throw engError;
   }
 
-  const { count: criteriaCount } = await supabase
+  const { count: criteriaCount, error: criteriaCountError } = await supabase
     .from('verification_criteria')
     .select('id', { count: 'exact', head: true })
     .eq('organization_id', orgId);
+  if (criteriaCountError) throw criteriaCountError;
 
   if (!criteriaCount) {
-    await supabase.from('verification_criteria').insert(
+    const { error: criteriaError } = await supabase.from('verification_criteria').insert(
       DEFAULT_CRITERIA.map((c) => ({ organization_id: orgId, ...c })),
     );
+    if (criteriaError) throw criteriaError;
   }
 
   await ensurePaymentReference(orgId);
 
-  await supabase.from('activity_log').insert({
+  const { error: logError } = await supabase.from('activity_log').insert({
     organization_id: orgId,
     action: 'customer_registered',
     description: 'Registered as NGOreality customer',
     performed_by: 'staff',
   });
+  if (logError) captureError(logError, { where: 'registerAsCustomer.activityLog' });
 }
 
 export type BulkEmailResult = {
@@ -201,6 +209,7 @@ export async function sendOutreachNow(
       const flush = await flushPendingNotifications();
       return { ...result, flushError: flush ? null : 'No notifications to flush' };
     } catch (e) {
+      captureError(e, { where: 'sendOutreachNow.flush' });
       return { ...result, flushError: e instanceof Error ? e.message : 'Flush failed' };
     }
   }

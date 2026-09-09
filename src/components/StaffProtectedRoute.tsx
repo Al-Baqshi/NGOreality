@@ -1,8 +1,9 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { QueryError } from './ui';
 
 export default function StaffProtectedRoute() {
-  const { user, isStaff, loading, profileLoading } = useAuth();
+  const { user, isStaff, loading, profileLoading, profileError, refetchProfile } = useAuth();
   const location = useLocation();
 
   if (loading || profileLoading) {
@@ -15,6 +16,16 @@ export default function StaffProtectedRoute() {
 
   if (!user) {
     return <Navigate to="/staff/login" replace state={{ from: location.pathname }} />;
+  }
+
+  if (profileError && !isStaff) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface p-6">
+        <div className="w-full max-w-lg">
+          <QueryError message={profileError} onRetry={() => void refetchProfile()} />
+        </div>
+      </div>
+    );
   }
 
   if (!isStaff) {

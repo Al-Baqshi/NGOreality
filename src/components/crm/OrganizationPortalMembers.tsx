@@ -95,16 +95,22 @@ export default function OrganizationPortalMembers({ organizationId }: { organiza
         </h3>
       </div>
       <div className="divide-y divide-ink-100 dark:divide-border">
-        {loading ? (
+        {loading && members.length === 0 ? (
           <div className="px-6 py-4 font-mono text-xs text-ink-400">Loading...</div>
-        ) : error ? (
+        ) : members.length === 0 && error ? (
           <div className="px-6 py-4 font-mono text-2xs text-accent">{error}</div>
         ) : members.length === 0 ? (
           <div className="px-6 py-6 text-center text-sm text-ink-400">
             Not claimed — no portal user manages this organisation yet.
           </div>
         ) : (
-          members.map((m) => {
+          <>
+            {error ? (
+              <div className="px-6 py-3 font-mono text-2xs text-accent" role="alert">
+                Could not refresh portal accounts. {error}
+              </div>
+            ) : null}
+            {members.map((m) => {
             const isSteward = Boolean(m.verified_at);
             return (
               <div key={m.user_id} className="px-6 py-3">
@@ -148,7 +154,8 @@ export default function OrganizationPortalMembers({ organizationId }: { organiza
                 </div>
               </div>
             );
-          })
+          })}
+          </>
         )}
       </div>
 

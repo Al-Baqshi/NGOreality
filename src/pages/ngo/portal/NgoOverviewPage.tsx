@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useNgoPortalContext } from '../../../contexts/NgoPortalContext';
-import { OrgTrustStatusBadge } from '../../../components/ui';
+import { OrgTrustStatusBadge, QueryError } from '../../../components/ui';
 import {
   getProfileCompletionItems,
   profileCompletionPercent,
@@ -12,7 +12,7 @@ import { allPublicCriteriaPass } from '../../../lib/criteria';
 import { BADGE_PIPELINE_NGO, getBadgePipelineStage } from '../../../lib/badgePipeline';
 
 export default function NgoOverviewPage() {
-  const { organization, badges, memberships, criteria } = useNgoPortalContext();
+  const { organization, badges, memberships, criteria, error } = useNgoPortalContext();
   if (!organization) return null;
 
   const activeBadge = badges.find((b) => b.is_active);
@@ -44,6 +44,8 @@ export default function NgoOverviewPage() {
           </div>
         </div>
 
+        {error && <QueryError message={error} />}
+
         {activeBadge && (
           <div className="card-brutal flex flex-col items-start gap-4 border-teal p-5 sm:flex-row sm:items-center sm:p-6">
             <img
@@ -69,7 +71,7 @@ export default function NgoOverviewPage() {
           </div>
         )}
 
-        {!activeBadge && badgeStage === 'membership_active_badge_pending' && (
+        {!error && !activeBadge && badgeStage === 'membership_active_badge_pending' && (
           <div className="card-brutal border-l-4 border-l-amber-500 p-5 sm:p-6">
             <h2 className="text-lg font-black uppercase tracking-tight">Membership active</h2>
             <p className="mt-1 text-sm text-ink-600 dark:text-muted-foreground leading-relaxed">
@@ -86,7 +88,7 @@ export default function NgoOverviewPage() {
           your progress.
         </p>
 
-        {!activeBadge && badgeStage !== 'membership_active_badge_pending' && (
+        {!error && !activeBadge && badgeStage !== 'membership_active_badge_pending' && (
           <Link
             to="/ngo/services"
             className="card-brutal block border-l-4 border-l-teal p-5 hover:bg-paper dark:hover:bg-muted/20"

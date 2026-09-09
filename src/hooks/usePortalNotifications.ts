@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { captureError } from '../lib/errorReporting';
 import type { PortalNotification, PortalNotificationAudience } from '../types';
 
 export function usePortalNotifications(audience: PortalNotificationAudience, limit = 80) {
@@ -19,8 +20,7 @@ export function usePortalNotifications(audience: PortalNotificationAudience, lim
       .limit(limit);
 
     if (qError) {
-      setError(qError.message);
-      setItems([]);
+      setError(captureError(qError, { where: 'usePortalNotifications' }));
     } else {
       setItems((data ?? []) as PortalNotification[]);
     }
@@ -61,7 +61,7 @@ export function usePortalNotifications(audience: PortalNotificationAudience, lim
       .eq('id', id)
       .is('read_at', null);
 
-    if (uError) return uError.message;
+    if (uError) return captureError(uError, { where: 'usePortalNotifications.markRead' });
     setItems((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)),
     );
@@ -78,7 +78,7 @@ export function usePortalNotifications(audience: PortalNotificationAudience, lim
       .in('id', unreadIds)
       .is('read_at', null);
 
-    if (uError) return uError.message;
+    if (uError) return captureError(uError, { where: 'usePortalNotifications.markAllRead' });
     await refetch();
     return null;
   };

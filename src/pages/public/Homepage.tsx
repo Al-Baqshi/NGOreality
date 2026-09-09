@@ -76,7 +76,7 @@ function LiveClock() {
 /* Search that navigates to the directory pre-filtered by country + keyword. */
 function DirectorySearch() {
   const navigate = useNavigate();
-  const { counts } = useDirectoryCountryCounts();
+  const { counts, error: countsError } = useDirectoryCountryCounts();
   const [country, setCountry] = useState('NZ');
   const [query, setQuery] = useState('');
 
@@ -113,7 +113,7 @@ function DirectorySearch() {
             {countryOptions.map(({ code, name, count }) => (
               <option key={code} value={code}>
                 {name}
-                {count ? ` (${count.toLocaleString()})` : ''}
+                {!countsError && count ? ` (${count.toLocaleString()})` : ''}
               </option>
             ))}
           </select>
@@ -141,6 +141,11 @@ function DirectorySearch() {
           Search
         </button>
       </div>
+      {countsError ? (
+        <p className="mt-2 px-2 font-mono text-2xs text-accent" role="status">
+          Country counts could not be loaded. You can still search.
+        </p>
+      ) : null}
     </form>
   );
 }

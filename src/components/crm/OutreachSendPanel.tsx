@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Mail, Send } from 'lucide-react';
 import type { Organization, OutreachEmailTemplate, OutreachStatus } from '../../types';
 import { draftOutreachEmailForOrg, sendOutreachForColumn, sendOutreachNow } from '../../lib/crmOutreach';
+import { captureError } from '../../lib/errorReporting';
 import { isMonitorApiConfigured } from '../../lib/monitorApi';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
@@ -17,20 +18,18 @@ type Props = {
   onMessage: (msg: string | null) => void;
 };
 
-const orgs = selectedOrgs ?? [];
-const monitorApiReady = isMonitorApiConfigured();
-
 export default function OutreachSendPanel({
   column,
   columnLabel,
   template,
-  selectedOrgs: _selectedOrgs,
+  selectedOrgs = [],
   busy,
   setBusy,
   onSent,
   onMessage,
 }: Props) {
   const confirm = useConfirm();
+  const orgs = selectedOrgs;
   const selectionKey = orgs.map((o) => o.id).join(',');
   const previewName = orgs[0]?.name ?? 'Your organisation';
   const defaultDraft = useMemo(
@@ -49,6 +48,7 @@ export default function OutreachSendPanel({
 
   const withEmail = orgs.filter((o) => o.email?.trim());
   const withoutEmail = orgs.filter((o) => !o.email?.trim());
+  const monitorApiReady = isMonitorApiConfigured();
 
   const handleSend = async () => {
     if (!withEmail.length) {
@@ -75,7 +75,7 @@ export default function OutreachSendPanel({
       onMessage(parts.join(' · '));
       onSent();
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : 'Send failed');
+      onMessage(captureError(err, { where: 'OutreachSendPanel.queue' }));
     } finally {
       setBusy(false);
     }
@@ -107,7 +107,7 @@ export default function OutreachSendPanel({
       onMessage(parts.join(' · '));
       onSent();
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : 'Send failed');
+      onMessage(captureError(err, { where: 'OutreachSendPanel.sendNow' }));
     } finally {
       setBusy(false);
     }

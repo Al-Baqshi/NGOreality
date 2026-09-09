@@ -4,6 +4,7 @@ import { Loader2, Plus, Search, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useClients, useWorkspaceIdentity } from '../../../hooks/useWorkspace';
 import * as crm from '../../../lib/crmApi';
+import { captureError } from '../../../lib/errorReporting';
 import SEO from '../../../components/SEO';
 
 const PAGE_SIZE = 25;
@@ -49,7 +50,7 @@ export default function NgoWorkspaceClientsPage() {
         <div>
           <h2 className="text-xl font-bold">Clients</h2>
           <p className="text-sm text-muted-foreground">
-            {loading && !data ? 'Loading…' : `${total} ${total === 1 ? 'person' : 'people'}`}
+            {loading && !data ? 'Loading…' : error && !data ? 'Could not load' : `${total} ${total === 1 ? 'person' : 'people'}`}
           </p>
         </div>
         <div className="flex gap-2">
@@ -100,7 +101,7 @@ export default function NgoWorkspaceClientsPage() {
         </div>
       )}
 
-      {data && data.items.length === 0 && !loading && (
+      {data && data.items.length === 0 && !loading && !error && (
         <div className="card-brutal p-6 text-center">
           <p className="font-medium">{search || status ? 'No matches' : 'No clients yet'}</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -190,7 +191,7 @@ function ImportButton({ onDone }: { onDone: () => void }) {
       setResult(res);
       onDone();
     } catch (err) {
-      setError(err instanceof crm.CrmApiError ? err.message : 'Import failed');
+      setError(captureError(err, { where: 'NgoWorkspaceClients.import' }));
     } finally {
       setBusy(false);
     }

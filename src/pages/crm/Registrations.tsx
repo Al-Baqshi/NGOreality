@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Award, BookMarked, PenLine, Sparkles, UserPlus, ExternalLink } from 'lucide-react';
-import { SectionHeader, OrgTrustStatusBadge } from '../../components/ui';
+import { SectionHeader, OrgTrustStatusBadge, QueryError } from '../../components/ui';
 import OrgOriginChip from '../../components/crm/OrgOriginChip';
 import RegistryMatchCheck from '../../components/crm/RegistryMatchCheck';
 import { updateBadgeRequestStatus, updateSetupRequestStatus } from '../../lib/crmRequests';
@@ -20,8 +20,18 @@ import {
 type SignupFilter = 'all' | 'registry' | 'new';
 
 export default function Registrations() {
-  const { signups, signupCounts, badgeRequests, setupRequests, loading, refetch } =
-    useRegistrations();
+  const {
+    signups,
+    signupCounts,
+    badgeRequests,
+    setupRequests,
+    signupsError,
+    badgeRequestsError,
+    setupRequestsError,
+    loading,
+    error: loadError,
+    refetch,
+  } = useRegistrations();
   const [signupFilter, setSignupFilter] = useState<SignupFilter>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,18 +62,18 @@ export default function Registrations() {
 
       <div className="grid grid-cols-1 min-[400px]:grid-cols-3 gap-3 mb-6">
         <div className="card-brutal p-4 text-center">
-          <div className="text-2xl font-black">{loading ? '—' : signupCounts.total}</div>
+          <div className="text-2xl font-black">{loading || loadError ? '—' : signupCounts.total}</div>
           <div className="label-brutal mt-1">Portal signups</div>
         </div>
         <div className="card-brutal p-4 text-center">
           <div className="text-2xl font-black text-teal">
-            {loading ? '—' : signupCounts.fromRegistry}
+            {loading || loadError ? '—' : signupCounts.fromRegistry}
           </div>
           <div className="label-brutal mt-1">From registry</div>
         </div>
         <div className="card-brutal p-4 text-center">
           <div className="text-2xl font-black text-accent">
-            {loading ? '—' : signupCounts.newSubmissions}
+            {loading || loadError ? '—' : signupCounts.newSubmissions}
           </div>
           <div className="label-brutal mt-1">New submissions</div>
         </div>
@@ -88,6 +98,8 @@ export default function Registrations() {
         </p>
       </div>
 
+      {loadError && <QueryError message={loadError} onRetry={refetch} />}
+
       {error && (
         <div className="border-2 border-accent bg-accent/10 p-3 mb-6 text-sm font-semibold">
           {error}
@@ -102,6 +114,7 @@ export default function Registrations() {
             title="Verification & badge requests"
             icon={<Award size={14} />}
             empty="No badge requests waiting"
+            failed={Boolean(badgeRequestsError)}
             count={badgeRequests.length}
             hint="Approve after the badge is issued from the organization page (standards → pass → issue). Rejecting notifies the NGO."
           >
@@ -124,6 +137,7 @@ export default function Registrations() {
             title="Setup requests (landing page / brand)"
             icon={<Sparkles size={14} />}
             empty="No setup requests waiting"
+            failed={Boolean(setupRequestsError)}
             count={setupRequests.length}
             hint="Approve to start the work, mark completed when delivered, or decline. The NGO is notified on every status change."
           >
@@ -171,7 +185,13 @@ export default function Registrations() {
               </div>
             </div>
             {filteredSignups.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-ink-400 text-center">No signups yet</p>
+              <p className={`px-4 py-6 text-sm text-center ${signupsError ? 'text-accent' : 'text-ink-400'}`}>
+                {signupsError
+                  ? 'Could not load signups.'
+                  : signupFilter === 'all'
+                    ? 'No signups yet'
+                    : 'No matching signups'}
+              </p>
             ) : (
               <div>
                 {filteredSignups.map((org) => (
@@ -227,6 +247,7 @@ function RequestSection({
   title,
   icon,
   empty,
+  failed,
   count,
   hint,
   children,
@@ -234,6 +255,7 @@ function RequestSection({
   title: string;
   icon: React.ReactNode;
   empty: string;
+  failed?: boolean;
   count: number;
   hint: string;
   children: React.ReactNode;
@@ -244,10 +266,12 @@ function RequestSection({
         <h3 className="font-mono text-xs uppercase tracking-wider font-semibold flex items-center gap-2">
           {icon} {title}
         </h3>
-        <span className="font-mono text-2xs text-ink-400">{count}</span>
+        <span className="font-mono text-2xs text-ink-400">{failed && count === 0 ? '—' : count}</span>
       </div>
       {count === 0 ? (
-        <p className="px-4 py-6 text-sm text-ink-400 text-center">{empty}</p>
+        <p className={`px-4 py-6 text-sm text-center ${failed ? 'text-accent' : 'text-ink-400'}`}>
+          {failed ? 'Could not load this list.' : empty}
+        </p>
       ) : (
         <>
           <p className="px-4 pt-3 text-2xs text-ink-400 font-mono leading-relaxed">{hint}</p>

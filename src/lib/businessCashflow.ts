@@ -413,9 +413,13 @@ export async function applyLinkedCashflowForecast(
   const lineRes = await applyAucklandForecastAssumptions(periods);
   if (lineRes.error) return lineRes;
 
-  const units = await fetchCashflowUnits(periods);
-  const unitGrid = buildUnitGrid(periods, units);
-  return syncDerivedLinesFromUnitGrid(periods, unitGrid);
+  try {
+    const units = await fetchCashflowUnits(periods);
+    const unitGrid = buildUnitGrid(periods, units);
+    return syncDerivedLinesFromUnitGrid(periods, unitGrid);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Could not load cashflow units' };
+  }
 }
 
 function csvEscape(cell: string | number): string {

@@ -6,6 +6,7 @@ import {
   type OutreachStatus,
 } from '../../types';
 import { bulkSetOutreachStatus } from '../../lib/crmOutreach';
+import { captureError } from '../../lib/errorReporting';
 import {
   deleteOutreachBatch,
   listOutreachBatches,
@@ -36,19 +37,19 @@ export default function OutreachBulkToolbar({ selectedIds, onClear, onMoved, onL
     setBusy(true);
     setMessage(null);
     try {
-      await bulkSetOutreachStatus(selectedIds, moveTo);
+      await bulkSetOutreachStatus(Array.from(selectedIds), moveTo);
       setMessage(`Moved ${selectedIds.size} to ${OUTREACH_STATUS_LABELS[moveTo]}`);
       onMoved();
       onClear();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Move failed');
+      setMessage(captureError(e, { where: 'OutreachBulkToolbar.move' }));
     } finally {
       setBusy(false);
     }
   };
 
   const handleSaveBatch = () => {
-    saveOutreachBatch(batchName, selectedIds);
+    saveOutreachBatch(batchName, Array.from(selectedIds));
     setBatchName('');
     refreshBatches();
     setMessage(`Saved batch (${selectedIds.size} orgs)`);

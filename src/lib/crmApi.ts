@@ -8,6 +8,7 @@
 
 import { supabase } from './supabase';
 import { getCentralAccessToken } from './baqshiAuth';
+import { captureError } from './errorReporting';
 import type {
   OrganizationRole,
   ServiceType,
@@ -101,7 +102,11 @@ export function setActiveTenant(tenantId: string | null): void {
 async function apiAccessToken(): Promise<string | null> {
   const central = await getCentralAccessToken();
   if (central) return central;
-  const { data } = await supabase.auth.getSession();
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    captureError(error, { where: 'crmApi.getSession' });
+    return null;
+  }
   return data.session?.access_token ?? null;
 }
 

@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { captureError } from '../../lib/errorReporting';
 import type { BlogPost } from '../../types';
 import { FileText, Plus, Pencil, Trash2, Eye, EyeOff, Search, Calendar, User } from 'lucide-react';
+import { QueryError } from '../../components/ui';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
 export default function BlogManager() {
@@ -14,15 +15,20 @@ export default function BlogManager() {
   const [editing, setEditing] = useState<BlogPost | null>(null);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchPosts = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    setError(null);
+    const { data, error: queryError } = await supabase
       .from('blog_posts')
       .select('*')
       .order('created_at', { ascending: false });
-    if (error) captureError(error, { where: 'BlogManager.fetchPosts' });
-    else if (data) setPosts(data);
+    if (queryError) {
+      setError(captureError(queryError, { where: 'BlogManager.fetchPosts' }));
+    } else {
+      setPosts(data ?? []);
+    }
     setLoading(false);
   };
 
@@ -46,7 +52,12 @@ export default function BlogManager() {
       variant: 'danger',
     });
     if (!ok) return;
-    await supabase.from('blog_posts').delete().eq('id', id);
+    setError(null);
+    const { error: deleteError } = await supabase.from('blog_posts').delete().eq('id', id);
+    if (deleteError) {
+      setError(captureError(deleteError, { where: 'BlogManager.delete' }));
+      return;
+    }
     fetchPosts();
   };
 
@@ -56,14 +67,21 @@ export default function BlogManager() {
     if (newStatus === 'published' && !post.published_at) {
       updates.published_at = new Date().toISOString();
     }
-    await supabase.from('blog_posts').update(updates).eq('id', post.id);
+    setError(null);
+    const { error: updateError } = await supabase.from('blog_posts').update(updates).eq('id', post.id);
+    if (updateError) {
+      setError(captureError(updateError, { where: 'BlogManager.togglePublish' }));
+      return;
+    }
     fetchPosts();
   };
 
   const handleSave = async (post: Partial<BlogPost>) => {
     setSaving(true);
+    setError(null);
+    let writeError: { message: string } | null = null;
     if (post.id) {
-      await supabase.from('blog_posts').update({
+      const { error: updateError } = await supabase.from('blog_posts').update({
         title: post.title,
         slug: post.slug,
         excerpt: post.excerpt,
@@ -73,8 +91,9 @@ export default function BlogManager() {
         status: post.status,
         updated_at: new Date().toISOString(),
       }).eq('id', post.id);
+      writeError = updateError;
     } else {
-      await supabase.from('blog_posts').insert({
+      const { error: insertError } = await supabase.from('blog_posts').insert({
         title: post.title,
         slug: post.slug,
         excerpt: post.excerpt || '',
@@ -83,8 +102,13 @@ export default function BlogManager() {
         author: post.author || '',
         status: post.status || 'draft',
       });
+      writeError = insertError;
     }
     setSaving(false);
+    if (writeError) {
+      setError(captureError(writeError, { where: 'BlogManager.save' }));
+      return;
+    }
     setEditing(null);
     setCreating(false);
     fetchPosts();
@@ -96,8 +120,9 @@ export default function BlogManager() {
       <BlogEditor
         post={editing}
         saving={saving}
+        error={error}
         onSave={handleSave}
-        onCancel={() => { setEditing(null); setCreating(false); }}
+        onCancel={() => { setEditing(null); setCreating(false); setError(null); }}
       />
     );
   }
@@ -151,8 +176,11 @@ export default function BlogManager() {
       </div>
 
       {/* Post list */}
-      {loading ? (
+      {error && posts.length > 0 ? <QueryError message={error} onRetry={fetchPosts} /> : null}
+      {loading && posts.length === 0 ? (
         <div className="text-center py-16 font-mono text-sm text-ink-400">Loading...</div>
+      ) : error && posts.length === 0 ? (
+        <QueryError message={error} onRetry={fetchPosts} />
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
           <FileText size={48} className="text-ink-200 mx-auto mb-4" />
@@ -222,9 +250,10 @@ export default function BlogManager() {
 
 // --- Blog Editor ---
 
-function BlogEditor({ post, saving, onSave, onCancel }: {
+function BlogEditor({ post, saving, error, onSave, onCancel }: {
   post: BlogPost | null;
   saving: boolean;
+  error: string | null;
   onSave: (post: Partial<BlogPost>) => void;
   onCancel: () => void;
 }) {
@@ -262,6 +291,8 @@ function BlogEditor({ post, saving, onSave, onCancel }: {
           Cancel
         </button>
       </div>
+
+      {error && <QueryError message={error} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content */}

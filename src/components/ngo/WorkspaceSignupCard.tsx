@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import * as crm from '../../lib/crmApi';
+import { captureError } from '../../lib/errorReporting';
 
 /**
  * One-click workspace creation.
@@ -42,9 +43,7 @@ export default function WorkspaceSignupCard({
       await crm.createWorkspace(organizationId);
       onCreated();
     } catch (err) {
-      setError(
-        err instanceof crm.CrmApiError ? err.message : 'Could not create your workspace',
-      );
+      setError(captureError(err, { where: 'WorkspaceSignupCard.create' }));
     } finally {
       setBusy(false);
     }

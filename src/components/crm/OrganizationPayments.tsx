@@ -10,6 +10,8 @@ import { isMonitorApiConfigured } from '../../lib/monitorApi';
 import { MEMBERSHIP_ANNUAL_CENTS, MEMBERSHIP_LABEL, PRICING_CURRENCY } from '../../config/pricing';
 import { LANDING_STANDARDS_PACKAGE_CENTS } from '../../config/customerProducts';
 import { PAYMENT_PRODUCT_LABELS, PAYMENT_STATUS_LABELS } from '../../types';
+import { QueryError } from '../ui';
+import { captureError } from '../../lib/errorReporting';
 import { CreditCard, Copy, Check } from 'lucide-react';
 
 function formatMoney(cents: number, currency: string) {
@@ -27,26 +29,39 @@ export default function OrganizationPayments({
   paymentReference: string | null;
   onPaymentRecorded?: () => void | Promise<void>;
 }) {
-  const { payments, loading, refetch } = useOrganizationPayments(organizationId);
+  const { payments, loading, error, refetch } = useOrganizationPayments(organizationId);
   const [reference, setReference] = useState(paymentReference ?? '');
   const [copied, setCopied] = useState(false);
   const [recording, setRecording] = useState(false);
   const [notes, setNotes] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+  const [refError, setRefError] = useState<string | null>(null);
 
   useEffect(() => {
     if (paymentReference) {
       setReference(paymentReference);
+      setRefError(null);
       return;
     }
-    ensurePaymentReference(organizationId).then(setReference);
+    ensurePaymentReference(organizationId)
+      .then((ref) => {
+        setReference(ref);
+        setRefError(null);
+      })
+      .catch((err) => {
+        setRefError(captureError(err, { where: 'OrganizationPayments.paymentReference' }));
+      });
   }, [organizationId, paymentReference]);
 
   const copyReference = async () => {
     if (!reference) return;
-    await navigator.clipboard.writeText(reference);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(reference);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      setMessage(captureError(err, { where: 'OrganizationPayments.copy' }));
+    }
   };
 
   const handleRecordMembership = async () => {
@@ -126,9 +141,11 @@ export default function OrganizationPayments({
             <li>Member portal for security checklist (repository, baseline, etc.)</li>
           </ul>
           <p className="font-mono text-2xs text-ink-500 mt-2">
-            {membershipActive && latestMembership?.period_end
-              ? `Paid · active until ${new Date(latestMembership.period_end).toLocaleDateString()}`
-              : 'Not paid — record payment after bank transfer clears'}
+            {error
+              ? 'Membership status could not be loaded'
+              : membershipActive && latestMembership?.period_end
+                ? `Paid · active until ${new Date(latestMembership.period_end).toLocaleDateString()}`
+                : 'Not paid — record payment after bank transfer clears'}
           </p>
           {membershipActive && (
             <p className="font-mono text-2xs text-amber-800 bg-amber-50 border border-amber-200 px-2 py-1.5 mt-2">
@@ -143,9 +160,11 @@ export default function OrganizationPayments({
             {formatMoney(LANDING_STANDARDS_PACKAGE_CENTS, PRICING_CURRENCY)} one-off
           </p>
           <p className="font-mono text-2xs text-ink-500 mt-2">
-            {packagePaid
-              ? 'Paid — fulfill via Setup / Registrations queue'
-              : 'Record when the $650 transfer clears (does not activate membership)'}
+            {error
+              ? 'Package status could not be loaded'
+              : packagePaid
+                ? 'Paid — fulfill via Setup / Registrations queue'
+                : 'Record when the $650 transfer clears (does not activate membership)'}
           </p>
         </div>
 
@@ -156,7 +175,7 @@ export default function OrganizationPayments({
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <code className="font-mono text-sm font-bold px-2 py-1 bg-white border-2 border-ink-950">
-              {reference || '…'}
+              {reference || (refError ? 'Unavailable' : '…')}
             </code>
             <button
               type="button"
@@ -171,6 +190,11 @@ export default function OrganizationPayments({
           <p className="font-mono text-2xs text-ink-500 mt-2">
             {BANK_TRANSFER_INSTRUCTIONS.referenceHint} · Account: {BANK_TRANSFER_INSTRUCTIONS.accountName}
           </p>
+          {refError ? (
+            <p className="mt-2 font-mono text-2xs text-accent" role="alert">
+              Could not load the payment reference.
+            </p>
+          ) : null}
         </div>
 
         <textarea
@@ -216,6 +240,10 @@ export default function OrganizationPayments({
       <div className="divide-y divide-ink-100">
         {loading ? (
           <p className="p-4 font-mono text-2xs text-ink-400">Loading payments…</p>
+        ) : error ? (
+          <div className="p-4">
+            <QueryError message={error} onRetry={refetch} />
+          </div>
         ) : payments.length === 0 ? (
           <p className="p-4 text-sm text-ink-400">No payments recorded yet.</p>
         ) : (

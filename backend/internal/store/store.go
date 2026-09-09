@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -269,8 +270,8 @@ func (s *Store) RecordCheck(ctx context.Context, rec CheckRecord, failureThresho
 
 	if newIncidentID != "" {
 		if err := s.QueueSiteDownAlert(ctx, rec.OrganizationID, newIncidentID); err != nil {
-			// Non-fatal: incident is recorded; email can be retried from CRM or next cycle.
-			_ = err
+			// Incident is recorded; email can be retried from CRM or the next cycle.
+			slog.Error("queue site-down alert failed", "organization_id", rec.OrganizationID, "incident_id", newIncidentID, "err", err)
 		}
 	}
 	return nil

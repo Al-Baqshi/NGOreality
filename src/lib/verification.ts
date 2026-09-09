@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { captureError } from './errorReporting';
 import { allPublicCriteriaPass } from './criteria';
 import { issueBadgeIfEligible } from './membershipBenefits';
 import { queueAndTrySend } from './notifications';
@@ -27,7 +28,10 @@ export async function updateCriterionStatuses(
     ),
   );
   const failed = results.find((r) => r.error);
-  return { error: failed?.error?.message ?? null };
+  if (failed?.error) {
+    return { error: captureError(failed.error, { where: 'updateCriterionStatuses' }) };
+  }
+  return { error: null };
 }
 
 export type AutoVerifyResult = {
@@ -68,17 +72,25 @@ export async function tryAutoVerifyOrganization(
     if (error) {
       return { verified: false, badgeIssued: false, message: error.message };
     }
-    await supabase.from('activity_log').insert({
+    const { error: logError } = await supabase.from('activity_log').insert({
       organization_id: organizationId,
       action: 'standards_met',
       description: 'All public trust standards passed — ready for membership / badge',
       performed_by: 'system',
     });
+    if (logError) captureError(logError, { where: 'tryAutoVerifyOrganization.activityLog' });
   }
 
-  const { data: hasMembership } = await supabase.rpc('has_active_membership', {
+  const { data: hasMembership, error: membershipError } = await supabase.rpc('has_active_membership', {
     p_org_id: organizationId,
   });
+  if (membershipError) {
+    return {
+      verified: true,
+      badgeIssued: false,
+      message: captureError(membershipError, { where: 'tryAutoVerifyOrganization.membership' }),
+    };
+  }
 
   if (!hasMembership) {
     return {
@@ -88,11 +100,19 @@ export async function tryAutoVerifyOrganization(
     };
   }
 
-  const { data: org } = await supabase
+  const { data: org, error: orgError } = await supabase
     .from('organizations')
     .select('id, name, verification_level, email')
     .eq('id', organizationId)
     .maybeSingle();
+
+  if (orgError) {
+    return {
+      verified: true,
+      badgeIssued: false,
+      message: captureError(orgError, { where: 'tryAutoVerifyOrganization.reload' }),
+    };
+  }
 
   if (!org) {
     return {
@@ -118,13 +138,21 @@ export async function tryAutoVerifyOrganization(
   }
 
   if (org.email?.trim()) {
-    await queueAndTrySend({
+    const send = await queueAndTrySend({
       organizationId,
       template: 'badge_issued',
       recipientEmail: org.email.trim(),
       organizationName: org.name,
       extra: { verificationId: badge.verificationId ?? '' },
     });
+    const emailNote = send.error || send.flushError
+      ? ` Email was queued but not sent: ${[send.error, send.flushError].filter(Boolean).join(' · ')}`
+      : '';
+    return {
+      verified: true,
+      badgeIssued: true,
+      message: `Standards met. Badge ${badge.verificationId} issued (membership already active).${emailNote}`,
+    };
   }
 
   return {

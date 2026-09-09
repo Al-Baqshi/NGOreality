@@ -5,6 +5,7 @@ import { useOrganizationsPage, type OrganizationsPageFilters } from '../../hooks
 import { useOutreachEmailStatus } from '../../hooks/useOutreachEmail';
 import { OUTREACH_STATUS_LABELS, type OutreachStatus, type Organization } from '../../types';
 import { bulkSetOutreachStatus } from '../../lib/crmOutreach';
+import { captureError } from '../../lib/errorReporting';
 import OutreachKanbanCard from './OutreachKanbanCard';
 
 interface Props {
@@ -68,6 +69,7 @@ export default function KanbanColumn({
   const [limit, setLimit] = useState(KANBAN_PAGE_SIZE);
   const [dragOver, setDragOver] = useState(false);
   const [selectBusy, setSelectBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const pageFilters = useMemo(
     () => ({
@@ -81,7 +83,7 @@ export default function KanbanColumn({
     [status, search, country, category, sortBy],
   );
 
-  const { organizations, totalCount, loading, refetch } = useOrganizationsPage(
+  const { organizations, totalCount, loading, error, refetch } = useOrganizationsPage(
     pageFilters,
     1,
     limit,
@@ -92,7 +94,7 @@ export default function KanbanColumn({
   }, [search, country, category, sortBy]);
 
   const orgIds = useMemo(() => organizations.map((o) => o.id), [organizations]);
-  const { byOrgId, refetch: refetchEmail } = useOutreachEmailStatus(orgIds);
+  const { byOrgId, error: emailError, refetch: refetchEmail } = useOutreachEmailStatus(orgIds);
 
   const refresh = useCallback(() => {
     refetch();
@@ -102,9 +104,12 @@ export default function KanbanColumn({
 
   const handleSelectFirstN = useCallback(async (n: number) => {
     setSelectBusy(true);
+    setActionError(null);
     try {
       const ids = await fetchColumnLeadIds(status, n, { search, country, category });
       onSelectMany(ids);
+    } catch (err) {
+      setActionError(captureError(err, { where: 'KanbanColumn.select' }));
     } finally {
       setSelectBusy(false);
     }
@@ -121,9 +126,14 @@ export default function KanbanColumn({
         ? [single]
         : [];
     if (!ids.length) return;
-    await bulkSetOutreachStatus(ids, status);
-    onClearSelection();
-    refresh();
+    setActionError(null);
+    try {
+      await bulkSetOutreachStatus(ids, status);
+      onClearSelection();
+      refresh();
+    } catch (err) {
+      setActionError(captureError(err, { where: 'KanbanColumn.drop' }));
+    }
   };
 
   const dragPayloadFor = (org: Organization) => {
@@ -156,7 +166,7 @@ export default function KanbanColumn({
               {label}
             </h3>
             <p className="mt-0.5 font-mono text-2xs text-ink-400 tabular-nums">
-              {loading ? 'Loading…' : `${totalCount.toLocaleString()} in stage`}
+              {loading ? 'Loading…' : error ? 'Could not load' : `${totalCount.toLocaleString()} in stage`}
             </p>
           </div>
           {columnSelectedCount > 0 && (
@@ -186,6 +196,12 @@ export default function KanbanColumn({
             <Loader2 size={14} className="shrink-0 animate-spin text-teal" aria-label="Selecting…" />
           )}
         </div>
+        {actionError && (
+          <p className="font-mono text-2xs text-accent break-words">{actionError}</p>
+        )}
+        {emailError && (
+          <p className="font-mono text-2xs text-accent break-words">Email status: {emailError}</p>
+        )}
       </div>
 
       <div className="kanban-column-body flex-1 min-h-0 overflow-y-auto">
@@ -193,6 +209,14 @@ export default function KanbanColumn({
           <div className="flex flex-col items-center justify-center gap-2 p-6 text-ink-400">
             <Loader2 className="animate-spin" size={20} />
             <p className="font-mono text-2xs">Loading cards…</p>
+          </div>
+        ) : error ? (
+          <div className="kanban-column-empty">
+            <p className="font-medium text-accent">Could not load this column</p>
+            <p className="mt-1 break-words">{error}</p>
+            <button type="button" onClick={() => refetch()} className="mt-3 font-mono text-2xs underline">
+              Try again
+            </button>
           </div>
         ) : (organizations ?? []).length === 0 ? (
           <div className="kanban-column-empty">

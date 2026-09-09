@@ -5,7 +5,7 @@ import CashflowForecastTable from '../../components/crm/CashflowForecastTable';
 import CashflowFunnelSummary from '../../components/crm/CashflowFunnelSummary';
 import CashflowNzGuide from '../../components/crm/CashflowNzGuide';
 import CashflowYearOutlook from '../../components/crm/CashflowYearOutlook';
-import { MetricCard, SectionHeader } from '../../components/ui';
+import { MetricCard, QueryError, SectionHeader } from '../../components/ui';
 import { formatNzCurrency } from '../../lib/formatMoney';
 import { CASHFLOW_UNIT_ROWS, batchRampLabel } from '../../config/salesFunnelModel';
 import { ALL_CASHFLOW_LINES, EXPENSE_CATEGORY_OPTIONS } from '../../config/businessPlanRef';
@@ -40,6 +40,7 @@ import {
 } from '../../lib/businessPlan';
 import { downloadCashflowExcel } from '../../lib/businessCashflowExcel';
 import { patchDerivedLinesForPeriod, patchStoredLine, patchStoredUnit } from '../../lib/cashflowLocalPatch';
+import { captureError } from '../../lib/errorReporting';
 
 const MONTHS_WINDOW = 12;
 
@@ -89,7 +90,7 @@ export default function CashFlow() {
       setCashflowStored(cf);
       setUnitsStored(units);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load cash flow');
+      setError(captureError(err, { where: 'CashFlow.refresh' }));
     } finally {
       setPageLoading(false);
     }
@@ -101,7 +102,7 @@ export default function CashFlow() {
 
   /** Persist pre-filled expected column to DB on first visit (so exports and reloads match the grid). */
   useEffect(() => {
-    if (pageLoading || worksheetFilled.current || periods.length === 0) return;
+    if (pageLoading || error || worksheetFilled.current || periods.length === 0) return;
     const expectedLineCount = periods.length * ALL_CASHFLOW_LINES.length;
     const expectedUnitCount = periods.length * CASHFLOW_UNIT_ROWS.length;
     const hasWorkspaceLine = cashflowStored.some(
@@ -113,11 +114,20 @@ export default function CashFlow() {
     worksheetFilled.current = true;
     setSavingWorksheet(true);
     (async () => {
-      const res = await applyLinkedCashflowForecast(periods, unitsStored);
-      if (res.error) setError(res.error);
-      else await refresh({ showSpinner: false });
+      try {
+        const res = await applyLinkedCashflowForecast(periods, unitsStored);
+        if (res.error) {
+          setError(captureError(new Error(res.error), { where: 'CashFlow.applyForecast' }));
+        } else {
+          await refresh({ showSpinner: false });
+        }
+      } catch (err) {
+        setError(captureError(err, { where: 'CashFlow.applyForecast' }));
+      }
     })().finally(() => setSavingWorksheet(false));
-  }, [pageLoading, cashflowStored.length, unitsStored.length, periods, refresh]);
+  }, [pageLoading, error, cashflowStored.length, unitsStored.length, periods, refresh]);
+
+  const worksheetUnknown = Boolean(error) && cashflowStored.length === 0 && unitsStored.length === 0;
 
   const handleAddExpense = async (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -132,7 +142,7 @@ export default function CashFlow() {
       notes: newExpense.notes,
     });
     setSavingExpense(false);
-    if (err) setError(err);
+    if (err) setError(captureError(new Error(err), { where: 'CashFlow.insertExpense' }));
     else {
       setNewExpense({
         incurred_on: new Date().toISOString().slice(0, 10),
@@ -147,7 +157,7 @@ export default function CashFlow() {
 
   const handleDeleteExpense = async (id: string) => {
     const { error: err } = await deleteExpense(id);
-    if (err) setError(err);
+    if (err) setError(captureError(new Error(err), { where: 'CashFlow.deleteExpense' }));
     else {
       setExpenses((prev) => prev.filter((e) => e.id !== id));
     }
@@ -204,7 +214,7 @@ export default function CashFlow() {
       notes,
     });
     if (err) {
-      setError(err);
+      setError(captureError(new Error(err), { where: 'CashFlow.upsertLine' }));
       void refresh({ showSpinner: false });
     }
   };
@@ -248,14 +258,14 @@ export default function CashFlow() {
       notes: row?.notes,
     });
     if (unitErr.error) {
-      setError(unitErr.error);
+      setError(captureError(new Error(unitErr.error), { where: 'CashFlow.upsertUnit' }));
       void refresh({ showSpinner: false });
       return;
     }
     if (field === 'expected') {
       const syncErr = await syncDerivedLinesForPeriod(period, monthIndex, nextUnitGrid);
       if (syncErr.error) {
-        setError(syncErr.error);
+        setError(captureError(new Error(syncErr.error), { where: 'CashFlow.syncDerived' }));
         void refresh({ showSpinner: false });
       }
     }
@@ -263,10 +273,18 @@ export default function CashFlow() {
 
   const handleResetWorksheet = async () => {
     setSavingWorksheet(true);
-    const res = await applyLinkedCashflowForecast(periods, unitsStored);
-    setSavingWorksheet(false);
-    if (res.error) setError(res.error);
-    else await refresh({ showSpinner: false });
+    try {
+      const res = await applyLinkedCashflowForecast(periods, unitsStored);
+      if (res.error) {
+        setError(captureError(new Error(res.error), { where: 'CashFlow.applyForecast' }));
+      } else {
+        await refresh({ showSpinner: false });
+      }
+    } catch (err) {
+      setError(captureError(err, { where: 'CashFlow.applyForecast' }));
+    } finally {
+      setSavingWorksheet(false);
+    }
   };
 
   const handleExportExcel = async () => {
@@ -282,7 +300,7 @@ export default function CashFlow() {
         `ngoreality-cashflow-${y}.xlsx`,
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Excel export failed');
+      setError(captureError(e, { where: 'CashFlow.exportExcel' }));
     } finally {
       setExportingExcel(false);
     }
@@ -331,37 +349,35 @@ export default function CashFlow() {
 
       <CashflowNzGuide />
 
-      <CashflowFunnelSummary periods={periods} totalsByPeriod={cashflowTotals} />
-
-      {error && (
-        <div className="border-2 border-accent bg-accent-light text-accent px-4 py-3 mb-6 font-mono text-2xs">
-          {error}
-        </div>
+      {worksheetUnknown ? null : (
+        <CashflowFunnelSummary periods={periods} totalsByPeriod={cashflowTotals} />
       )}
+
+      {error && <QueryError message={error} />}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-8">
         <MetricCard
           label="12-mo receipts (expected)"
-          value={formatNzCurrency(yearRollup.receiptsExp)}
+          value={pageLoading || error ? '—' : formatNzCurrency(yearRollup.receiptsExp)}
           sub="From volume units → green lines"
           currency
           accent
         />
         <MetricCard
           label="Operating profit (expected)"
-          value={formatNzCurrency(yearRollup.opExp)}
+          value={pageLoading || error ? '—' : formatNzCurrency(yearRollup.opExp)}
           sub="(A) − (C) trading result"
           currency
         />
         <MetricCard
           label="12-mo net cashflow (expected)"
-          value={formatNzCurrency(yearRollup.netExp)}
+          value={pageLoading || error ? '—' : formatNzCurrency(yearRollup.netExp)}
           sub={yearRollup.netExp >= 0 ? 'Profit after reserves' : 'Loss — review costs'}
           currency
         />
         <MetricCard
           label="Closing bank (month 12 exp)"
-          value={formatNzCurrency(yearRollup.closingExp)}
+          value={pageLoading || error ? '—' : formatNzCurrency(yearRollup.closingExp)}
           sub="End balance in bank"
           currency
         />
@@ -395,18 +411,24 @@ export default function CashFlow() {
       </div>
 
       <div className="card-brutal overflow-hidden mb-12">
-        <CashflowForecastTable
-          periods={periods}
-          grid={cashflowGrid}
-          unitGrid={unitGrid}
-          totalsByPeriod={cashflowTotals}
-          loading={pageLoading}
-          onSaveLine={handleSaveCashflowLine}
-          onSaveUnit={handleSaveUnit}
-        />
+        {worksheetUnknown ? (
+          <p className="p-8 text-center text-sm text-accent">Could not load the cashflow worksheet.</p>
+        ) : (
+          <CashflowForecastTable
+            periods={periods}
+            grid={cashflowGrid}
+            unitGrid={unitGrid}
+            totalsByPeriod={cashflowTotals}
+            loading={pageLoading}
+            onSaveLine={handleSaveCashflowLine}
+            onSaveUnit={handleSaveUnit}
+          />
+        )}
       </div>
 
-      <CashflowYearOutlook periods={periods} totalsByPeriod={cashflowTotals} />
+      {worksheetUnknown ? null : (
+        <CashflowYearOutlook periods={periods} totalsByPeriod={cashflowTotals} />
+      )}
 
       <SectionHeader>Expenses</SectionHeader>
       <form onSubmit={handleAddExpense} className="card-brutal p-4 mb-6 grid gap-3 md:grid-cols-6">
@@ -457,7 +479,9 @@ export default function CashFlow() {
       </form>
 
       <div className="card-brutal overflow-hidden">
-        {expenses.length === 0 ? (
+        {error && expenses.length === 0 ? (
+          <p className="p-8 text-center text-sm text-ink-400">Could not load expenses.</p>
+        ) : expenses.length === 0 ? (
           <p className="p-8 text-center text-sm text-ink-400">No expenses recorded yet.</p>
         ) : (
           <table className="w-full text-sm">

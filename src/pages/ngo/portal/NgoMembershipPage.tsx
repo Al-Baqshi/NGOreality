@@ -14,6 +14,8 @@ import { GST_PRICE_SUFFIX, MEMBERSHIP_ANNUAL_CENTS, PRICING_CURRENCY } from '../
 import { PAYMENT_STATUS_LABELS, type OrganizationPayment } from '../../../types';
 import NgoPortalPageShell from '../../../components/ngo/NgoPortalPageShell';
 import NgoBillingTopUpPanel from '../../../components/ngo/NgoBillingTopUpPanel';
+import { captureError } from '../../../lib/errorReporting';
+import { createPendingBankPayment } from '../../../lib/payments';
 import { cn } from '@/lib/utils';
 
 const STATUS_STYLES = {
@@ -25,20 +27,29 @@ const STATUS_STYLES = {
 };
 
 export default function NgoMembershipPage() {
-  const { organization, memberships, refetch } = useNgoPortalContext();
+  const { organization, memberships, refetch, error: portalError } = useNgoPortalContext();
   const [payments, setPayments] = useState<OrganizationPayment[]>([]);
   const [autoRenew, setAutoRenew] = useState(false);
+  const [autoRenewKnown, setAutoRenewKnown] = useState(false);
   const [autoRenewLoading, setAutoRenewLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!organization?.id) return;
+    setActionError(null);
     supabase
       .from('organization_payments')
       .select('*')
       .eq('organization_id', organization.id)
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        if (data) setPayments(data as OrganizationPayment[]);
+      .then(({ data, error }) => {
+        if (error) {
+          setActionError((prev) =>
+            [prev, captureError(error, { where: 'NgoMembershipPage.payments' })].filter(Boolean).join(' · '),
+          );
+          return;
+        }
+        setPayments((data ?? []) as OrganizationPayment[]);
       });
 
     supabase
@@ -46,7 +57,15 @@ export default function NgoMembershipPage() {
       .select('auto_renew_membership')
       .eq('id', organization.id)
       .single()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          setAutoRenewKnown(false);
+          setActionError((prev) =>
+            [prev, captureError(error, { where: 'NgoMembershipPage.autoRenew' })].filter(Boolean).join(' · '),
+          );
+          return;
+        }
+        setAutoRenewKnown(true);
         if (data && typeof data.auto_renew_membership === 'boolean') {
           setAutoRenew(data.auto_renew_membership);
         }
@@ -76,34 +95,29 @@ export default function NgoMembershipPage() {
     setAutoRenewLoading(false);
     if (error) {
       setAutoRenew(!newValue);
-      alert('Failed to update auto-renew preference: ' + error.message);
+      setActionError(captureError(error, { where: 'NgoMembershipPage.autoRenewToggle' }));
     } else {
+      setActionError(null);
       setAutoRenew(newValue);
     }
   };
 
   const handleManualRenew = async () => {
     if (!organization) return;
-    const { error } = await supabase
-      .from('organization_payments')
-      .insert({
-        organization_id: organization.id,
-        product_type: 'membership_annual',
-        amount_cents: MEMBERSHIP_ANNUAL_CENTS,
-        currency: PRICING_CURRENCY,
-        status: 'pending',
-        payment_method: 'bank_transfer',
-        bank_transfer_reference: organization.payment_reference,
-        period_start: new Date().toISOString().split('T')[0],
-        period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        notes: 'Manual renewal initiated by organization',
-        recorded_by: organization.id,
-      });
-    if (error) {
-      alert('Failed to initiate renewal: ' + error.message);
-    } else {
-      refetch();
+    const { payment, error: payError } = await createPendingBankPayment({
+      organizationId: organization.id,
+      productType: 'membership_annual',
+      notes: 'Manual renewal initiated by organization',
+    });
+    if (payError) {
+      setActionError(payError);
+      return;
     }
+    setActionError(null);
+    if (payment) {
+      setPayments((prev) => [payment, ...prev.filter((p) => p.id !== payment.id)]);
+    }
+    refetch();
   };
 
   if (!organization) return null;
@@ -111,6 +125,9 @@ export default function NgoMembershipPage() {
   return (
     <NgoPortalPageShell title="Membership" path="/ngo/membership">
       <div className="space-y-6">
+        {actionError && (
+          <p className="text-sm text-accent border-2 border-accent px-3 py-2">{actionError}</p>
+        )}
         <div className="card-brutal p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div className="flex items-center gap-2">
@@ -168,27 +185,39 @@ export default function NgoMembershipPage() {
                         </p>
                         <span
                           className={
-                            autoRenew
-                              ? 'border border-teal/40 bg-teal-light px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wider text-teal'
-                              : 'border border-ink-300 bg-white px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wider text-ink-500'
+                            !autoRenewKnown
+                              ? 'border border-amber-300 bg-amber-50 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wider text-amber-800'
+                              : autoRenew
+                                ? 'border border-teal/40 bg-teal-light px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wider text-teal'
+                                : 'border border-ink-300 bg-white px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wider text-ink-500'
                           }
                         >
-                          {autoRenew ? 'On' : 'Off'}
+                          {!autoRenewKnown ? 'Unknown' : autoRenew ? 'On' : 'Off'}
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-                        When on, we renew your membership and charge {membershipPrice} before
-                        expiry. When off, you renew manually.
+                        {!autoRenewKnown
+                          ? 'Could not load whether auto-renew is on. Refresh the page or try again.'
+                          : autoRenew
+                            ? `When on, we renew your membership and charge ${membershipPrice} before expiry.`
+                            : `When off, you renew manually.`}
                       </p>
                     </div>
                   </div>
                   <button
                     type="button"
                     role="switch"
-                    aria-checked={autoRenew}
-                    aria-label={autoRenew ? 'Turn auto-renew off' : 'Turn auto-renew on'}
+                    aria-checked={autoRenewKnown ? autoRenew : undefined}
+                    aria-label={
+                      !autoRenewKnown
+                        ? 'Auto-renew setting could not be loaded'
+                        : autoRenew
+                          ? 'Turn auto-renew off'
+                          : 'Turn auto-renew on'
+                    }
                     disabled={
                       autoRenewLoading ||
+                      !autoRenewKnown ||
                       membershipStatus === 'none' ||
                       membershipStatus === 'expired'
                     }
@@ -210,13 +239,13 @@ export default function NgoMembershipPage() {
                     <span className="sr-only">{autoRenew ? 'On' : 'Off'}</span>
                   </button>
                 </div>
-                {autoRenew ? (
+                {autoRenewKnown && autoRenew ? (
                   <p className="mt-3 flex items-center gap-1.5 font-mono text-xs text-teal">
                     <RotateCcw size={12} aria-hidden />
                     Will renew automatically before{' '}
                     {formatMembershipDate(latestMembership.expires_at)}.
                   </p>
-                ) : membershipStatus !== 'none' && membershipStatus !== 'expired' ? (
+                ) : autoRenewKnown && membershipStatus !== 'none' && membershipStatus !== 'expired' ? (
                   <p className="mt-3 font-mono text-xs text-ink-500">
                     Manual renewal needed before{' '}
                     {formatMembershipDate(latestMembership.expires_at)} to avoid interruption.
@@ -245,6 +274,8 @@ export default function NgoMembershipPage() {
                 </div>
               )}
             </div>
+          ) : portalError ? (
+            <p className="text-sm text-ink-500">Membership records could not be loaded.</p>
           ) : (
             <p className="text-sm text-ink-500">
               No active membership on file yet. Submit a{' '}

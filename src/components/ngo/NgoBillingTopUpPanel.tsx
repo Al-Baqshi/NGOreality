@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, Copy, Check, Landmark, Smartphone, Wallet } from 'lucide-react';
 import { ensurePaymentReference } from '../../lib/payments';
+import { captureError } from '../../lib/errorReporting';
 import {
   bankTransferDetailsConfigured,
   bankTransferLines,
@@ -30,20 +31,33 @@ export default function NgoBillingTopUpPanel({
 }: NgoBillingTopUpPanelProps) {
   const [reference, setReference] = useState(paymentReference ?? '');
   const [copied, setCopied] = useState(false);
+  const [refError, setRefError] = useState<string | null>(null);
 
   useEffect(() => {
     if (paymentReference) {
       setReference(paymentReference);
+      setRefError(null);
       return;
     }
-    ensurePaymentReference(organizationId).then(setReference);
+    ensurePaymentReference(organizationId)
+      .then((ref) => {
+        setReference(ref);
+        setRefError(null);
+      })
+      .catch((err) => {
+        setRefError(captureError(err, { where: 'NgoBillingTopUpPanel.paymentReference' }));
+      });
   }, [organizationId, paymentReference]);
 
   const copyReference = async () => {
     if (!reference) return;
-    await navigator.clipboard.writeText(reference);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(reference);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      setRefError(captureError(err, { where: 'NgoBillingTopUpPanel.copy' }));
+    }
   };
 
   const bankLines = bankTransferLines();
@@ -77,7 +91,7 @@ export default function NgoBillingTopUpPanel({
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <code className="font-mono text-sm font-bold px-2 py-1.5 bg-ink-50 border-2 border-ink-200">
-            {reference || '…'}
+            {reference || (refError ? 'Unavailable' : '…')}
           </code>
           <button
             type="button"
@@ -89,6 +103,11 @@ export default function NgoBillingTopUpPanel({
             {copied ? 'Copied' : 'Copy reference'}
           </button>
         </div>
+        {refError && (
+          <p className="mt-2 text-xs text-accent" role="alert">
+            Could not load your payment reference. Refresh the page or contact us if this continues.
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">

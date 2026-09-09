@@ -1,15 +1,27 @@
 import { useParams, Link } from 'react-router-dom';
 import { useBlogPost } from '../../hooks/useSupabase';
 import { Calendar, User, ArrowLeft } from 'lucide-react';
+import { QueryError } from '../../components/ui';
 import SEO, { ArticleJsonLd, BreadcrumbJsonLd } from '../../components/SEO';
 import { absoluteUrl } from '../../config/site';
 
 export default function BlogDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const { post, loading } = useBlogPost(slug);
+  const { post, loading, error } = useBlogPost(slug);
 
-  if (loading) {
+  if (loading && !post) {
     return <div className="text-center py-16 font-mono text-sm text-ink-400">Loading...</div>;
+  }
+
+  if (error && !post) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-16 md:py-24">
+        <Link to="/public/blog" className="inline-flex items-center gap-2 font-mono text-2xs uppercase tracking-wider text-ink-500 hover:text-ink-950 transition-colors mb-6">
+          <ArrowLeft size={14} /> Back to Blog
+        </Link>
+        <QueryError message={error} />
+      </div>
+    );
   }
 
   if (!post) {
@@ -63,6 +75,7 @@ export default function BlogDetail() {
 
         {/* Article */}
         <section className="max-w-3xl mx-auto px-6 py-12 md:py-16">
+          {error ? <QueryError message={error} /> : null}
           <Link to="/public/blog" className="inline-flex items-center gap-2 font-mono text-2xs uppercase tracking-wider text-ink-500 hover:text-ink-950 transition-colors mb-6">
             <ArrowLeft size={14} /> Back to Blog
           </Link>

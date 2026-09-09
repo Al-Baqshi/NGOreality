@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useNgoPortalContext } from '../../contexts/NgoPortalContext';
-import { OrgTrustStatusBadge } from '../ui';
+import { OrgTrustStatusBadge, QueryError } from '../ui';
 import SEO from '../SEO';
 
 type NgoPortalPageShellProps = {
@@ -34,11 +34,7 @@ export default function NgoPortalPageShell({
           </div>
         )}
 
-        {error && (
-          <p className="text-accent text-xs font-mono border-2 border-accent px-3 py-2" role="alert">
-            {error}
-          </p>
-        )}
+        {error && <QueryError message={error} />}
 
         {children}
       </div>

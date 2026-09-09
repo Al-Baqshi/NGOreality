@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { captureError } from '../lib/errorReporting';
 import { useCrmDashboardStats } from './useCrm';
 import type { CrmNavCountKey } from '../components/crm/crm-nav';
 
@@ -23,9 +24,10 @@ const ZERO: CrmNavCounts = {
  * payments) need their own queries, and both are HEAD counts that transfer no
  * rows.
  */
-export function useCrmNavCounts(): CrmNavCounts {
-  const { stats } = useCrmDashboardStats();
+export function useCrmNavCounts(): CrmNavCounts & { error: string | null } {
+  const { stats, error: statsError } = useCrmDashboardStats();
   const [extra, setExtra] = useState({ inquiries: 0, unreconciled: 0 });
+  const [extraError, setExtraError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,10 +43,18 @@ export function useCrmNavCounts(): CrmNavCounts {
         .eq('status', 'pending'),
     ]).then(([inquiries, payments]) => {
       if (cancelled) return;
-      setExtra({
-        inquiries: inquiries.count ?? 0,
-        unreconciled: payments.count ?? 0,
-      });
+      const extraParts: string[] = [];
+      if (inquiries.error) {
+        extraParts.push(captureError(inquiries.error, { where: 'useCrmNavCounts.inquiries' }));
+      }
+      if (payments.error) {
+        extraParts.push(captureError(payments.error, { where: 'useCrmNavCounts.unreconciled' }));
+      }
+      setExtraError(extraParts.length ? extraParts.join(' · ') : null);
+      setExtra((prev) => ({
+        inquiries: inquiries.error ? prev.inquiries : (inquiries.count ?? 0),
+        unreconciled: payments.error ? prev.unreconciled : (payments.count ?? 0),
+      }));
     });
 
     return () => {
@@ -52,7 +62,9 @@ export function useCrmNavCounts(): CrmNavCounts {
     };
   }, []);
 
-  if (!stats) return { ...ZERO, ...extra };
+  const combinedError = statsError || extraError;
+
+  if (!stats) return { ...ZERO, ...extra, error: combinedError };
 
   const registrations =
     (stats.badge_requests_pending ?? 0) + (stats.ngo_setup_requests_pending ?? 0);
@@ -69,5 +81,6 @@ export function useCrmNavCounts(): CrmNavCounts {
     incidents: stats.incidents_open ?? 0,
     inquiries: extra.inquiries,
     unreconciled: extra.unreconciled,
+    error: combinedError,
   };
 }

@@ -1,5 +1,5 @@
 import { useOrganizationsPage } from '../../hooks/useCrm';
-import { OrgTrustStatusBadge, SectionHeader } from '../../components/ui';
+import { OrgTrustStatusBadge, QueryError, SectionHeader } from '../../components/ui';
 import OrgOriginChip from '../../components/crm/OrgOriginChip';
 import { Shield, Landmark, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -7,21 +7,22 @@ import { FINANCIAL_VERIFICATION_ENABLED } from '../../config/features';
 import FinancialComingSoon from '../../components/FinancialComingSoon';
 
 export default function Verification() {
-  const { organizations: needsReview, loading: reviewLoading } = useOrganizationsPage(
+  const { organizations: needsReview, loading: reviewLoading, error: reviewError } = useOrganizationsPage(
     { status: 'onboarding' },
     1,
   );
-  const { organizations: underReview, loading: underLoading } = useOrganizationsPage(
+  const { organizations: underReview, loading: underLoading, error: underError } = useOrganizationsPage(
     { status: 'under_review' },
     1,
   );
-  const { organizations: verified, loading: verifiedLoading } = useOrganizationsPage(
+  const { organizations: verified, loading: verifiedLoading, error: verifiedError } = useOrganizationsPage(
     { status: 'verified' },
     1,
   );
 
   const queue = [...needsReview, ...underReview].slice(0, 100);
   const queueLoading = reviewLoading || underLoading;
+  const queueError = reviewError || underError;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -29,10 +30,12 @@ export default function Verification() {
 
       <div className="mb-8">
         <h3 className="font-mono text-xs uppercase tracking-wider font-semibold text-ink-500 mb-4 flex items-center gap-2">
-          <Shield size={14} /> Awaiting review ({queue.length}+)
+          <Shield size={14} /> Awaiting review ({queueLoading || queueError ? '—' : `${queue.length}+`})
         </h3>
         {queueLoading ? (
           <div className="card-brutal p-8 text-center text-sm text-ink-400">Loading...</div>
+        ) : queueError ? (
+          <QueryError message={queueError} />
         ) : queue.length === 0 ? (
           <div className="card-brutal p-8 text-center">
             <p className="text-sm text-ink-400">No organizations awaiting review</p>
@@ -78,12 +81,14 @@ export default function Verification() {
 
       <div className="mb-8">
         <h3 className="font-mono text-xs uppercase tracking-wider font-semibold text-teal mb-1 flex items-center gap-2">
-          <Shield size={14} /> NGOreality verified ({verifiedLoading ? '…' : verified.length}+ on this page)
+          <Shield size={14} /> NGOreality verified ({verifiedLoading || verifiedError ? '…' : `${verified.length}+`} on this page)
         </h3>
         <p className="font-mono text-2xs text-ink-400 mb-4 uppercase tracking-wider">
           Public trust badge issued — includes standards passed with badge
         </p>
-        {verified.length === 0 && !verifiedLoading ? (
+        {verifiedError ? (
+          <QueryError message={verifiedError} />
+        ) : verified.length === 0 && !verifiedLoading ? (
           <div className="card-brutal p-8 text-center">
             <p className="text-sm text-ink-400">No organisations with the public badge yet</p>
           </div>

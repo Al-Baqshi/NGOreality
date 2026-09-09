@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useOrganizationsPage } from '../../hooks/useCrm';
-import { SectionHeader, OrgTrustStatusBadge } from '../../components/ui';
+import { SectionHeader, OrgTrustStatusBadge, QueryError } from '../../components/ui';
 import PipelineGuide from '../../components/crm/PipelineGuide';
 import { Mail, Copy, ArrowLeft } from 'lucide-react';
+import { captureError } from '../../lib/errorReporting';
 
 export default function CustomersList() {
   const [page, setPage] = useState(1);
-  const { organizations, totalCount, totalPages, loading } = useOrganizationsPage(
+  const { organizations, totalCount, totalPages, loading, error, refetch } = useOrganizationsPage(
     { isCustomer: true },
     page,
     50,
@@ -22,12 +23,18 @@ export default function CustomersList() {
   );
 
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   const copyEmails = async () => {
     if (emails.length === 0) return;
-    await navigator.clipboard.writeText(emails.join(', '));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(emails.join(', '));
+      setCopyError(null);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      setCopyError(captureError(err, { where: 'CustomersList.copyEmails' }));
+    }
   };
 
   return (
@@ -45,20 +52,25 @@ export default function CustomersList() {
       <div className="flex flex-wrap gap-3 mb-6">
         <button
           type="button"
-          onClick={copyEmails}
+          onClick={() => void copyEmails()}
           disabled={emails.length === 0}
           className="btn-brutal-outline text-sm flex items-center gap-2 min-h-[44px] disabled:opacity-40"
         >
           <Copy size={16} /> {copied ? 'Copied!' : `Copy emails on this page (${emails.length})`}
         </button>
         <p className="font-mono text-2xs text-ink-400 self-center">
-          Full customer count: {loading ? '…' : totalCount.toLocaleString()}
+          Full customer count: {loading ? '…' : error ? '—' : totalCount.toLocaleString()}
         </p>
       </div>
+      {copyError && <QueryError message={copyError} />}
 
       <div className="card-brutal overflow-hidden">
         {loading ? (
           <p className="p-8 text-center text-sm text-ink-400">Loading…</p>
+        ) : error ? (
+          <div className="p-4">
+            <QueryError message={error} onRetry={refetch} />
+          </div>
         ) : organizations.length === 0 ? (
           <p className="p-8 text-center text-sm text-ink-400">
             No customers yet. Use <strong>Register as customer</strong> on the outreach board or inbound queue.

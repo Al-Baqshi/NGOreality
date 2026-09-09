@@ -5,6 +5,7 @@ import { Send, CheckCircle, AlertCircle } from 'lucide-react';
 import SEO from '../../components/SEO';
 import Turnstile from '../../components/Turnstile';
 import { usePublicOrganizationBySlug } from '../../hooks/useSupabase';
+import { captureError } from '../../lib/errorReporting';
 import { isRegistryListed } from '../../types';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '');
@@ -21,7 +22,7 @@ function isValidPhone(phone: string): boolean {
 export default function Contact() {
   const [searchParams] = useSearchParams();
   const orgSlug = searchParams.get('org') || undefined;
-  const { organization: listedOrg } = usePublicOrganizationBySlug(orgSlug);
+  const { organization: listedOrg, error: listingError } = usePublicOrganizationBySlug(orgSlug);
 
   const [form, setForm] = useState({
     organization_name: '',
@@ -34,6 +35,7 @@ export default function Contact() {
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [error, setError] = useState('');
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -105,8 +107,8 @@ export default function Contact() {
           turnstile_token: turnstileToken,
         }),
       });
-    } catch {
-      setError('Could not reach us just now. Please check your connection and try again.');
+    } catch (err) {
+      setError(captureError(err, { where: 'Contact.submitInquiry' }));
       setTurnstileToken(null);
       setSubmitting(false);
       return;
@@ -114,7 +116,9 @@ export default function Contact() {
 
     if (!response.ok) {
       const detail = await response.json().catch(() => null);
-      setError(detail?.error ?? 'Something went wrong. Please try again.');
+      const message = detail?.error ?? 'Something went wrong. Please try again.';
+      captureError(new Error(message), { where: 'Contact.submitInquiry', detail: { status: response.status } });
+      setError(message);
       setTurnstileToken(null);
       setSubmitting(false);
       return;
@@ -123,8 +127,6 @@ export default function Contact() {
     setSubmitting(false);
     setSubmitted(true);
   };
-
-  const [error, setError] = useState('');
 
   return (
     <>
@@ -154,6 +156,11 @@ export default function Contact() {
         </section>
 
         <section className="max-w-2xl mx-auto px-6 py-16 md:py-24">
+          {listingError && (
+            <p className="mb-6 text-sm text-accent border-2 border-accent px-3 py-2" role="alert">
+              Could not load that directory listing. You can still send an inquiry below.
+            </p>
+          )}
           {listedOrg && isRegistryListed(listedOrg) && !submitted && (
             <div className="card-brutal p-4 mb-6 border-l-4 border-l-sky-500">
               <p className="text-sm text-ink-600 leading-relaxed">

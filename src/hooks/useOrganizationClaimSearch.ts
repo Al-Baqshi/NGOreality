@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { captureError } from '../lib/errorReporting';
 
 export interface ClaimSearchOrganization {
   id: string;
@@ -62,7 +63,7 @@ export function useOrganizationClaimSearch(query: string) {
 
       if (error) {
         setResults([]);
-        setSearchError(error.message);
+        setSearchError(captureError(error, { where: 'useOrganizationClaimSearch' }));
       } else {
         setResults((data ?? []) as ClaimSearchOrganization[]);
       }

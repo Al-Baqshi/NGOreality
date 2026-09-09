@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { usePublicOrganizationBySlug } from '../../hooks/useSupabase';
-import { DirectoryTrustBadge } from '../../components/ui';
+import { DirectoryTrustBadge, QueryError } from '../../components/ui';
 import { COUNTRY_NAMES } from '../../data/countryNames';
 import { isNgorealityVerified, isRegistryListed, REGISTRY_SOURCE_LABELS } from '../../types';
 import { formatTagLabel } from '../../lib/tags';
@@ -10,12 +10,25 @@ import { ArrowLeft, Globe, MapPin, ExternalLink, Shield } from 'lucide-react';
 
 export default function OrganizationProfile() {
   const { slug } = useParams<{ slug: string }>();
-  const { organization, loading } = usePublicOrganizationBySlug(slug);
+  const { organization, loading, error } = usePublicOrganizationBySlug(slug);
 
-  if (loading) {
+  if (loading && !organization) {
     return (
       <div className="max-w-3xl mx-auto px-6 py-24 text-center font-mono text-sm text-ink-400">
         Loading…
+      </div>
+    );
+  }
+
+  if (error && !organization) {
+    return (
+      <div className="max-w-3xl mx-auto px-6 py-24">
+        <QueryError message={error} />
+        <div className="text-center mt-4">
+          <Link to="/public/directory" className="text-sm text-teal hover:underline">
+            Back to directory
+          </Link>
+        </div>
       </div>
     );
   }
@@ -76,6 +89,7 @@ export default function OrganizationProfile() {
         </section>
 
         <section className="max-w-3xl mx-auto px-6 py-10 md:py-14 space-y-8">
+          {error ? <QueryError message={error} /> : null}
           {registryListed && (
             <div className="card-brutal p-5 border-l-4 border-l-sky-500">
               <p className="text-sm text-ink-600 leading-relaxed">

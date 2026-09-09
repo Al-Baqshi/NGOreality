@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { captureError } from '../lib/errorReporting';
 import { ensurePaymentReference } from '../lib/payments';
 import type {
   BadgeRequest,
@@ -51,7 +52,7 @@ export function useNgoPortal() {
     const memberRow = memberRows?.[0] ?? null;
 
     if (memberError) {
-      setError(memberError.message);
+      setError(captureError(memberError, { where: 'useNgoPortal.membership' }));
       setLoading(false);
       return;
     }
@@ -59,6 +60,11 @@ export function useNgoPortal() {
     if (!memberRow) {
       setMember(null);
       setOrganization(null);
+      setMemberships([]);
+      setBadges([]);
+      setBadgeRequests([]);
+      setSetupRequests([]);
+      setCriteria([]);
       setLoading(false);
       return;
     }
@@ -94,15 +100,47 @@ export function useNgoPortal() {
         .eq('organization_id', orgId),
     ]);
 
-    if (orgRes.error) setError(orgRes.error.message);
-    else setOrganization(orgRes.data);
+    const failures: string[] = [];
+    if (orgRes.error) {
+      failures.push(captureError(orgRes.error, { where: 'useNgoPortal.organization' }));
+    } else if (!orgRes.data) {
+      failures.push(
+        captureError(new Error('Linked organization record is missing'), {
+          where: 'useNgoPortal.organizationMissing',
+        }),
+      );
+      setOrganization(null);
+    } else {
+      setOrganization(orgRes.data);
+    }
 
-    if (!membershipsRes.error && membershipsRes.data) setMemberships(membershipsRes.data);
-    if (!badgesRes.error && badgesRes.data) setBadges(badgesRes.data);
-    if (!requestsRes.error && requestsRes.data) setBadgeRequests(requestsRes.data);
-    if (!setupRes.error && setupRes.data) setSetupRequests(setupRes.data as NgoSetupRequest[]);
-    if (!criteriaRes.error && criteriaRes.data) setCriteria(criteriaRes.data);
+    if (membershipsRes.error) {
+      failures.push(captureError(membershipsRes.error, { where: 'useNgoPortal.memberships' }));
+    } else {
+      setMemberships(membershipsRes.data ?? []);
+    }
+    if (badgesRes.error) {
+      failures.push(captureError(badgesRes.error, { where: 'useNgoPortal.badges' }));
+    } else {
+      setBadges(badgesRes.data ?? []);
+    }
+    if (requestsRes.error) {
+      failures.push(captureError(requestsRes.error, { where: 'useNgoPortal.badgeRequests' }));
+    } else {
+      setBadgeRequests(requestsRes.data ?? []);
+    }
+    if (setupRes.error) {
+      failures.push(captureError(setupRes.error, { where: 'useNgoPortal.setupRequests' }));
+    } else {
+      setSetupRequests((setupRes.data ?? []) as NgoSetupRequest[]);
+    }
+    if (criteriaRes.error) {
+      failures.push(captureError(criteriaRes.error, { where: 'useNgoPortal.criteria' }));
+    } else {
+      setCriteria(criteriaRes.data ?? []);
+    }
 
+    setError(failures.length ? failures.join(' · ') : null);
     setLoading(false);
   }, [user]);
 
@@ -126,7 +164,15 @@ export function useNgoPortal() {
       };
     }
 
-    const paymentReference = await ensurePaymentReference(organization.id);
+    let paymentReference: string;
+    try {
+      paymentReference = await ensurePaymentReference(organization.id);
+    } catch (err) {
+      return {
+        error: captureError(err, { where: 'useNgoPortal.paymentReference' }),
+        paymentReference: null,
+      };
+    }
 
     const { error: insertError } = await supabase.from('badge_requests').insert({
       organization_id: organization.id,
@@ -142,17 +188,24 @@ export function useNgoPortal() {
       return {
         error: rlsDenied
           ? 'NGOreality still needs to confirm you manage this organisation before you can apply for a Reality Badge. Monitoring still works.'
-          : insertError.message,
+          : captureError(insertError, { where: 'useNgoPortal.requestBadge' }),
         paymentReference: null,
       };
     }
 
     if (requestType === 'renewal') {
-      await supabase
+      const { error: renewError } = await supabase
         .from('organization_memberships')
         .update({ status: 'pending_renewal' })
         .eq('organization_id', organization.id)
         .eq('status', 'active');
+      if (renewError) {
+        await fetchPortal();
+        return {
+          error: `Request submitted, but membership could not be marked pending renewal: ${captureError(renewError, { where: 'useNgoPortal.requestBadge.renewal' })}`,
+          paymentReference,
+        };
+      }
     }
 
     await fetchPortal();

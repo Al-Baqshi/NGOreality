@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { captureError } from '../../lib/errorReporting';
 import { useServiceEngagements, useStaffTasks } from '../../hooks/useCrm';
-import { FormField } from '../ui';
+import { FormField, QueryError } from '../ui';
 import {
   ENGAGEMENT_STATUS_LABELS,
   ENGAGEMENT_TYPE_LABELS,
@@ -13,8 +14,8 @@ import {
 import { Plus, Calendar } from 'lucide-react';
 
 export default function OrganizationEngagements({ organizationId }: { organizationId: string }) {
-  const { engagements, loading, refetch } = useServiceEngagements(organizationId);
-  const { tasks, loading: tasksLoading, refetch: refetchTasks } = useStaffTasks(organizationId);
+  const { engagements, loading, error, refetch } = useServiceEngagements(organizationId);
+  const { tasks, loading: tasksLoading, error: tasksError, refetch: refetchTasks } = useStaffTasks(organizationId);
   const [showEngagement, setShowEngagement] = useState(false);
   const [showTask, setShowTask] = useState(false);
   const [engForm, setEngForm] = useState({
@@ -30,9 +31,11 @@ export default function OrganizationEngagements({ organizationId }: { organizati
     due_date: new Date().toISOString().slice(0, 10),
     notes: '',
   });
+  const [writeError, setWriteError] = useState<string | null>(null);
 
   const saveEngagement = async () => {
-    await supabase.from('service_engagements').insert({
+    setWriteError(null);
+    const { error } = await supabase.from('service_engagements').insert({
       organization_id: organizationId,
       engagement_type: engForm.engagement_type,
       status: engForm.status,
@@ -41,21 +44,31 @@ export default function OrganizationEngagements({ organizationId }: { organizati
       next_follow_up_at: engForm.next_follow_up_at || null,
       started_at: engForm.status === 'active' ? new Date().toISOString() : null,
     });
-    await supabase.from('activity_log').insert({
+    if (error) {
+      setWriteError(captureError(error, { where: 'OrganizationEngagements.save' }));
+      return;
+    }
+    const { error: logError } = await supabase.from('activity_log').insert({
       organization_id: organizationId,
       action: 'engagement_created',
       description: `${ENGAGEMENT_TYPE_LABELS[engForm.engagement_type]} — ${ENGAGEMENT_STATUS_LABELS[engForm.status]}`,
       performed_by: 'staff',
     });
+    if (logError) captureError(logError, { where: 'OrganizationEngagements.saveLog' });
     setShowEngagement(false);
     refetch();
   };
 
   const saveTask = async () => {
-    await supabase.from('staff_tasks').insert({
+    setWriteError(null);
+    const { error } = await supabase.from('staff_tasks').insert({
       organization_id: organizationId,
       ...taskForm,
     });
+    if (error) {
+      setWriteError(captureError(error, { where: 'OrganizationEngagements.saveTask' }));
+      return;
+    }
     setShowTask(false);
     refetchTasks();
   };
@@ -65,6 +78,9 @@ export default function OrganizationEngagements({ organizationId }: { organizati
 
   return (
     <div className="space-y-4">
+      {(error || tasksError || writeError) && (
+        <QueryError message={error || tasksError || writeError || ''} />
+      )}
       <div className="card-brutal">
         <div className="border-b-3 border-ink-950 px-4 py-3 flex items-center justify-between gap-2">
           <h3 className="font-mono text-xs uppercase tracking-wider font-semibold flex items-center gap-2">
@@ -109,6 +125,8 @@ export default function OrganizationEngagements({ organizationId }: { organizati
         <div className="divide-y divide-ink-100">
           {loading ? (
             <p className="px-4 py-4 font-mono text-2xs text-ink-400">Loading…</p>
+          ) : error && engagements.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-accent text-center">Could not load engagements.</p>
           ) : engagements.length === 0 ? (
             <p className="px-4 py-6 text-sm text-ink-400 text-center">No engagements yet</p>
           ) : (
@@ -161,6 +179,8 @@ export default function OrganizationEngagements({ organizationId }: { organizati
         <div className="divide-y divide-ink-100">
           {tasksLoading ? (
             <p className="px-4 py-4 font-mono text-2xs text-ink-400">Loading…</p>
+          ) : tasksError && tasks.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-accent text-center">Could not load tasks.</p>
           ) : tasks.length === 0 ? (
             <p className="px-4 py-6 text-sm text-ink-400 text-center">No tasks</p>
           ) : (

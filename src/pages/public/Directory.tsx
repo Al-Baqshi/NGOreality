@@ -7,7 +7,7 @@ import {
   useDirectoryTagCounts,
 } from '../../hooks/useDirectory';
 import { Search, Shield, MapPin, ExternalLink, Tag, ChevronLeft, ChevronRight } from 'lucide-react';
-import { DirectoryTrustBadge } from '../../components/ui';
+import { DirectoryTrustBadge, QueryError } from '../../components/ui';
 import SEO, { BreadcrumbJsonLd } from '../../components/SEO';
 import WorldMap from '../../components/WorldMap';
 import { COUNTRY_NAMES } from '../../data/countryNames';
@@ -19,7 +19,7 @@ export default function Directory() {
   const [searchParams] = useSearchParams();
   const initialQuery = searchParams.get('q')?.trim() ?? '';
   const initialCountry = searchParams.get('country')?.trim().toUpperCase() || DEFAULT_COUNTRY;
-  const { counts: countryCounts, nzTotal } = useDirectoryCountryCounts();
+  const { counts: countryCounts, nzTotal, error: countryError } = useDirectoryCountryCounts();
   const [search, setSearch] = useState(initialQuery);
   const [searchDebounced, setSearchDebounced] = useState(initialQuery);
   const [selectedCountry, setSelectedCountry] = useState(initialCountry);
@@ -47,8 +47,8 @@ export default function Directory() {
   );
 
   const { organizations, totalCount, totalPages, loading, error } = useDirectoryPage(filters, page);
-  const { verifiedCount } = useDirectorySummary({ country: selectedCountry || undefined });
-  const { tags: tagCounts } = useDirectoryTagCounts(selectedCountry || '');
+  const { verifiedCount, error: verifiedError } = useDirectorySummary({ country: selectedCountry || undefined });
+  const { tags: tagCounts, error: tagError } = useDirectoryTagCounts(selectedCountry || '');
 
   const tagOptions = useMemo(
     () =>
@@ -79,8 +79,12 @@ export default function Directory() {
               </div>
               <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tight mb-4">Directory</h1>
               <p className="text-ink-300">
-                New Zealand charities from the official register ({nzTotal.toLocaleString()} listed), tagged by sector.
-                NGOreality Verified badges are awarded after our digital independence review.
+                New Zealand charities from the official register
+                {countryError
+                  ? ' — listing counts could not be loaded right now.'
+                  : ` (${nzTotal.toLocaleString()} listed)`}
+                , tagged by sector. NGOreality Verified badges are awarded after our digital independence
+                review.
               </p>
             </div>
           </div>
@@ -100,17 +104,26 @@ export default function Directory() {
               </div>
               <div className="flex flex-wrap items-center gap-4 md:gap-6">
                 <div className="text-right">
-                  <div className="text-2xl font-black text-teal">{verifiedCount.toLocaleString()}</div>
+                  <div className="text-2xl font-black text-teal">
+                    {verifiedError ? '—' : verifiedCount.toLocaleString()}
+                  </div>
                   <div className="font-mono text-2xs uppercase tracking-wider text-ink-400">NGOreality Verified</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-black text-ink-950">{displayTotal.toLocaleString()}</div>
+                  <div className="text-2xl font-black text-ink-950">
+                    {countryError && selectedCountry === 'NZ' ? '—' : displayTotal.toLocaleString()}
+                  </div>
                   <div className="font-mono text-2xs uppercase tracking-wider text-ink-400">
                     {selectedCountry === 'NZ' ? 'In New Zealand' : 'Matching filters'}
                   </div>
                 </div>
               </div>
             </div>
+            {(countryError || verifiedError || tagError) && (
+              <div className="mb-4">
+                <QueryError message={countryError || verifiedError || tagError || ''} />
+              </div>
+            )}
             <div className="card-brutal p-4 md:p-6">
               <WorldMap
                 countryCounts={countryCounts}
@@ -127,7 +140,8 @@ export default function Directory() {
                 <span className="font-mono text-xs uppercase tracking-wider text-ink-500">
                   Showing: <strong className="text-ink-950">{countryLabel}</strong>
                   <span className="text-ink-400 font-normal normal-case tracking-normal ml-1">
-                    ({displayTotal.toLocaleString()} organizations)
+                    ({countryError && selectedCountry === 'NZ' ? '—' : displayTotal.toLocaleString()}{' '}
+                    organizations)
                   </span>
                 </span>
                 {selectedCountry !== DEFAULT_COUNTRY && (
@@ -169,8 +183,9 @@ export default function Directory() {
                   value={selectedTag}
                   onChange={(e) => setSelectedTag(e.target.value)}
                   className="input-brutal min-w-[200px] text-base"
+                  disabled={Boolean(tagError)}
                 >
-                  <option value="">All tags</option>
+                  <option value="">{tagError ? 'Tags unavailable' : 'All tags'}</option>
                   {tagOptions.map(({ slug, label, count }) => (
                     <option key={slug} value={slug}>
                       {label} ({count.toLocaleString()})

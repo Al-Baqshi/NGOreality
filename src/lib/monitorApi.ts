@@ -50,6 +50,9 @@ export async function fetchNotificationSummary(): Promise<NotificationCounts | n
   if (apiKey?.trim()) headers['X-API-Key'] = apiKey.trim();
 
   const res = await fetch(`${apiUrl}/v1/notifications/summary`, { headers });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Notification summary failed (${res.status})`);
+  }
   return normalizeNotificationSummary((await res.json()) as Record<string, unknown>);
 }

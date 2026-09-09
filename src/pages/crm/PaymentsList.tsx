@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePaymentsLedger } from '../../hooks/useCrm';
-import { EmptyState, MetricCard, SectionHeader } from '../../components/ui';
+import { EmptyState, MetricCard, QueryError, SectionHeader } from '../../components/ui';
 import {
   PAYMENT_METHOD_LABELS,
   PAYMENT_PRODUCT_LABELS,
@@ -11,6 +11,7 @@ import {
 } from '../../types';
 import { MEMBERSHIP_ANNUAL_CENTS, GST_PRICE_SUFFIX, PRICING_CURRENCY } from '../../config/pricing';
 import { ArrowLeft, Check, Copy, CreditCard, Landmark, Search } from 'lucide-react';
+import { captureError } from '../../lib/errorReporting';
 import {
   Select,
   SelectContent,
@@ -42,12 +43,13 @@ function statusClass(status: PaymentStatus): string {
 }
 
 export default function PaymentsList() {
-  const { payments, loading } = usePaymentsLedger(500);
+  const { payments, loading, error, refetch } = usePaymentsLedger(500);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | PaymentStatus>('all');
   const [methodFilter, setMethodFilter] = useState<'all' | PaymentMethod>('all');
   const [page, setPage] = useState(1);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -86,9 +88,14 @@ export default function PaymentsList() {
   const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const copyRef = async (id: string, value: string) => {
-    await navigator.clipboard.writeText(value);
-    setCopiedId(id);
-    window.setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1600);
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopyError(null);
+      setCopiedId(id);
+      window.setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1600);
+    } catch (err) {
+      setCopyError(captureError(err, { where: 'PaymentsList.copyRef' }));
+    }
   };
 
   const onSearch = (value: string) => {
@@ -126,19 +133,23 @@ export default function PaymentsList() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <MetricCard
           label="Paid"
-          value={formatMoney(summary.paidCents, summary.currency)}
-          sub={`${summary.paidCount} recorded`}
-          currency
+          value={loading || error ? '—' : formatMoney(summary.paidCents, summary.currency)}
+          sub={error ? 'Could not load' : loading ? 'Loading…' : `${summary.paidCount} recorded`}
+          currency={!error && !loading}
           compact
           accent
         />
         <MetricCard
           label="Awaiting bank"
-          value={summary.pendingCount}
+          value={loading || error ? '—' : summary.pendingCount}
           sub={
-            summary.pendingCount
-              ? `${formatMoney(summary.pendingCents, summary.currency)} outstanding`
-              : 'Nothing waiting'
+            error
+              ? 'Could not load'
+              : loading
+                ? 'Loading…'
+                : summary.pendingCount
+                  ? `${formatMoney(summary.pendingCents, summary.currency)} outstanding`
+                  : 'Nothing waiting'
           }
           compact
         />
@@ -213,8 +224,17 @@ export default function PaymentsList() {
       </div>
 
       <div className="card-brutal overflow-hidden">
+        {copyError ? (
+          <p className="border-b border-accent px-4 py-2 font-mono text-2xs text-accent" role="alert">
+            {copyError}
+          </p>
+        ) : null}
         {loading ? (
           <p className="p-8 text-center text-sm text-ink-400">Loading…</p>
+        ) : error ? (
+          <div className="p-4">
+            <QueryError message={error} onRetry={refetch} />
+          </div>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<CreditCard size={48} />}

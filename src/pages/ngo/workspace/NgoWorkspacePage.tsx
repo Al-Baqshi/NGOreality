@@ -32,7 +32,7 @@ export default function NgoWorkspacePage() {
   const { organization } = useNgoPortalContext();
   const identity = useWorkspaceIdentity();
 
-  if (identity.loading) {
+  if (identity.loading && !identity.data && !identity.noWorkspace) {
     return (
       <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -68,7 +68,7 @@ export default function NgoWorkspacePage() {
     );
   }
 
-  if (identity.error) {
+  if (identity.error && !identity.data) {
     return (
       <div className="card-brutal p-6" role="alert">
         <div className="flex items-center gap-2 font-medium text-destructive">
@@ -83,7 +83,16 @@ export default function NgoWorkspacePage() {
     );
   }
 
-  return <WorkspaceDashboard roleLabel={identity.data?.role ?? 'viewer'} />;
+  return (
+    <>
+      {identity.error ? (
+        <div className="card-brutal p-4 text-sm text-destructive" role="alert">
+          {identity.error}
+        </div>
+      ) : null}
+      <WorkspaceDashboard roleLabel={identity.data?.role ?? 'viewer'} />
+    </>
+  );
 }
 
 function WorkspaceDashboard({ roleLabel }: { roleLabel: string }) {
@@ -146,7 +155,7 @@ function WorkspaceDashboard({ roleLabel }: { roleLabel: string }) {
             </div>
           )}
 
-          {data.clients_total === 0 && (
+          {data.clients_total === 0 && !error && (
             <div className="card-brutal p-6">
               <h3 className="font-bold">No clients yet</h3>
               <p className="mt-2 text-sm text-muted-foreground">

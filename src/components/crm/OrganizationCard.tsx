@@ -1,8 +1,10 @@
-import { Link, useState } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Globe, Mail, UserPlus, MoreHorizontal, ExternalLink, Loader2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Organization, OutreachStatus } from '../../types';
 import { setOutreachStatus, markRegisteredInbound, registerAsCustomer } from '../../lib/crmOutreach';
+import { captureError } from '../../lib/errorReporting';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import type { OrgEmailStatus } from '../../hooks/useOutreachEmail';
 import { outreachEmailBadge } from '../../lib/outreachEmailBadge';
@@ -43,12 +45,16 @@ export default function OrganizationCard({
   const confirm = useConfirm();
   const [menuOpen, setMenuOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const move = async (next: OutreachStatus) => {
     setBusyAction(`move-${next}`);
+    setActionError(null);
     try {
       await setOutreachStatus(org.id, next);
       onUpdated();
+    } catch (err) {
+      setActionError(captureError(err, { where: 'OrganizationCard.move' }));
     } finally {
       setBusyAction(null);
     }
@@ -56,9 +62,12 @@ export default function OrganizationCard({
 
   const handleRegisterInbound = async () => {
     setBusyAction('register-inbound');
+    setActionError(null);
     try {
       await markRegisteredInbound(org.id);
       onUpdated();
+    } catch (err) {
+      setActionError(captureError(err, { where: 'OrganizationCard.registerInbound' }));
     } finally {
       setBusyAction(null);
     }
@@ -72,9 +81,12 @@ export default function OrganizationCard({
     });
     if (!ok) return;
     setBusyAction('register-customer');
+    setActionError(null);
     try {
       await registerAsCustomer(org.id);
       onUpdated();
+    } catch (err) {
+      setActionError(captureError(err, { where: 'OrganizationCard.registerCustomer' }));
     } finally {
       setBusyAction(null);
     }
@@ -139,14 +151,12 @@ export default function OrganizationCard({
           )}
         </div>
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="p-1 text-ink-400 hover:text-ink-900 dark:hover:text-white rounded transition-colors"
-              aria-label="Actions"
-            >
-              <MoreHorizontal size={16} />
-            </button>
+          <DropdownMenuTrigger
+            type="button"
+            className="rounded p-1 text-ink-400 transition-colors hover:text-ink-900 dark:hover:text-white"
+            aria-label="Actions"
+          >
+            <MoreHorizontal size={16} />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <div className="px-2 py-1 border-b border-ink-200 dark:border-ink-700">
@@ -245,6 +255,9 @@ export default function OrganizationCard({
         </DropdownMenu>
       </div>
 
+      {actionError && (
+        <p className="mt-2 font-mono text-2xs text-accent">{actionError}</p>
+      )}
       {busyAction && (
         <div className="absolute inset-0 bg-white/80 dark:bg-ink-900/80 flex items-center justify-center z-10">
           <Loader2 size={16} className="animate-spin text-teal" />

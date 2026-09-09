@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useOrganization, useContacts, useVerificationCriteria, useBadges, useActivityLog } from '../../hooks/useSupabase';
-import { OrgTrustStatusBadge, CriterionStatus, FormField, Modal } from '../../components/ui';
+import { OrgTrustStatusBadge, CriterionStatus, FormField, Modal, QueryError } from '../../components/ui';
 import {
   DEFAULT_CRITERIA,
   FINANCIAL_CRITERIA,
@@ -25,6 +25,7 @@ import { hasRegistryProvenance, OUTREACH_KANBAN_STATUSES } from '../../types';
 import OrgOriginChip from '../../components/crm/OrgOriginChip';
 import RegistryMatchCheck from '../../components/crm/RegistryMatchCheck';
 import { markRegisteredInbound, registerAsCustomer, setOutreachStatus } from '../../lib/crmOutreach';
+import { captureError } from '../../lib/errorReporting';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { FINANCIAL_VERIFICATION_ENABLED } from '../../config/features';
 import FinancialComingSoon from '../../components/FinancialComingSoon';
@@ -41,12 +42,12 @@ import { ArrowLeft, Globe, Mail, Phone, MapPin, CreditCard as Edit3, Save, X, Sh
 export default function OrganizationDetail() {
   const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
-  const { organization, loading, refetch: refetchOrganization } = useOrganization(id);
-  const { contacts, loading: contactsLoading } = useContacts(id);
-  const { criteria, loading: criteriaLoading, refetch: refetchCriteria, setCriteria } = useVerificationCriteria(id);
-  const { badges, loading: badgesLoading, refetch: refetchBadges } = useBadges(id);
-  const { payments } = useOrganizationPayments(id);
-  const { entries, loading: logLoading } = useActivityLog(id);
+  const { organization, loading, error, refetch: refetchOrganization } = useOrganization(id);
+  const { contacts, loading: contactsLoading, error: contactsError } = useContacts(id);
+  const { criteria, loading: criteriaLoading, error: criteriaError, refetch: refetchCriteria, setCriteria } = useVerificationCriteria(id);
+  const { badges, loading: badgesLoading, error: badgesError, refetch: refetchBadges } = useBadges(id);
+  const { payments, error: paymentsError } = useOrganizationPayments(id);
+  const { entries, loading: logLoading, error: logError } = useActivityLog(id);
 
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState(organization || null);
@@ -55,6 +56,13 @@ export default function OrganizationDetail() {
   const [criteriaBusy, setCriteriaBusy] = useState(false);
   const [verifyNotice, setVerifyNotice] = useState<string | null>(null);
   const [badgeNotice, setBadgeNotice] = useState<{ text: string; tone: 'ok' | 'err' } | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const reportWrite = (error: unknown, where: string): boolean => {
+    if (!error) return false;
+    setActionError(captureError(error, { where }));
+    return true;
+  };
 
   useEffect(() => {
     if (organization) setEditForm(organization);
@@ -62,46 +70,57 @@ export default function OrganizationDetail() {
 
   const handleSave = async () => {
     if (!editForm || !id) return;
-    await supabase.from('organizations').update({
+    setActionError(null);
+    const { error } = await supabase.from('organizations').update({
       ...editForm,
       updated_at: new Date().toISOString(),
     }).eq('id', id);
+    if (reportWrite(error, 'OrganizationDetail.save')) return;
     setEditing(false);
-    window.location.reload();
+    await refetchOrganization();
   };
 
   const handleTrustStageChange = async (stage: OrgTrustStage) => {
     if (!id) return;
+    setActionError(null);
     const { status, verification_level } = trustStageToFields(stage);
     const label = getTrustStageLabel(stage);
-    await supabase
+    const { error } = await supabase
       .from('organizations')
       .update({ status, verification_level, updated_at: new Date().toISOString() })
       .eq('id', id);
-    await supabase.from('activity_log').insert({
+    if (reportWrite(error, 'OrganizationDetail.trustStage')) return;
+    const { error: logError } = await supabase.from('activity_log').insert({
       organization_id: id,
       action: 'trust_stage_change',
       description: `Trust stage set to ${label}`,
       performed_by: 'admin',
     });
-    // Create staff notification for trust stage change
-    await supabase.rpc('notify_staff_system', {
+    if (logError) captureError(logError, { where: 'OrganizationDetail.trustStageLog' });
+    const { error: notifyError } = await supabase.rpc('notify_staff_system', {
       p_organization_id: id,
       p_action: 'trust_stage_change',
       p_description: `Trust stage changed to ${label}`,
       p_link_path: `/organizations/${id}`,
     });
-    window.location.reload();
+    if (notifyError) captureError(notifyError, { where: 'OrganizationDetail.trustStageNotify' });
+    await refetchOrganization();
   };
 
   const handleOutreachChange = async (outreach: OutreachStatus) => {
     if (!id) return;
-    if (outreach === 'registered' || outreach === 'responded') {
-      await markRegisteredInbound(id);
-    } else {
-      await setOutreachStatus(id, outreach);
+    setActionError(null);
+    try {
+      if (outreach === 'registered' || outreach === 'responded') {
+        await markRegisteredInbound(id);
+      } else {
+        await setOutreachStatus(id, outreach);
+      }
+    } catch (err) {
+      reportWrite(err, 'OrganizationDetail.outreach');
+      return;
     }
-    window.location.reload();
+    await refetchOrganization();
   };
 
   const handleRegisterAsCustomer = async () => {
@@ -112,8 +131,14 @@ export default function OrganizationDetail() {
       confirmLabel: 'Register',
     });
     if (!ok) return;
-    await registerAsCustomer(id);
-    window.location.reload();
+    setActionError(null);
+    try {
+      await registerAsCustomer(id);
+    } catch (err) {
+      reportWrite(err, 'OrganizationDetail.registerCustomer');
+      return;
+    }
+    await refetchOrganization();
   };
 
   const handleDeleteOrganization = async () => {
@@ -125,23 +150,29 @@ export default function OrganizationDetail() {
       variant: 'danger',
     });
     if (!ok) return;
-    await supabase.from('organizations').delete().eq('id', id);
+    setActionError(null);
+    const { error } = await supabase.from('organizations').delete().eq('id', id);
+    if (reportWrite(error, 'OrganizationDetail.delete')) return;
     window.location.href = '/organizations';
   };
 
   const handleAddContact = async () => {
     if (!id) return;
-    await supabase.from('contacts').insert({
+    setActionError(null);
+    const { error } = await supabase.from('contacts').insert({
       organization_id: id,
       ...contactForm,
     });
+    if (reportWrite(error, 'OrganizationDetail.addContact')) return;
     setContactModal(false);
     setContactForm({ name: '', role: '', email: '', phone: '', is_primary: false, notes: '' });
     window.location.reload();
   };
 
   const handleDeleteContact = async (contactId: string) => {
-    await supabase.from('contacts').delete().eq('id', contactId);
+    setActionError(null);
+    const { error } = await supabase.from('contacts').delete().eq('id', contactId);
+    if (reportWrite(error, 'OrganizationDetail.deleteContact')) return;
     window.location.reload();
   };
 
@@ -205,22 +236,26 @@ export default function OrganizationDetail() {
 
   const handleInitializeCriteria = async () => {
     if (!id) return;
+    setActionError(null);
     const rows = DEFAULT_CRITERIA.map((c) => ({
       organization_id: id,
       ...c,
     }));
-    await supabase.from('verification_criteria').insert(rows);
-    window.location.reload();
+    const { error } = await supabase.from('verification_criteria').insert(rows);
+    if (reportWrite(error, 'OrganizationDetail.initCriteria')) return;
+    await refetchCriteria();
   };
 
   const handleInitializeFinancialCriteria = async () => {
     if (!id) return;
+    setActionError(null);
     const rows = FINANCIAL_CRITERIA.map((c) => ({
       organization_id: id,
       ...c,
     }));
-    await supabase.from('verification_criteria').insert(rows);
-    window.location.reload();
+    const { error } = await supabase.from('verification_criteria').insert(rows);
+    if (reportWrite(error, 'OrganizationDetail.initFinancialCriteria')) return;
+    await refetchCriteria();
   };
 
   const handleRevokeBadge = async (badgeId: string, verificationId: string) => {
@@ -232,29 +267,42 @@ export default function OrganizationDetail() {
       variant: 'danger',
     });
     if (!ok) return;
-    await supabase.from('verification_badges').update({ is_active: false }).eq('id', badgeId);
-    const { count: activeCount } = await supabase
+    setActionError(null);
+    const { error: revokeError } = await supabase.from('verification_badges').update({ is_active: false }).eq('id', badgeId);
+    if (reportWrite(revokeError, 'OrganizationDetail.revokeBadge')) return;
+    const { count: activeCount, error: countError } = await supabase
       .from('verification_badges')
       .select('id', { count: 'exact', head: true })
       .eq('organization_id', id)
       .eq('is_active', true);
+    if (reportWrite(countError, 'OrganizationDetail.revokeBadgeCount')) return;
     if ((activeCount ?? 0) === 0) {
       const nextStatus = organization.source_registry ? 'listed' : 'onboarding';
-      await supabase
+      const { error: statusError } = await supabase
         .from('organizations')
         .update({ verification_level: 'none', status: nextStatus })
         .eq('id', id);
+      if (reportWrite(statusError, 'OrganizationDetail.revokeBadgeStatus')) return;
     }
-    await supabase.from('activity_log').insert({
+    const { error: logError } = await supabase.from('activity_log').insert({
       organization_id: id,
       action: 'badge_revoked',
       description: `Badge revoked: ${verificationId}`,
       performed_by: 'admin',
     });
-    window.location.reload();
+    if (logError) captureError(logError, { where: 'OrganizationDetail.revokeBadgeLog' });
+    await refetchOrganization();
+    await refetchBadges();
   };
 
-  if (loading) return <div className="text-center py-16 font-mono text-sm text-ink-400">Loading...</div>;
+  if (loading && !organization) return <div className="text-center py-16 font-mono text-sm text-ink-400">Loading...</div>;
+  if (error && !organization) {
+    return (
+      <div className="max-w-6xl mx-auto py-16">
+        <QueryError message={error} onRetry={refetchOrganization} />
+      </div>
+    );
+  }
   if (!organization) return <div className="text-center py-16 font-mono text-sm text-ink-400">Organization not found</div>;
 
   const publicCriteria = criteria.filter(isPublicCriterion);
@@ -264,15 +312,16 @@ export default function OrganizationDetail() {
   const publicScore = publicCriteriaScore(criteria);
   const publicReady = allPublicCriteriaPass(criteria);
   const financialScore = financialCriteriaList.length > 0 ? Math.round((financialCriteriaList.filter((c) => c.status === 'pass').length / financialCriteriaList.length) * 100) : 0;
-  const membershipPaid = hasActiveMembershipPayment(payments);
-  const hasActiveBadge = badges.some((b) => b.is_active);
+  const membershipPaid = !paymentsError && hasActiveMembershipPayment(payments);
+  const hasActiveBadge = !badgesError && badges.some((b) => b.is_active);
   const badgeStage = getBadgePipelineStage({
     hasActiveBadge,
     hasActiveMembership: membershipPaid,
-    standardsPass: publicReady,
+    standardsPass: publicReady && !criteriaError,
   });
+  const relatedLoadError = paymentsError || badgesError || criteriaError;
   const badgeStatusCopy =
-    badgeStage === 'issued' ? null : BADGE_PIPELINE_STAFF[badgeStage];
+    relatedLoadError || badgeStage === 'issued' ? null : BADGE_PIPELINE_STAFF[badgeStage];
 
   return (
     <div className="max-w-6xl mx-auto min-w-0 w-full">
@@ -280,6 +329,9 @@ export default function OrganizationDetail() {
       <Link to="/organizations" className="inline-flex items-center gap-2 font-mono text-2xs uppercase tracking-wider text-ink-500 hover:text-ink-950 transition-colors mb-6">
         <ArrowLeft size={14} /> Back to Organizations
       </Link>
+
+      {error && <QueryError message={error} onRetry={refetchOrganization} />}
+      {actionError && <QueryError message={actionError} />}
 
       {/* Header */}
       <div className="card-brutal p-4 sm:p-6 mb-6 overflow-hidden">
@@ -552,7 +604,7 @@ export default function OrganizationDetail() {
                     </button>
                   </>
                 )}
-                {criteria.length === 0 && (
+                {criteria.length === 0 && !criteriaError && (
                   <button onClick={handleInitializeCriteria} className="btn-brutal-outline text-2xs py-1.5 px-3 flex items-center gap-1">
                     <Plus size={12} /> Initialize
                   </button>
@@ -561,13 +613,19 @@ export default function OrganizationDetail() {
             </div>
             <div className="border-b border-ink-100 px-6 py-2 bg-amber-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <span className="font-mono text-2xs text-amber-700 uppercase tracking-wider">
-                {publicReady
-                  ? membershipPaid
-                    ? 'Standards + membership met → badge auto-issues'
-                    : 'Standards met — badge pending membership payment'
-                  : membershipPaid
-                    ? 'Membership active — badge pending public standards'
-                    : 'All public standards must pass before the badge can issue'}
+                {criteriaError
+                  ? 'Standards could not be loaded'
+                  : paymentsError
+                    ? publicReady
+                      ? 'Standards met — membership status could not be loaded'
+                      : 'Membership status could not be loaded'
+                    : publicReady
+                      ? membershipPaid
+                        ? 'Standards + membership met → badge auto-issues'
+                        : 'Standards met — badge pending membership payment'
+                      : membershipPaid
+                        ? 'Membership active — badge pending public standards'
+                        : 'All public standards must pass before the badge can issue'}
               </span>
               {criteriaBusy && <span className="font-mono text-2xs text-ink-500">Saving…</span>}
               {verifyNotice && !criteriaBusy && (
@@ -575,12 +633,24 @@ export default function OrganizationDetail() {
               )}
             </div>
             <div className="divide-y divide-ink-100">
-              {criteriaLoading ? (
+              {criteriaLoading && criteria.length === 0 ? (
                 <div className="px-6 py-4 font-mono text-xs text-ink-400">Loading...</div>
+              ) : publicCriteria.length === 0 && criteriaError ? (
+                <div className="px-6 py-4 text-sm text-accent" role="alert">
+                  Could not load standards.
+                  <span className="mt-1 block font-mono text-2xs text-ink-500">{criteriaError}</span>
+                </div>
               ) : publicCriteria.length === 0 ? (
                 <div className="px-6 py-6 text-center text-sm text-ink-400">No criteria. Click Initialize.</div>
               ) : (
-                publicCriteria.map((c) => (
+                <>
+                  {criteriaError ? (
+                    <div className="px-6 py-3 text-sm text-accent" role="alert">
+                      Could not refresh standards.
+                      <span className="mt-1 block font-mono text-2xs text-ink-500">{criteriaError}</span>
+                    </div>
+                  ) : null}
+                  {publicCriteria.map((c) => (
                   <div key={c.id} className="flex items-center justify-between px-6 py-3">
                     <div className="flex-1">
                       <div className="text-sm font-medium">{c.criterion_label}</div>
@@ -607,7 +677,8 @@ export default function OrganizationDetail() {
                       </div>
                     </div>
                   </div>
-                ))
+                  ))}
+                </>
               )}
             </div>
           </div>
@@ -626,10 +697,22 @@ export default function OrganizationDetail() {
               </span>
             </div>
             <div className="divide-y divide-ink-100">
-              {memberCriteria.length === 0 ? (
+              {criteriaError && memberCriteria.length === 0 ? (
+                <div className="px-6 py-4 text-sm text-accent" role="alert">
+                  Could not load member checklist.
+                  <span className="mt-1 block font-mono text-2xs text-ink-500">{criteriaError}</span>
+                </div>
+              ) : memberCriteria.length === 0 ? (
                 <div className="px-6 py-4 text-sm text-ink-400">Initialize criteria to add member checklist.</div>
               ) : (
-                memberCriteria.map((c) => (
+                <>
+                  {criteriaError ? (
+                    <div className="px-6 py-3 text-sm text-accent" role="alert">
+                      Could not refresh member checklist.
+                      <span className="mt-1 block font-mono text-2xs text-ink-500">{criteriaError}</span>
+                    </div>
+                  ) : null}
+                  {memberCriteria.map((c) => (
                   <div key={c.id} className="flex items-center justify-between px-6 py-3">
                     <div className="flex-1 text-sm font-medium">{c.criterion_label}</div>
                     <div className="flex items-center gap-2">
@@ -650,7 +733,8 @@ export default function OrganizationDetail() {
                       </div>
                     </div>
                   </div>
-                ))
+                ))}
+                </>
               )}
             </div>
           </div>
@@ -741,12 +825,24 @@ export default function OrganizationDetail() {
               </button>
             </div>
             <div className="divide-y divide-ink-100">
-              {contactsLoading ? (
+              {contactsLoading && contacts.length === 0 ? (
                 <div className="px-6 py-4 font-mono text-xs text-ink-400">Loading...</div>
+              ) : contacts.length === 0 && contactsError ? (
+                <div className="px-6 py-4 text-sm text-accent" role="alert">
+                  Could not load contacts.
+                  <span className="mt-1 block font-mono text-2xs text-ink-500">{contactsError}</span>
+                </div>
               ) : contacts.length === 0 ? (
                 <div className="px-6 py-6 text-center text-sm text-ink-400">No contacts</div>
               ) : (
-                contacts.map((c) => (
+                <>
+                  {contactsError ? (
+                    <div className="px-6 py-3 text-sm text-accent" role="alert">
+                      Could not refresh contacts.
+                      <span className="mt-1 block font-mono text-2xs text-ink-500">{contactsError}</span>
+                    </div>
+                  ) : null}
+                  {contacts.map((c) => (
                   <div key={c.id} className="flex items-start justify-between px-6 py-3">
                     <div>
                       <div className="text-sm font-medium flex items-center gap-2">
@@ -760,7 +856,8 @@ export default function OrganizationDetail() {
                       <Trash2 size={14} />
                     </button>
                   </div>
-                ))
+                  ))}
+                </>
               )}
             </div>
           </div>
@@ -799,12 +896,24 @@ export default function OrganizationDetail() {
               </div>
             )}
             <div className="divide-y divide-ink-100">
-              {badgesLoading ? (
+              {badgesLoading && badges.length === 0 ? (
                 <div className="px-6 py-4 font-mono text-xs text-ink-400">Loading...</div>
+              ) : badges.length === 0 && badgesError ? (
+                <div className="px-6 py-4 text-sm text-accent" role="alert">
+                  Could not load badges.
+                  <span className="mt-1 block font-mono text-2xs text-ink-500">{badgesError}</span>
+                </div>
               ) : badges.length === 0 ? (
                 <div className="px-6 py-6 text-center text-sm text-ink-400">No badge issued yet</div>
               ) : (
-                badges.map((b) => (
+                <>
+                  {badgesError ? (
+                    <div className="px-6 py-3 text-sm text-accent" role="alert">
+                      Could not refresh badges.
+                      <span className="mt-1 block font-mono text-2xs text-ink-500">{badgesError}</span>
+                    </div>
+                  ) : null}
+                  {badges.map((b) => (
                   <div key={b.id} className="px-6 py-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-mono text-xs font-bold">{b.verification_id}</span>
@@ -827,7 +936,8 @@ export default function OrganizationDetail() {
                       {b.level} &middot; Issued {new Date(b.issued_at).toLocaleDateString()}
                     </div>
                   </div>
-                ))
+                  ))}
+                </>
               )}
             </div>
           </div>
@@ -840,19 +950,32 @@ export default function OrganizationDetail() {
               </h3>
             </div>
             <div className="divide-y divide-ink-100 max-h-64 overflow-y-auto">
-              {logLoading ? (
+              {logLoading && entries.length === 0 ? (
                 <div className="px-6 py-4 font-mono text-xs text-ink-400">Loading...</div>
+              ) : entries.length === 0 && logError ? (
+                <div className="px-6 py-4 text-sm text-accent" role="alert">
+                  Could not load activity.
+                  <span className="mt-1 block font-mono text-2xs text-ink-500">{logError}</span>
+                </div>
               ) : entries.length === 0 ? (
                 <div className="px-6 py-6 text-center text-sm text-ink-400">No activity</div>
               ) : (
-                entries.map((e) => (
+                <>
+                  {logError ? (
+                    <div className="px-6 py-3 text-sm text-accent" role="alert">
+                      Could not refresh activity.
+                      <span className="mt-1 block font-mono text-2xs text-ink-500">{logError}</span>
+                    </div>
+                  ) : null}
+                  {entries.map((e) => (
                   <div key={e.id} className="px-6 py-3">
                     <div className="text-xs font-medium">{e.description}</div>
                     <div className="font-mono text-2xs text-ink-400 mt-0.5">
                       {e.action} &middot; {new Date(e.created_at).toLocaleDateString()}
                     </div>
                   </div>
-                ))
+                  ))}
+                </>
               )}
             </div>
           </div>

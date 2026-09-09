@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { captureError } from './errorReporting';
 import { LANDING_STANDARDS_PACKAGE_LABEL } from '../config/customerProducts';
 
 export type NgoSetupRequestKind = 'landing_standards' | 'brand_assets' | 'general';
@@ -44,7 +45,7 @@ export async function submitNgoSetupRequest(
     questionnaire: input.questionnaire,
   });
 
-  if (reqError) return { error: reqError.message };
+  if (reqError) return { error: captureError(reqError, { where: 'submitNgoSetupRequest.insert' }) };
 
   const orgPatch: Record<string, string> = {
     updated_at: new Date().toISOString(),
@@ -58,7 +59,12 @@ export async function submitNgoSetupRequest(
     .update(orgPatch)
     .eq('id', input.organizationId);
 
-  if (orgError) return { error: orgError.message };
+  if (orgError) {
+    captureError(orgError, { where: 'submitNgoSetupRequest.orgPatch' });
+    return {
+      error: `Request submitted, but organisation brand details could not be saved: ${orgError.message}`,
+    };
+  }
 
   return { error: null };
 }

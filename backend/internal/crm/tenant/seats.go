@@ -134,14 +134,24 @@ func (r *Registry) ListSeats(ctx context.Context, tenantID string) ([]Seat, erro
 	return out, rows.Err()
 }
 
-// activeSeatCount counts seats that consume a purchased seat. Disabled seats
-// are retained for attribution and are not billed.
-func activeSeatCount(ctx context.Context, tx pgx.Tx, tenantID string) (int, error) {
+// billableSeatCount is active non-owner seats.
+//
+// The owner is included in the workspace subscription (the $25/mo admin seat)
+// and must not consume seats_purchased. Counting them made DEFAULT 1 reject
+// the first teammate invite with 402 — the feature could not be used.
+func billableSeatCount(ctx context.Context, tx pgx.Tx, tenantID string) (int, error) {
 	var n int
 	err := tx.QueryRow(ctx,
 		`SELECT count(*) FROM platform.tenant_users
-		  WHERE tenant_id = $1 AND status = 'active'`, tenantID).Scan(&n)
+		  WHERE tenant_id = $1 AND status = 'active' AND role <> 'owner'`, tenantID).Scan(&n)
 	return n, err
+}
+
+// inviteWouldExceed reports whether issuing one more invitation would pass the
+// purchased extra-seat cap. Pending invites reserve a seat so two admins cannot
+// race past the limit.
+func inviteWouldExceed(billable, pending, purchased int) bool {
+	return billable+pending >= purchased
 }
 
 // pendingInviteCount — an outstanding invite reserves a seat, otherwise an
@@ -197,7 +207,7 @@ func (r *Registry) CreateInvite(ctx context.Context, tenantID, email, role, invi
 		if err != nil {
 			return err
 		}
-		active, err := activeSeatCount(ctx, tx, tenantID)
+		billable, err := billableSeatCount(ctx, tx, tenantID)
 		if err != nil {
 			return err
 		}
@@ -205,9 +215,9 @@ func (r *Registry) CreateInvite(ctx context.Context, tenantID, email, role, invi
 		if err != nil {
 			return err
 		}
-		if active+pending >= purchased {
-			return fmt.Errorf("%w: %d of %d seats are in use or invited",
-				ErrSeatLimit, active+pending, purchased)
+		if inviteWouldExceed(billable, pending, purchased) {
+			return fmt.Errorf("%w: %d of %d extra seats are in use or invited",
+				ErrSeatLimit, billable+pending, purchased)
 		}
 
 		// Replace any superseded invite for this address, so revoking the new
@@ -346,11 +356,11 @@ func (r *Registry) AcceptInvite(ctx context.Context, token, userID, userEmail st
 		if err != nil {
 			return err
 		}
-		active, err := activeSeatCount(ctx, tx, tenantID)
+		billable, err := billableSeatCount(ctx, tx, tenantID)
 		if err != nil {
 			return err
 		}
-		if active >= purchased {
+		if billable >= purchased {
 			return ErrSeatLimit
 		}
 

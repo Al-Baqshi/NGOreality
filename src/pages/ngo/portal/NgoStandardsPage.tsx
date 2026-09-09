@@ -8,7 +8,7 @@ import {
 import NgoPortalPageShell from '../../../components/ngo/NgoPortalPageShell';
 
 export default function NgoStandardsPage() {
-  const { criteria } = useNgoPortalContext();
+  const { criteria, error } = useNgoPortalContext();
   const publicCriteria = criteria.filter(isPublicCriterion);
   const memberCriteria = criteria.filter(isMemberCriterion);
   const publicReady = allPublicCriteriaPass(criteria);
@@ -21,7 +21,9 @@ export default function NgoStandardsPage() {
           <h2 className="text-lg font-black uppercase tracking-tight mb-2">Public trust standards</h2>
           {publicCriteria.length === 0 ? (
             <p className="text-sm text-ink-500">
-              Your trust checklist is being set up. Our team will add criteria soon — check back after onboarding.
+              {error
+                ? 'Trust standards could not be loaded.'
+                : 'Your trust checklist is being set up. Our team will add criteria soon — check back after onboarding.'}
             </p>
           ) : (
             <>

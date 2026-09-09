@@ -1,7 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import { captureError } from '../../lib/errorReporting';
 import { useState, useEffect } from 'react';
-import { SectionHeader, EmptyState } from '../../components/ui';
+import { SectionHeader, EmptyState, QueryError } from '../../components/ui';
 import { Link } from 'react-router-dom';
 import { Users, Search, Mail } from 'lucide-react';
 import type { Contact, Organization } from '../../types';
@@ -11,6 +11,7 @@ type ContactWithOrg = Contact & { organizations: Organization };
 export default function Contacts() {
   const [contacts, setContacts] = useState<ContactWithOrg[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
@@ -18,9 +19,13 @@ export default function Contacts() {
       .from('contacts')
       .select('*, organizations(*)')
       .order('created_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (error) captureError(error, { where: 'Contacts.load' });
-        else if (data) setContacts(data as ContactWithOrg[]);
+      .then(({ data, error: queryError }) => {
+        if (queryError) {
+          setError(captureError(queryError, { where: 'Contacts.load' }));
+        } else {
+          setError(null);
+          setContacts((data ?? []) as ContactWithOrg[]);
+        }
         setLoading(false);
       });
   }, []);
@@ -48,8 +53,11 @@ export default function Contacts() {
         </div>
       </div>
 
-      {loading ? (
+      {error && contacts.length > 0 ? <QueryError message={error} /> : null}
+      {loading && contacts.length === 0 ? (
         <div className="text-center py-16 font-mono text-sm text-ink-400">Loading...</div>
+      ) : error && contacts.length === 0 ? (
+        <QueryError message={error} />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<Users size={48} />}

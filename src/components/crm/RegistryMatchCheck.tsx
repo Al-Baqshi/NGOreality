@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, ExternalLink } from 'lucide-react';
 import { findRegistryMatches, type RegistryMatch } from '../../lib/registryMatch';
+import { captureError } from '../../lib/errorReporting';
+import { QueryError } from '../ui';
 
 /**
  * For a self-submitted org: search the imported registry for similar names so
@@ -16,16 +18,28 @@ export default function RegistryMatchCheck({
   organizationName: string;
 }) {
   const [matches, setMatches] = useState<RegistryMatch[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    findRegistryMatches(organizationName, organizationId).then((rows) => {
-      if (!cancelled) setMatches(rows);
-    });
+    setError(null);
+    findRegistryMatches(organizationName, organizationId)
+      .then((rows) => {
+        if (!cancelled) setMatches(rows);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setMatches([]);
+        setError(captureError(err, { where: 'RegistryMatchCheck' }));
+      });
     return () => {
       cancelled = true;
     };
   }, [organizationId, organizationName]);
+
+  if (error) {
+    return <QueryError message={error} />;
+  }
 
   if (matches === null) {
     return (

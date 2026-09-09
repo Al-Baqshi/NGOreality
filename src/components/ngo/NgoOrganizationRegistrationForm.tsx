@@ -18,6 +18,7 @@ import OrganizationClaimSearch from '../OrganizationClaimSearch';
 import NgoDirectoryOrgPreview from './NgoDirectoryOrgPreview';
 import Turnstile, { isTurnstileEnabled } from '../Turnstile';
 import { verifyTurnstileToken } from '../../lib/turnstile';
+import { captureError } from '../../lib/errorReporting';
 import type { ClaimSearchOrganization } from '../../hooks/useOrganizationClaimSearch';
 
 type SignupMode = 'existing' | 'new';
@@ -144,7 +145,13 @@ export default function NgoOrganizationRegistrationForm({
       .then(({ data, error: loadError }) => {
         if (cancelled) return;
         setPrefillLoading(false);
-        if (loadError || !data) {
+        if (loadError) {
+          setPrefillError(
+            captureError(loadError, { where: 'NgoOrganizationRegistrationForm.prefill' }),
+          );
+          return;
+        }
+        if (!data) {
           setPrefillError('We could not find that organisation. Search the directory below.');
           return;
         }
@@ -174,23 +181,28 @@ export default function NgoOrganizationRegistrationForm({
     if (!getPendingRegistration(user)) return;
     resumeAttempted.current = true;
     setResuming(true);
-    void resumePendingRegistration(user).then((result) => {
-      setResuming(false);
-      if (!result) return;
-      if (result.status === 'linked') {
-        onSuccess?.();
-        return;
-      }
-      if (result.status === 'already_managed' && result.pending.mode === 'existing') {
-        setAlreadyManaged({
-          organizationId: result.pending.organizationId,
-          organizationName: result.pending.organizationName,
-          managers: result.managers,
-        });
-        return;
-      }
-      if (result.error) setError(result.error);
-    });
+    void resumePendingRegistration(user)
+      .then((result) => {
+        setResuming(false);
+        if (!result) return;
+        if (result.status === 'linked') {
+          onSuccess?.();
+          return;
+        }
+        if (result.status === 'already_managed' && result.pending.mode === 'existing') {
+          setAlreadyManaged({
+            organizationId: result.pending.organizationId,
+            organizationName: result.pending.organizationName,
+            managers: result.managers,
+          });
+          return;
+        }
+        if (result.error) setError(result.error);
+      })
+      .catch((err) => {
+        setResuming(false);
+        setError(captureError(err, { where: 'NgoOrganizationRegistrationForm.resume' }));
+      });
   }, [loggedIn, user, onSuccess]);
 
   const finishRegistration = async (): Promise<{ error: string | null; parked: boolean }> => {

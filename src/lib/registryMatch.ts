@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { captureError } from './errorReporting';
 
 /**
  * Fuzzy check of a self-submitted organization name against the imported
@@ -71,7 +72,10 @@ export async function findRegistryMatches(
   if (excludeOrgId) query = query.neq('id', excludeOrgId);
 
   const { data, error } = await query;
-  if (error || !data) return [];
+  if (error) {
+    throw new Error(captureError(error, { where: 'findRegistryMatches' }));
+  }
+  if (!data?.length) return [];
 
   const scored = data
     .map((row) => {

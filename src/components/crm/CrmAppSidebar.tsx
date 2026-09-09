@@ -15,7 +15,7 @@ import {
 
 export function CrmAppSidebar(props: ComponentProps<typeof Sidebar>) {
   const { pathname } = useLocation();
-  const navCounts = useCrmNavCounts();
+  const { error: countsError, ...navCounts } = useCrmNavCounts();
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -49,6 +49,11 @@ export function CrmAppSidebar(props: ComponentProps<typeof Sidebar>) {
           className="mt-auto"
           items={[{ title: 'Public site', url: '/public', icon: Globe }]}
         />
+        {countsError ? (
+          <p className="px-3 pb-2 font-mono text-[10px] leading-snug text-sidebar-primary" role="status">
+            Sidebar counts could not be loaded.
+          </p>
+        ) : null}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

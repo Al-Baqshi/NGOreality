@@ -56,7 +56,12 @@ export default function NgoLogin() {
     // and nothing appeared in the CRM because there was nothing to show. A
     // workspace is a separate product — not having one says nothing about
     // whether you have an organisation.
-    const { data: sessionData } = await supabase.auth.getSession();
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      setError(captureError(sessionError, { where: 'NgoLogin.session' }));
+      setSubmitting(false);
+      return;
+    }
     const supabaseUser = sessionData.session?.user;
 
     if (supabaseUser) {
@@ -69,20 +74,25 @@ export default function NgoLogin() {
           .eq('user_id', supabaseUser.id)
           .limit(1);
         if (membersError) {
-          captureError(membersError, { where: 'NgoLogin.membershipCheck' });
-        } else if (!members?.length) {
+          setError(captureError(membersError, { where: 'NgoLogin.membershipCheck' }));
+          setSubmitting(false);
+          return;
+        }
+        if (!members?.length) {
           destination = '/ngo/signup';
         }
       }
     } else {
       // Central-only account: no Supabase metadata, so the CRM seat is the
-      // only signal we have. This is informational, never blocking — a 403
-      // here means "no workspace", which the portal itself explains better.
+      // only signal we have. A 403/404 means "no workspace", which the portal
+      // itself explains. Any other failure is not "signed in fine" — stay here.
       try {
         await getIdentity();
       } catch (err) {
         if (!(err instanceof CrmApiError && (err.status === 403 || err.status === 404))) {
-          captureError(err, { where: 'NgoLogin.identity' });
+          setError(captureError(err, { where: 'NgoLogin.identity' }));
+          setSubmitting(false);
+          return;
         }
       }
     }

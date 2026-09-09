@@ -23,9 +23,13 @@ export function useDirectoryCountryCounts() {
     supabase.rpc('directory_country_counts').then(({ data, error }) => {
       if (error) {
         setError(captureError(error, { where: 'useDirectoryCountryCounts' }));
-      } else if (data && typeof data === 'object') {
+      } else if (data && typeof data === 'object' && !Array.isArray(data)) {
         setCounts(data as Record<string, number>);
         setError(null);
+      } else {
+        setError(
+          captureError(new Error('Country counts response was empty'), { where: 'useDirectoryCountryCounts.empty' }),
+        );
       }
       setLoading(false);
     });
@@ -45,11 +49,17 @@ export function useDirectoryTagCounts(country: string) {
       if (error) {
         setTags({});
         setError(captureError(error, { where: 'useDirectoryTagCounts', detail: { country } }));
-      } else if (data && typeof data === 'object') {
+      } else if (data && typeof data === 'object' && !Array.isArray(data)) {
         setTags(data as Record<string, number>);
         setError(null);
       } else {
         setTags({});
+        setError(
+          captureError(new Error('Tag counts response was empty'), {
+            where: 'useDirectoryTagCounts.empty',
+            detail: { country },
+          }),
+        );
       }
       setLoading(false);
     });

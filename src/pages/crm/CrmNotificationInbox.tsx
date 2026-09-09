@@ -10,9 +10,8 @@ export default function CrmNotificationInbox() {
     usePortalNotifications('staff');
 
   const handleOpen = async (item: PortalNotification) => {
-    if (!item.read_at) {
-      await markRead(item.id);
-    }
+    if (!item.read_at) return markRead(item.id);
+    return null;
   };
 
   return (
@@ -42,8 +41,8 @@ export default function CrmNotificationInbox() {
       </p>
 
       <div className="grid grid-cols-2 gap-3 mb-6">
-        <MetricCard label="Unread" value={unreadCount} sub="Waiting for you" compact accent={unreadCount > 0} />
-        <MetricCard label="In inbox" value={items.length} sub="Latest activity" compact />
+        <MetricCard label="Unread" value={error ? '—' : unreadCount} sub="Waiting for you" compact accent={!error && unreadCount > 0} />
+        <MetricCard label="In inbox" value={error ? '—' : items.length} sub="Latest activity" compact />
       </div>
 
       <NotificationFeed
@@ -52,7 +51,7 @@ export default function CrmNotificationInbox() {
         error={error}
         emptyMessage="No alerts yet. New contact inquiries and NGO portal activity will appear here."
         onRefresh={() => void refetch()}
-        onMarkAllRead={() => void markAllRead()}
+        onMarkAllRead={markAllRead}
         onOpen={handleOpen}
       />
 

@@ -3,7 +3,7 @@ import NgoSetupRequestPanel from '../../../components/ngo/NgoSetupRequestPanel';
 import NgoPortalPageShell from '../../../components/ngo/NgoPortalPageShell';
 
 export default function NgoSetupRequestPage() {
-  const { organization, setupRequests, refetch } = useNgoPortalContext();
+  const { organization, setupRequests, refetch, error } = useNgoPortalContext();
   if (!organization) return null;
 
   return (
@@ -11,6 +11,7 @@ export default function NgoSetupRequestPage() {
       <NgoSetupRequestPanel
         organization={organization}
         setupRequests={setupRequests}
+        loadError={error}
         onUpdated={() => void refetch()}
       />
     </NgoPortalPageShell>

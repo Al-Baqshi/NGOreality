@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { SectionHeader } from '../../components/ui';
+import { QueryError, SectionHeader } from '../../components/ui';
 import { useCrmDashboardStats, useExpiringBadges } from '../../hooks/useCrm';
 import { Award } from 'lucide-react';
 
 export default function CrmBadges() {
   const [tab, setTab] = useState<'expiring' | 'expired'>('expiring');
-  const { stats, loading: statsLoading } = useCrmDashboardStats();
-  const { rows, loading } = useExpiringBadges(tab);
+  const { stats, loading: statsLoading, error: statsError } = useCrmDashboardStats();
+  const { rows, loading, error } = useExpiringBadges(tab);
 
   return (
     <div className="max-w-4xl mx-auto">
       <SectionHeader>Badges & renewals</SectionHeader>
+
+      {statsError && <QueryError message={statsError} />}
 
       <div className="flex gap-2 mb-6">
         <button
@@ -21,7 +23,7 @@ export default function CrmBadges() {
             tab === 'expiring' ? 'bg-ink-950 text-white' : 'bg-white text-ink-600'
           }`}
         >
-          Expiring 30d ({statsLoading ? '—' : stats.badges_expiring_30d})
+          Expiring 30d ({statsLoading || statsError ? '—' : stats.badges_expiring_30d})
         </button>
         <button
           type="button"
@@ -30,7 +32,7 @@ export default function CrmBadges() {
             tab === 'expired' ? 'bg-accent text-white' : 'bg-white text-ink-600'
           }`}
         >
-          Expired ({statsLoading ? '—' : stats.badges_expired})
+          Expired ({statsLoading || statsError ? '—' : stats.badges_expired})
         </button>
       </div>
 
@@ -43,6 +45,10 @@ export default function CrmBadges() {
         </div>
         {loading ? (
           <p className="px-4 py-8 font-mono text-sm text-ink-400 text-center">Loading…</p>
+        ) : error ? (
+          <div className="p-4">
+            <QueryError message={error} />
+          </div>
         ) : rows.length === 0 ? (
           <p className="px-4 py-8 text-sm text-ink-400 text-center">None in this list</p>
         ) : (

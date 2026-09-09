@@ -7,9 +7,8 @@ export default function NgoNotificationsPage() {
   const { items, loading, error, refetch, markRead, markAllRead } = usePortalNotifications('ngo');
 
   const handleOpen = async (item: PortalNotification) => {
-    if (!item.read_at) {
-      await markRead(item.id);
-    }
+    if (!item.read_at) return markRead(item.id);
+    return null;
   };
 
   return (
@@ -25,7 +24,7 @@ export default function NgoNotificationsPage() {
         error={error}
         emptyMessage="No updates yet. When our team changes something on your account, you will see it here."
         onRefresh={() => void refetch()}
-        onMarkAllRead={() => void markAllRead()}
+        onMarkAllRead={markAllRead}
         onOpen={handleOpen}
       />
     </NgoPortalPageShell>

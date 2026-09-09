@@ -16,7 +16,7 @@ export interface OutreachBatchCommandProps {
   hint?: React.ReactNode;
 }
 
-const STAGE_CHIPS: Record<(typeof OUTREACH_KANBAN_STATUSES)[number], string> = {
+const STAGE_CHIPS: Partial<Record<OutreachStatus, string>> = {
   not_contacted: 'Not contacted',
   cold_email: 'Cold email',
   contacted: 'Contacted',
@@ -109,7 +109,7 @@ export default function OutreachBatchCommand({
                 onClick={() => setPending(status)}
                 className="inline-flex min-h-[34px] items-center rounded-md border border-ink-200/80 bg-white/90 px-2.5 text-xs font-medium text-ink-700 transition-colors hover:border-teal/50 hover:bg-teal/5 hover:text-teal disabled:opacity-50 dark:border-border dark:bg-card dark:text-foreground"
               >
-                {STAGE_CHIPS[status]}
+                {STAGE_CHIPS[status] ?? OUTREACH_STATUS_LABELS[status]}
               </button>
             ))}
           </div>

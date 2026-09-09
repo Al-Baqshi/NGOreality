@@ -84,7 +84,7 @@ export default function OutreachToolbar({
 
       {showFilters && (
         <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-ink-200 dark:border-ink-800">
-          <Select value={statusFilter} onValueChange={onStatusFilterChange}>
+          <Select value={statusFilter} onValueChange={(v) => onStatusFilterChange(v ?? '')}>
             <SelectTrigger className="w-[180px] min-h-[44px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -98,7 +98,7 @@ export default function OutreachToolbar({
             </SelectContent>
           </Select>
 
-          <Select value={locationFilter} onValueChange={onLocationFilterChange}>
+          <Select value={locationFilter} onValueChange={(v) => onLocationFilterChange(v ?? '')}>
             <SelectTrigger className="w-[180px] min-h-[44px]">
               <SelectValue placeholder="Location" />
             </SelectTrigger>
@@ -118,7 +118,7 @@ export default function OutreachToolbar({
             </SelectContent>
           </Select>
 
-          <Select value={categoryFilter} onValueChange={onCategoryFilterChange}>
+          <Select value={categoryFilter} onValueChange={(v) => onCategoryFilterChange(v ?? '')}>
             <SelectTrigger className="w-[180px] min-h-[44px]">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
@@ -138,7 +138,7 @@ export default function OutreachToolbar({
             </SelectContent>
           </Select>
 
-          <Select value={sortBy} onValueChange={onSortChange}>
+          <Select value={sortBy} onValueChange={(v) => onSortChange(v ?? '')}>
             <SelectTrigger className="w-[180px] min-h-[44px]">
               <SelectValue placeholder="Sort" />
             </SelectTrigger>

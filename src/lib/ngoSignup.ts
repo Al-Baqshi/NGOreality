@@ -1,5 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { captureError } from './errorReporting';
 
 export type OrgManagerInfo = {
   email: string;
@@ -32,7 +33,8 @@ export type PendingRegistration =
 
 const okStatuses = new Set(['claimed', 'joined', 'already_member', 'created']);
 
-function rpcError(message: string): LinkResult {
+function rpcError(message: string, err?: unknown, where?: string): LinkResult {
+  if (err) captureError(err, { where: where ?? 'ngoSignup' });
   return { status: 'error', organizationId: null, managers: [], error: message };
 }
 
@@ -44,7 +46,7 @@ export async function linkExistingOrganization(organizationId: string): Promise<
     p_organization_id: organizationId,
   });
 
-  if (error) return rpcError(error.message);
+  if (error) return rpcError(error.message, error, 'linkExistingOrganization');
 
   if (data?.status === 'already_managed') {
     return {
@@ -72,7 +74,7 @@ export async function joinOrganization(organizationId: string): Promise<LinkResu
     p_organization_id: organizationId,
   });
 
-  if (error) return rpcError(error.message);
+  if (error) return rpcError(error.message, error, 'joinOrganization');
 
   if (okStatuses.has(data?.status)) {
     return { status: 'linked', organizationId, managers: [], error: null };
@@ -96,7 +98,7 @@ export async function provisionNgoOrganization(input: {
     p_website_url: input.websiteUrl,
   });
 
-  if (error) return rpcError(error.message);
+  if (error) return rpcError(error.message, error, 'provisionNgoOrganization');
 
   if (data?.status === 'created') {
     return { status: 'linked', organizationId: data.organization_id ?? null, managers: [], error: null };
@@ -114,7 +116,8 @@ export function getPendingRegistration(user: User | null | undefined): PendingRe
 }
 
 export async function clearPendingRegistration(): Promise<void> {
-  await supabase.auth.updateUser({ data: { pending_registration: null } });
+  const { error } = await supabase.auth.updateUser({ data: { pending_registration: null } });
+  if (error) captureError(error, { where: 'clearPendingRegistration' });
 }
 
 /**

@@ -8,6 +8,7 @@
  */
 
 import { supabase } from './supabase';
+import { captureError } from './errorReporting';
 import { activateMembershipBenefits, isMembershipProduct } from './membershipBenefits';
 import type { OrganizationPayment } from '../types';
 
@@ -27,8 +28,10 @@ export async function listPendingPayments(limit = 100): Promise<PendingPayment[]
     .order('created_at', { ascending: true })
     .limit(limit);
 
-  if (error || !data) return [];
-  return data as PendingPayment[];
+  if (error) {
+    throw new Error(captureError(error, { where: 'listPendingPayments' }));
+  }
+  return (data ?? []) as PendingPayment[];
 }
 
 /**
@@ -132,7 +135,9 @@ export async function reconcilePayment(input: {
     .select('id')
     .maybeSingle();
 
-  if (error) return { error: error.message };
+  if (error) {
+    return { error: captureError(error, { where: 'reconcileBankTransfer.update' }) };
+  }
   if (!data) {
     return {
       error: null,
@@ -140,13 +145,14 @@ export async function reconcilePayment(input: {
     };
   }
 
-  await supabase.from('activity_log').insert({
+  const { error: logError } = await supabase.from('activity_log').insert({
     organization_id: input.organizationId,
     action: 'payment_reconciled',
     description: `Bank transfer matched (${(input.amountCents / 100).toFixed(2)} NZD, ref ${input.bankReference.trim()})`,
     performed_by: input.recordedBy ?? 'staff',
     metadata: { payment_id: input.paymentId, bank_reference: input.bankReference.trim() },
   });
+  if (logError) captureError(logError, { where: 'reconcileBankTransfer.activityLog' });
 
   // Activating benefits is what the charity is actually waiting for: membership
   // period, badge eligibility, and hourly monitoring.
@@ -165,7 +171,7 @@ export async function reconcilePayment(input: {
   }
 
   if (input.productType === 'landing_standards_package') {
-    await supabase
+    const { error: setupError } = await supabase
       .from('ngo_setup_requests')
       .update({
         status: 'in_review',
@@ -174,13 +180,15 @@ export async function reconcilePayment(input: {
       .eq('organization_id', input.organizationId)
       .eq('request_kind', 'landing_standards')
       .in('status', ['pending', 'in_review']);
+    if (setupError) captureError(setupError, { where: 'reconcileBankTransfer.landingSetup' });
 
-    await supabase.from('activity_log').insert({
+    const { error: landingLogError } = await supabase.from('activity_log').insert({
       organization_id: input.organizationId,
       action: 'landing_package_paid',
       description: 'Trust landing page package reconciled — ready for staff fulfillment',
       performed_by: input.recordedBy ?? 'staff',
     });
+    if (landingLogError) captureError(landingLogError, { where: 'reconcileBankTransfer.landingLog' });
 
     return { error: null, message: 'Payment recorded — fulfill landing package via Setup requests.' };
   }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useOrganizationsPage, type OrganizationsPageFilters } from '../../hooks/useCrm';
-import { OrgTrustStatusBadge, SectionHeader, EmptyState } from '../../components/ui';
+import { OrgTrustStatusBadge, SectionHeader, EmptyState, QueryError } from '../../components/ui';
 import { Plus, Search, Building2, LayoutGrid, List, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { OrgStatus, OutreachStatus } from '../../types';
 import { ORG_STATUS_LABELS, OUTREACH_STATUS_LABELS } from '../../types';
@@ -79,7 +79,7 @@ export default function OrganizationsList() {
     [statusFilter, outreachFilter, hasWebsiteFilter, searchParams],
   );
 
-  const { organizations, totalCount, totalPages, loading, pageSize } = useOrganizationsPage(filters, page);
+  const { organizations, totalCount, totalPages, loading, error, pageSize, refetch } = useOrganizationsPage(filters, page);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -220,6 +220,8 @@ export default function OrganizationsList() {
 
       {loading ? (
         <div className="text-center py-16 font-mono text-sm text-ink-400">Loading...</div>
+      ) : error ? (
+        <QueryError message={error} onRetry={refetch} />
       ) : organizations.length === 0 ? (
         <EmptyState
           icon={<Building2 size={48} />}

@@ -3,6 +3,7 @@ import { Send, Mail, Loader2, X, AlertTriangle, CheckCircle2, ChevronDown, Chevr
 import { Link } from 'react-router-dom';
 import type { Organization, OutreachEmailTemplate, OutreachStatus } from '../../types';
 import { draftOutreachEmailForOrg, sendOutreachForColumn, sendOutreachNow } from '../../lib/crmOutreach';
+import { captureError } from '../../lib/errorReporting';
 import { isMonitorApiConfigured } from '../../lib/monitorApi';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
@@ -106,7 +107,7 @@ export default function SendEmailModal({
       onSent();
       setTimeout(() => onClose(), 2000);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Send failed');
+      setMessage(captureError(err, { where: 'SendEmailModal.queue' }));
     } finally {
       setBusy(false);
     }
@@ -139,7 +140,7 @@ export default function SendEmailModal({
       onSent();
       setTimeout(() => onClose(), 2000);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Send failed');
+      setMessage(captureError(err, { where: 'SendEmailModal.sendNow' }));
     } finally {
       setBusy(false);
     }

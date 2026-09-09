@@ -1,7 +1,8 @@
 import { useInquiries } from '../../hooks/useSupabase';
 import { supabase } from '../../lib/supabase';
+import { captureError } from '../../lib/errorReporting';
 import { useState } from 'react';
-import { SectionHeader, EmptyState, FormField, Modal } from '../../components/ui';
+import { SectionHeader, EmptyState, FormField, Modal, QueryError } from '../../components/ui';
 import { Mail, Clock, CheckCircle, XCircle } from 'lucide-react';
 import type { InquirySubmission } from '../../types';
 
@@ -20,12 +21,21 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function Inquiries() {
-  const { inquiries, loading, refetch } = useInquiries();
+  const { inquiries, loading, error, refetch } = useInquiries();
   const [selected, setSelected] = useState<InquirySubmission | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const handleStatusChange = async (id: string, newStatus: InquirySubmission['status']) => {
-    await supabase.from('inquiry_submissions').update({ status: newStatus }).eq('id', id);
+    setActionError(null);
+    const { error: updateError } = await supabase
+      .from('inquiry_submissions')
+      .update({ status: newStatus })
+      .eq('id', id);
+    if (updateError) {
+      setActionError(captureError(updateError, { where: 'Inquiries.statusChange' }));
+      return;
+    }
     refetch();
   };
 
@@ -38,14 +48,20 @@ export default function Inquiries() {
     <div className="max-w-6xl mx-auto">
       <SectionHeader>Inquiries</SectionHeader>
 
-      {loading ? (
+      {actionError && <QueryError message={actionError} />}
+
+      {error && <QueryError message={error} onRetry={refetch} />}
+
+      {loading && inquiries.length === 0 ? (
         <div className="text-center py-16 font-mono text-sm text-ink-400">Loading...</div>
       ) : inquiries.length === 0 ? (
+        error ? null : (
         <EmptyState
           icon={<Mail size={48} />}
           title="No inquiries yet"
           description="Inquiries from the public contact form will appear here."
         />
+        )
       ) : (
         <div className="space-y-3">
           {inquiries.map((inq) => (

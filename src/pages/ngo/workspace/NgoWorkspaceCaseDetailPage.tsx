@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCase, useCaseNotes, useWorkspaceIdentity } from '../../../hooks/useWorkspace';
 import * as crm from '../../../lib/crmApi';
+import { captureError } from '../../../lib/errorReporting';
 import SEO from '../../../components/SEO';
 
 export default function NgoWorkspaceCaseDetailPage() {
@@ -12,7 +13,7 @@ export default function NgoWorkspaceCaseDetailPage() {
   const { data: kase, loading, error, refetch } = useCase(id);
   const notes = useCaseNotes(id);
 
-  if (loading) {
+  if (loading && !kase) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -21,10 +22,21 @@ export default function NgoWorkspaceCaseDetailPage() {
     );
   }
 
-  if (error || !kase) {
+  if (error && !kase) {
     return (
       <div className="card-brutal p-6" role="alert">
-        <p className="font-medium text-destructive">{error ?? 'Case not found'}</p>
+        <p className="font-medium text-destructive">{error}</p>
+        <Link to="/ngo/workspace/clients" className="mt-3 inline-block text-sm underline">
+          Back to clients
+        </Link>
+      </div>
+    );
+  }
+
+  if (!kase) {
+    return (
+      <div className="card-brutal p-6" role="alert">
+        <p className="font-medium text-destructive">Case not found</p>
         <Link to="/ngo/workspace/clients" className="mt-3 inline-block text-sm underline">
           Back to clients
         </Link>
@@ -57,6 +69,12 @@ export default function NgoWorkspaceCaseDetailPage() {
         )}
       </div>
 
+      {error ? (
+        <div className="card-brutal p-4 text-sm text-destructive" role="alert">
+          {error}
+        </div>
+      ) : null}
+
       <NotesSection
         caseId={kase.id}
         notes={notes}
@@ -80,7 +98,7 @@ function CloseCaseButton({ caseId, onClosed }: { caseId: string; onClosed: () =>
       await crm.updateCase(caseId, { title: current.title, status: 'closed' });
       onClosed();
     } catch (err) {
-      setError(err instanceof crm.CrmApiError ? err.message : 'Could not close the case');
+      setError(captureError(err, { where: 'NgoWorkspaceCaseDetail.close' }));
     } finally {
       setBusy(false);
     }
@@ -135,7 +153,7 @@ function NotesSection({
       setRestricted(false);
       void notes.refetch();
     } catch (err) {
-      setError(err instanceof crm.CrmApiError ? err.message : 'Could not save the note');
+      setError(captureError(err, { where: 'NgoWorkspaceCaseDetail.addNote' }));
     } finally {
       setBusy(false);
     }
@@ -182,9 +200,15 @@ function NotesSection({
         </p>
       )}
 
-      {notes.loading && <p className="mt-3 text-sm text-muted-foreground">Loading notes…</p>}
+      {notes.error && (
+        <p role="alert" className="mt-2 text-sm text-destructive">
+          {notes.error}
+        </p>
+      )}
 
-      {notes.data && notes.data.length === 0 && !notes.loading && (
+      {notes.loading && !notes.data && <p className="mt-3 text-sm text-muted-foreground">Loading notes…</p>}
+
+      {notes.data && notes.data.length === 0 && !notes.loading && !notes.error && (
         <p className="mt-3 text-sm text-muted-foreground">No notes yet.</p>
       )}
 

@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCrmDashboardStats, useWorkQueue } from '../../hooks/useCrm';
-import { SectionHeader } from '../../components/ui';
+import { SectionHeader, QueryError } from '../../components/ui';
 import {
   BADGE_REQUEST_STATUS_LABELS,
   ENGAGEMENT_STATUS_LABELS,
@@ -9,16 +10,24 @@ import {
 } from '../../types';
 import { Calendar, Award, AlertTriangle, Phone, CheckCircle2, Sparkles } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { captureError } from '../../lib/errorReporting';
 
 export default function WorkQueue() {
-  const { stats, loading: statsLoading } = useCrmDashboardStats();
-  const { followUps, tasks, badgeRequests, setupRequests, incidents, loading, refetch } = useWorkQueue();
+  const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useCrmDashboardStats();
+  const { followUps, tasks, badgeRequests, setupRequests, incidents, followUpsError, tasksError, badgeRequestsError, setupRequestsError, incidentsError, loading, error, refetch } = useWorkQueue();
+
+  const [taskError, setTaskError] = useState<string | null>(null);
 
   const completeTask = async (taskId: string) => {
-    await supabase
+    setTaskError(null);
+    const { error: updateError } = await supabase
       .from('staff_tasks')
       .update({ status: 'done', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq('id', taskId);
+    if (updateError) {
+      setTaskError(captureError(updateError, { where: 'WorkQueue.completeTask' }));
+      return;
+    }
     refetch();
   };
 
@@ -31,26 +40,30 @@ export default function WorkQueue() {
 
       <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3 mb-8 lg:grid-cols-4">
         <div className="card-brutal p-4 text-center">
-          <div className="text-2xl font-black">{statsLoading ? '—' : stats.outreach_due}</div>
+          <div className="text-2xl font-black">{statsLoading || statsError ? '—' : stats.outreach_due}</div>
           <div className="label-brutal mt-1">Outreach due</div>
         </div>
         <div className="card-brutal p-4 text-center">
-          <div className="text-2xl font-black">{statsLoading ? '—' : stats.follow_ups_due}</div>
+          <div className="text-2xl font-black">{statsLoading || statsError ? '—' : stats.follow_ups_due}</div>
           <div className="label-brutal mt-1">Follow-ups</div>
         </div>
         <div className="card-brutal p-4 text-center">
-          <div className="text-2xl font-black">{statsLoading ? '—' : stats.badge_requests_pending}</div>
+          <div className="text-2xl font-black">{statsLoading || statsError ? '—' : stats.badge_requests_pending}</div>
           <div className="label-brutal mt-1">Badge requests</div>
         </div>
         <div className="card-brutal p-4 text-center">
-          <div className="text-2xl font-black">{statsLoading ? '—' : stats.ngo_setup_requests_pending ?? 0}</div>
+          <div className="text-2xl font-black">{statsLoading || statsError ? '—' : stats.ngo_setup_requests_pending ?? 0}</div>
           <div className="label-brutal mt-1">NGO setup</div>
         </div>
         <div className="card-brutal p-4 text-center">
-          <div className="text-2xl font-black text-accent">{statsLoading ? '—' : stats.incidents_open}</div>
+          <div className="text-2xl font-black text-accent">{statsLoading || statsError ? '—' : stats.incidents_open}</div>
           <div className="label-brutal mt-1">Sites down</div>
         </div>
       </div>
+
+      {statsError && <QueryError message={statsError} onRetry={refetchStats} />}
+      {error && <QueryError message={error} onRetry={refetch} />}
+      {taskError && <QueryError message={taskError} />}
 
       {loading ? (
         <p className="font-mono text-sm text-ink-400">Loading queue…</p>
@@ -60,6 +73,7 @@ export default function WorkQueue() {
             title="Follow-ups due"
             icon={<Calendar size={14} />}
             empty="No follow-ups due today"
+            failed={Boolean(followUpsError)}
             count={followUps.length}
           >
             {followUps.map((e) => (
@@ -73,7 +87,7 @@ export default function WorkQueue() {
             ))}
           </QueueSection>
 
-          <QueueSection title="Tasks due" icon={<Phone size={14} />} empty="No tasks due" count={tasks.length}>
+          <QueueSection title="Tasks due" icon={<Phone size={14} />} empty="No tasks due" failed={Boolean(tasksError)} count={tasks.length}>
             {tasks.map((t) => (
               <div key={t.id} className="flex items-center justify-between gap-2 px-4 py-3 border-b border-ink-100 last:border-0">
                 <Link to={`/organizations/${t.organization_id}`} className="min-w-0 flex-1">
@@ -98,6 +112,7 @@ export default function WorkQueue() {
             title="Badge requests"
             icon={<Award size={14} />}
             empty="No pending requests"
+            failed={Boolean(badgeRequestsError)}
             count={badgeRequests.length}
             action={
               <Link to="/registrations" className="font-mono text-2xs uppercase tracking-wider text-teal hover:underline">
@@ -120,6 +135,7 @@ export default function WorkQueue() {
             title="NGO setup requests"
             icon={<Sparkles size={14} />}
             empty="No pending setup requests"
+            failed={Boolean(setupRequestsError)}
             count={setupRequests.length}
             action={
               <Link to="/registrations" className="font-mono text-2xs uppercase tracking-wider text-teal hover:underline">
@@ -148,6 +164,7 @@ export default function WorkQueue() {
             title="Open website incidents"
             icon={<AlertTriangle size={14} />}
             empty="All monitors green"
+            failed={Boolean(incidentsError)}
             count={incidents.length}
           >
             {incidents.map((inc) => (
@@ -179,6 +196,7 @@ function QueueSection({
   title,
   icon,
   empty,
+  failed,
   count,
   action,
   children,
@@ -186,6 +204,7 @@ function QueueSection({
   title: string;
   icon: React.ReactNode;
   empty: string;
+  failed?: boolean;
   count: number;
   action?: React.ReactNode;
   children: React.ReactNode;
@@ -198,11 +217,13 @@ function QueueSection({
         </h3>
         <div className="flex items-center gap-3">
           {action}
-          <span className="font-mono text-2xs text-ink-400">{count}</span>
+          <span className="font-mono text-2xs text-ink-400">{failed && count === 0 ? '—' : count}</span>
         </div>
       </div>
       {count === 0 ? (
-        <p className="px-4 py-6 text-sm text-ink-400 text-center">{empty}</p>
+        <p className={`px-4 py-6 text-sm text-center ${failed ? 'text-accent' : 'text-ink-400'}`}>
+          {failed ? 'Could not load this list.' : empty}
+        </p>
       ) : (
         <div>{children}</div>
       )}

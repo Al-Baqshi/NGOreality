@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { captureError } from '../lib/errorReporting';
 import type { BadgeRequest, NgoSetupRequest, Organization } from '../types';
 
 /**
@@ -40,10 +41,15 @@ export function useRegistrations() {
   const [signupCounts, setSignupCounts] = useState({ total: 0, fromRegistry: 0, newSubmissions: 0 });
   const [badgeRequests, setBadgeRequests] = useState<BadgeRequestRow[]>([]);
   const [setupRequests, setSetupRequests] = useState<SetupRequestRow[]>([]);
+  const [signupsError, setSignupsError] = useState<string | null>(null);
+  const [badgeRequestsError, setBadgeRequestsError] = useState<string | null>(null);
+  const [setupRequestsError, setSetupRequestsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
     setLoading(true);
+    setError(null);
 
     const [orgs, totalCount, registryCount, badge, setup] = await Promise.all([
       supabase
@@ -75,13 +81,44 @@ export function useRegistrations() {
         .limit(50),
     ]);
 
-    if (!orgs.error && orgs.data) setSignups(orgs.data as SignupOrg[]);
-    const total = totalCount.count ?? 0;
-    const fromRegistry = registryCount.count ?? 0;
-    setSignupCounts({ total, fromRegistry, newSubmissions: total - fromRegistry });
+    const failures: string[] = [];
+    if (orgs.error) {
+      const msg = captureError(orgs.error, { where: 'useRegistrations.signups' });
+      failures.push(msg);
+      setSignupsError(msg);
+    } else {
+      setSignupsError(null);
+      setSignups((orgs.data ?? []) as SignupOrg[]);
+    }
+    if (totalCount.error) {
+      failures.push(captureError(totalCount.error, { where: 'useRegistrations.totalCount' }));
+    }
+    if (registryCount.error) {
+      failures.push(captureError(registryCount.error, { where: 'useRegistrations.registryCount' }));
+    }
+    if (!totalCount.error && !registryCount.error) {
+      const total = totalCount.count ?? 0;
+      const fromRegistry = registryCount.count ?? 0;
+      setSignupCounts({ total, fromRegistry, newSubmissions: Math.max(0, total - fromRegistry) });
+    }
     // PostgREST types the embedded to-one relation as an array; cast via unknown.
-    if (!badge.error && badge.data) setBadgeRequests(badge.data as unknown as BadgeRequestRow[]);
-    if (!setup.error && setup.data) setSetupRequests(setup.data as unknown as SetupRequestRow[]);
+    if (badge.error) {
+      const msg = captureError(badge.error, { where: 'useRegistrations.badgeRequests' });
+      failures.push(msg);
+      setBadgeRequestsError(msg);
+    } else {
+      setBadgeRequestsError(null);
+      setBadgeRequests((badge.data ?? []) as unknown as BadgeRequestRow[]);
+    }
+    if (setup.error) {
+      const msg = captureError(setup.error, { where: 'useRegistrations.setupRequests' });
+      failures.push(msg);
+      setSetupRequestsError(msg);
+    } else {
+      setSetupRequestsError(null);
+      setSetupRequests((setup.data ?? []) as unknown as SetupRequestRow[]);
+    }
+    setError(failures.length ? failures.join(' · ') : null);
     setLoading(false);
   }, []);
 
@@ -89,5 +126,16 @@ export function useRegistrations() {
     refetch();
   }, [refetch]);
 
-  return { signups, signupCounts, badgeRequests, setupRequests, loading, refetch };
+  return {
+    signups,
+    signupCounts,
+    badgeRequests,
+    setupRequests,
+    signupsError,
+    badgeRequestsError,
+    setupRequestsError,
+    loading,
+    error,
+    refetch,
+  };
 }

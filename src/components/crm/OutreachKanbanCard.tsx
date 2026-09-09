@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink, Globe, GripVertical, Mail } from 'lucide-react';
 import type { Organization, OutreachStatus } from '../../types';
 import { OUTREACH_KANBAN_STATUSES, OUTREACH_STATUS_LABELS } from '../../types';
 import { markRegisteredInbound, registerAsCustomer, setOutreachStatus } from '../../lib/crmOutreach';
+import { captureError } from '../../lib/errorReporting';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import type { OrgEmailStatus } from '../../hooks/useOutreachEmail';
 import { outreachEmailBadge } from '../../lib/outreachEmailBadge';
@@ -41,15 +43,26 @@ export default function OutreachKanbanCard({
   dragPayloadIds,
 }: Props) {
   const confirm = useConfirm();
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const move = async (next: OutreachStatus) => {
-    await setOutreachStatus(org.id, next);
-    onUpdated();
+    setActionError(null);
+    try {
+      await setOutreachStatus(org.id, next);
+      onUpdated();
+    } catch (err) {
+      setActionError(captureError(err, { where: 'OutreachKanbanCard.move' }));
+    }
   };
 
   const handleRegisterInbound = async () => {
-    await markRegisteredInbound(org.id);
-    onUpdated();
+    setActionError(null);
+    try {
+      await markRegisteredInbound(org.id);
+      onUpdated();
+    } catch (err) {
+      setActionError(captureError(err, { where: 'OutreachKanbanCard.registerInbound' }));
+    }
   };
 
   const handleRegisterCustomer = async () => {
@@ -59,8 +72,13 @@ export default function OutreachKanbanCard({
       confirmLabel: 'Register',
     });
     if (!ok) return;
-    await registerAsCustomer(org.id);
-    onUpdated();
+    setActionError(null);
+    try {
+      await registerAsCustomer(org.id);
+      onUpdated();
+    } catch (err) {
+      setActionError(captureError(err, { where: 'OutreachKanbanCard.registerCustomer' }));
+    }
   };
 
   const idsToDrag = dragPayloadIds?.length ? dragPayloadIds : [org.id];
@@ -210,6 +228,7 @@ export default function OutreachKanbanCard({
         >
           Register as customer
         </button>
+        {actionError && <p className="font-mono text-2xs text-accent">{actionError}</p>}
       </div>
     </div>
   );

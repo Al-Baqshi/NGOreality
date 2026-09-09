@@ -8,6 +8,7 @@ import {
 } from '../config/pricing';
 import { LANDING_STANDARDS_PACKAGE_CENTS } from '../config/customerProducts';
 import { activateMembershipBenefits, isMembershipProduct } from './membershipBenefits';
+import { captureError } from './errorReporting';
 import type { OrganizationPayment, PaymentProductType, PaymentStatus } from '../types';
 
 export function paymentReferenceFromOrgId(orgId: string): string {
@@ -15,19 +16,28 @@ export function paymentReferenceFromOrgId(orgId: string): string {
 }
 
 export async function ensurePaymentReference(orgId: string): Promise<string> {
-  const { data: org } = await supabase
+  const { data: org, error: readError } = await supabase
     .from('organizations')
     .select('payment_reference')
     .eq('id', orgId)
     .maybeSingle();
 
-  if (org?.payment_reference) return org.payment_reference;
+  if (readError) {
+    throw new Error(captureError(readError, { where: 'ensurePaymentReference.read' }));
+  }
+  if (!org) {
+    throw new Error('Organisation not found — cannot allocate a payment reference.');
+  }
+  if (org.payment_reference) return org.payment_reference;
 
   const reference = paymentReferenceFromOrgId(orgId);
-  await supabase
+  const { error: writeError } = await supabase
     .from('organizations')
     .update({ payment_reference: reference, updated_at: new Date().toISOString() })
     .eq('id', orgId);
+  if (writeError) {
+    throw new Error(captureError(writeError, { where: 'ensurePaymentReference.write' }));
+  }
 
   return reference;
 }
@@ -59,7 +69,7 @@ export function isLandingPackageProduct(productType: string): boolean {
 }
 
 async function markLandingPackagePaid(organizationId: string, recordedBy?: string) {
-  await supabase
+  const { error: setupError } = await supabase
     .from('ngo_setup_requests')
     .update({
       status: 'in_review',
@@ -68,13 +78,15 @@ async function markLandingPackagePaid(organizationId: string, recordedBy?: strin
     .eq('organization_id', organizationId)
     .eq('request_kind', 'landing_standards')
     .in('status', ['pending', 'in_review']);
+  if (setupError) captureError(setupError, { where: 'markLandingPackagePaid.setupRequest' });
 
-  await supabase.from('activity_log').insert({
+  const { error: logError } = await supabase.from('activity_log').insert({
     organization_id: organizationId,
     action: 'landing_package_paid',
     description: 'Trust landing page package marked paid — ready for staff fulfillment',
     performed_by: recordedBy ?? 'staff',
   });
+  if (logError) captureError(logError, { where: 'markLandingPackagePaid.activityLog' });
 }
 
 export async function recordPayment(input: {
@@ -94,7 +106,15 @@ export async function recordPayment(input: {
     input.productType === 'verification_annual' ? 'membership_annual' : input.productType;
   const amountCents = amountForProduct(productType, input.amountCents);
 
-  const reference = await ensurePaymentReference(input.organizationId);
+  let reference: string;
+  try {
+    reference = await ensurePaymentReference(input.organizationId);
+  } catch (err) {
+    return {
+      payment: null,
+      error: err instanceof Error ? err.message : 'Could not allocate a payment reference.',
+    };
+  }
   const bankRef =
     input.bankTransferReference?.trim() ||
     (input.paymentMethod === 'bank_transfer' ? reference : '');
@@ -122,16 +142,27 @@ export async function recordPayment(input: {
     .select()
     .maybeSingle();
 
-  if (error) return { payment: null, error: error.message };
+  if (error) {
+    return { payment: null, error: captureError(error, { where: 'recordPayment.insert' }) };
+  }
+  if (!data) {
+    return {
+      payment: null,
+      error: captureError(new Error('Payment was saved but the record could not be loaded. Refresh before recording again.'), {
+        where: 'recordPayment.insertEmpty',
+      }),
+    };
+  }
 
   if (status === 'paid') {
-    await supabase.from('activity_log').insert({
+    const { error: logError } = await supabase.from('activity_log').insert({
       organization_id: input.organizationId,
       action: 'payment_recorded',
       description: `${productType} marked paid (${(amountCents / 100).toFixed(2)} ${PRICING_CURRENCY})`,
       performed_by: input.recordedBy ?? 'staff',
       metadata: { payment_id: data?.id, method: input.paymentMethod },
     });
+    if (logError) captureError(logError, { where: 'recordPayment.activityLog' });
 
     if (isMembershipProduct(productType)) {
       const benefits = await activateMembershipBenefits({
@@ -156,15 +187,16 @@ export async function recordPayment(input: {
     }
 
     if (productType === 'monitoring_monthly') {
-      const { count } = await supabase
+      const { count, error: countError } = await supabase
         .from('service_engagements')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', input.organizationId)
         .eq('engagement_type', 'monitoring')
         .in('status', ['lead', 'active']);
+      if (countError) captureError(countError, { where: 'recordPayment.monitoringCount' });
 
       if (!count) {
-        await supabase.from('service_engagements').insert({
+        const { error: engError } = await supabase.from('service_engagements').insert({
           organization_id: input.organizationId,
           engagement_type: 'monitoring',
           status: 'active',
@@ -173,8 +205,9 @@ export async function recordPayment(input: {
           started_at: paidAt.toISOString(),
           notes: 'Legacy monitoring-only payment',
         });
+        if (engError) captureError(engError, { where: 'recordPayment.monitoringEngagement' });
       }
-      await supabase
+      const { error: monitorError } = await supabase
         .from('website_monitors')
         .update({
           tier: 'paid_live',
@@ -182,6 +215,7 @@ export async function recordPayment(input: {
           updated_at: paidAt.toISOString(),
         })
         .eq('organization_id', input.organizationId);
+      if (monitorError) captureError(monitorError, { where: 'recordPayment.monitoringTier' });
     }
   }
 
@@ -210,31 +244,49 @@ export async function createPendingBankPayment(input: {
   if (!rpcError && rpcRow) {
     const payment = (Array.isArray(rpcRow) ? rpcRow[0] : rpcRow) as OrganizationPayment | undefined;
     if (payment?.id) {
-      const reference =
-        payment.bank_transfer_reference?.trim() ||
-        (await ensurePaymentReference(input.organizationId));
-      return { payment, reference, error: null };
+      try {
+        const reference =
+          payment.bank_transfer_reference?.trim() ||
+          (await ensurePaymentReference(input.organizationId));
+        return { payment, reference, error: null };
+      } catch (err) {
+        return {
+          payment,
+          reference: payment.bank_transfer_reference?.trim() ?? '',
+          error: err instanceof Error ? err.message : 'Payment created but reference could not be saved.',
+        };
+      }
     }
   }
 
   if (rpcError && !/could not find|schema cache|function .* does not exist/i.test(rpcError.message)) {
+    captureError(rpcError, { where: 'createPendingBankPayment.rpc' });
     return {
       payment: null,
-      reference: await ensurePaymentReference(input.organizationId).catch(() => ''),
+      reference: '',
       error: rpcError.message,
     };
   }
 
   // Legacy path (staff RLS / pre-migration).
   const amountCents = amountForProduct(productType);
-  const reference = await ensurePaymentReference(input.organizationId);
+  let reference: string;
+  try {
+    reference = await ensurePaymentReference(input.organizationId);
+  } catch (err) {
+    return {
+      payment: null,
+      reference: '',
+      error: err instanceof Error ? err.message : 'Could not allocate a payment reference.',
+    };
+  }
 
   const membershipTypes =
     productType === 'membership_annual'
       ? (['membership_annual', 'verification_annual'] as const)
       : ([productType] as const);
 
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from('organization_payments')
     .select('*')
     .eq('organization_id', input.organizationId)
@@ -243,6 +295,14 @@ export async function createPendingBankPayment(input: {
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  if (existingError) {
+    return {
+      payment: null,
+      reference,
+      error: captureError(existingError, { where: 'createPendingBankPayment.existing' }),
+    };
+  }
 
   if (existing) {
     return { payment: existing as OrganizationPayment, reference, error: null };
@@ -267,7 +327,22 @@ export async function createPendingBankPayment(input: {
     .select()
     .maybeSingle();
 
-  if (error) return { payment: null, reference, error: error.message };
+  if (error) {
+    return {
+      payment: null,
+      reference,
+      error: captureError(error, { where: 'createPendingBankPayment.insert' }),
+    };
+  }
+  if (!data) {
+    return {
+      payment: null,
+      reference,
+      error: captureError(new Error('Payment was created but the record could not be loaded. Refresh before requesting again.'), {
+        where: 'createPendingBankPayment.insertEmpty',
+      }),
+    };
+  }
   return { payment: data as OrganizationPayment, reference, error: null };
 }
 

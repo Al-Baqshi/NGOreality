@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2, Lock, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCases, useClient, useWorkspaceIdentity } from '../../../hooks/useWorkspace';
 import * as crm from '../../../lib/crmApi';
+import { captureError } from '../../../lib/errorReporting';
 import SEO from '../../../components/SEO';
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
@@ -21,7 +22,7 @@ export default function NgoWorkspaceClientDetailPage() {
   const { data: client, loading, error, refetch } = useClient(id);
   const cases = useCases({ client_id: id, limit: 50 });
 
-  if (loading) {
+  if (loading && !client) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -30,10 +31,21 @@ export default function NgoWorkspaceClientDetailPage() {
     );
   }
 
-  if (error || !client) {
+  if (error && !client) {
     return (
       <div className="card-brutal p-6" role="alert">
-        <p className="font-medium text-destructive">{error ?? 'Client not found'}</p>
+        <p className="font-medium text-destructive">{error}</p>
+        <Link to="/ngo/workspace/clients" className="mt-3 inline-block text-sm underline">
+          Back to clients
+        </Link>
+      </div>
+    );
+  }
+
+  if (!client) {
+    return (
+      <div className="card-brutal p-6" role="alert">
+        <p className="font-medium text-destructive">Client not found</p>
         <Link to="/ngo/workspace/clients" className="mt-3 inline-block text-sm underline">
           Back to clients
         </Link>
@@ -64,6 +76,12 @@ export default function NgoWorkspaceClientDetailPage() {
           </p>
         </div>
       </div>
+
+      {error ? (
+        <div className="card-brutal p-4 text-sm text-destructive" role="alert">
+          {error}
+        </div>
+      ) : null}
 
       <div className="card-brutal p-5">
         <h3 className="font-bold">Details</h3>
@@ -159,7 +177,7 @@ function CasesSection({
       setAdding(false);
       onChanged();
     } catch (err) {
-      setError(err instanceof crm.CrmApiError ? err.message : 'Could not create the case');
+      setError(captureError(err, { where: 'NgoWorkspaceClientDetail.createCase' }));
     } finally {
       setBusy(false);
     }
@@ -202,9 +220,15 @@ function CasesSection({
         </p>
       )}
 
-      {cases.loading && <p className="mt-3 text-sm text-muted-foreground">Loading cases…</p>}
+      {cases.error && (
+        <p role="alert" className="mt-2 text-sm text-destructive">
+          {cases.error}
+        </p>
+      )}
 
-      {cases.data && cases.data.items.length === 0 && !cases.loading && (
+      {cases.loading && !cases.data && <p className="mt-3 text-sm text-muted-foreground">Loading cases…</p>}
+
+      {cases.data && cases.data.items.length === 0 && !cases.loading && !cases.error && (
         <p className="mt-3 text-sm text-muted-foreground">No cases yet.</p>
       )}
 

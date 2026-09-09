@@ -51,8 +51,8 @@ type NotificationFeedProps = {
   error: string | null;
   emptyMessage?: string;
   onRefresh: () => void;
-  onMarkAllRead: () => void;
-  onOpen: (item: PortalNotification) => void;
+  onMarkAllRead: () => void | Promise<string | null | void>;
+  onOpen: (item: PortalNotification) => void | Promise<string | null | void>;
 };
 
 export default function NotificationFeed({
@@ -69,6 +69,7 @@ export default function NotificationFeed({
   const [readFilter, setReadFilter] = useState<ReadFilter>('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const unread = items.filter((n) => !n.read_at).length;
   const eventTypes = useMemo(() => {
@@ -104,9 +105,11 @@ export default function NotificationFeed({
     return [...map.entries()];
   }, [filtered]);
 
-  const handleClick = (item: PortalNotification) => {
-    void onOpen(item);
-    if (item.link_path) navigate(item.link_path);
+  const openItem = async (item: PortalNotification, followLink: boolean) => {
+    const result = await onOpen(item);
+    if (typeof result === 'string' && result) setActionError(result);
+    else setActionError(null);
+    if (followLink && item.link_path) navigate(item.link_path);
   };
 
   const handleRefresh = async () => {
@@ -128,7 +131,11 @@ export default function NotificationFeed({
               <span className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-white">
                 Activity
               </span>
-              {unread > 0 ? (
+              {error ? (
+                <span className="rounded-full bg-white/10 px-2.5 py-0.5 font-mono text-2xs uppercase tracking-wider text-white/70">
+                  Could not load
+                </span>
+              ) : unread > 0 ? (
                 <span className="rounded-full bg-[#EBBB57] px-2.5 py-0.5 font-mono text-2xs font-bold uppercase tracking-wider text-[#041C3C]">
                   {unread} new
                 </span>
@@ -143,7 +150,13 @@ export default function NotificationFeed({
             {unread > 0 ? (
               <button
                 type="button"
-                onClick={() => void onMarkAllRead()}
+                onClick={() => {
+                  void (async () => {
+                    const result = await onMarkAllRead();
+                    if (typeof result === 'string' && result) setActionError(result);
+                    else setActionError(null);
+                  })();
+                }}
                 className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-[#EBBB57]/70 bg-[#EBBB57]/10 px-3 font-mono text-2xs font-semibold uppercase tracking-wider text-[#EBBB57] transition-colors hover:bg-[#EBBB57] hover:text-[#041C3C]"
               >
                 <CheckCheck size={12} aria-hidden />
@@ -233,14 +246,23 @@ export default function NotificationFeed({
           ) : null}
         </p>
       ) : null}
+      {actionError ? (
+        <p className="border-b border-accent px-4 py-3 font-mono text-xs text-accent" role="alert">
+          {actionError}
+        </p>
+      ) : null}
 
-      {loading ? (
+      {loading && items.length === 0 ? (
         <p className="p-6 text-sm text-ink-400">Loading…</p>
       ) : items.length === 0 ? (
+        error ? (
+          <p className="p-6 text-sm text-ink-400">Could not load notifications.</p>
+        ) : (
         <div className="p-10 text-center text-sm text-ink-500">
           <Inbox size={32} className="mx-auto mb-3 text-teal" aria-hidden />
           {emptyMessage}
         </div>
+        )
       ) : filtered.length === 0 ? (
         <p className="p-8 text-center text-sm text-ink-500">No alerts match these filters.</p>
       ) : (
@@ -265,7 +287,7 @@ export default function NotificationFeed({
                       >
                         <button
                           type="button"
-                          onClick={() => handleClick(item)}
+                          onClick={() => void openItem(item, true)}
                           className="flex min-h-[64px] min-w-0 flex-1 gap-3 px-4 py-3 text-left transition-colors hover:bg-teal/[0.08] dark:hover:bg-muted/50"
                         >
                           <span
@@ -316,7 +338,7 @@ export default function NotificationFeed({
                         {isUnread ? (
                           <button
                             type="button"
-                            onClick={() => void onOpen(item)}
+                            onClick={() => void openItem(item, false)}
                             className="shrink-0 px-3 text-ink-400 transition-colors hover:bg-teal hover:text-white"
                             title="Mark as read"
                             aria-label="Mark as read"

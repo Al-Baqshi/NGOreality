@@ -75,12 +75,14 @@ export function useCrmDashboardStats() {
     setError(null);
     const { data, error: rpcError } = await supabase.rpc('crm_dashboard_stats');
     if (rpcError) {
-      setError(rpcError.message);
+      setError(captureError(rpcError, { where: 'useCrmDashboardStats' }));
       setLoading(false);
       return;
     }
     if (data && typeof data === 'object') {
       setStats({ ...EMPTY_STATS, ...(data as CrmDashboardStats) });
+    } else {
+      setError(captureError(new Error('Dashboard stats response was empty'), { where: 'useCrmDashboardStats.empty' }));
     }
     setLoading(false);
   }, []);
@@ -126,9 +128,11 @@ export function useOrganizationsPage(
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchPage = useCallback(async () => {
     setLoading(true);
+    setError(null);
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
@@ -193,10 +197,13 @@ export function useOrganizationsPage(
       query = query.order('name', { ascending: true });
     }
 
-    const { data, error, count } = await query.range(from, to);
-    if (error) captureError(error, { where: 'useOrganizationsPage' });
-    else if (data) {
-      setOrganizations(data);
+    const { data, error: queryError, count } = await query.range(from, to);
+    if (queryError) {
+      setError(captureError(queryError, { where: 'useOrganizationsPage' }));
+      setOrganizations([]);
+      setTotalCount(0);
+    } else {
+      setOrganizations(data ?? []);
       setTotalCount(count ?? 0);
     }
     setLoading(false);
@@ -228,6 +235,7 @@ export function useOrganizationsPage(
     totalPages,
     pageSize,
     loading,
+    error,
     refetch: fetchPage,
   };
 }
@@ -235,17 +243,22 @@ export function useOrganizationsPage(
 export function useServiceEngagements(organizationId: string | undefined) {
   const [engagements, setEngagements] = useState<ServiceEngagement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
     if (!organizationId) return;
     setLoading(true);
-    const { data, error } = await supabase
+    setError(null);
+    const { data, error: queryError } = await supabase
       .from('service_engagements')
       .select('*')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false });
-    if (error) captureError(error, { where: 'useServiceEngagements' });
-    else if (data) setEngagements(data);
+    if (queryError) {
+      setError(captureError(queryError, { where: 'useServiceEngagements' }));
+    } else {
+      setEngagements(data ?? []);
+    }
     setLoading(false);
   }, [organizationId]);
 
@@ -253,23 +266,28 @@ export function useServiceEngagements(organizationId: string | undefined) {
     refetch();
   }, [refetch]);
 
-  return { engagements, loading, refetch };
+  return { engagements, loading, error, refetch };
 }
 
 export function useStaffTasks(organizationId: string | undefined) {
   const [tasks, setTasks] = useState<StaffTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
     if (!organizationId) return;
     setLoading(true);
-    const { data, error } = await supabase
+    setError(null);
+    const { data, error: queryError } = await supabase
       .from('staff_tasks')
       .select('*')
       .eq('organization_id', organizationId)
       .order('due_date', { ascending: true });
-    if (error) captureError(error, { where: 'useStaffTasks' });
-    else if (data) setTasks(data);
+    if (queryError) {
+      setError(captureError(queryError, { where: 'useStaffTasks' }));
+    } else {
+      setTasks(data ?? []);
+    }
     setLoading(false);
   }, [organizationId]);
 
@@ -277,7 +295,7 @@ export function useStaffTasks(organizationId: string | undefined) {
     refetch();
   }, [refetch]);
 
-  return { tasks, loading, refetch };
+  return { tasks, loading, error, refetch };
 }
 
 export type WebsiteIncidentRow = {
@@ -295,10 +313,17 @@ export function useWorkQueue() {
   const [badgeRequests, setBadgeRequests] = useState<(BadgeRequest & { organizations: { name: string } })[]>([]);
   const [setupRequests, setSetupRequests] = useState<(NgoSetupRequest & { organizations: { name: string } })[]>([]);
   const [incidents, setIncidents] = useState<WebsiteIncidentRow[]>([]);
+  const [followUpsError, setFollowUpsError] = useState<string | null>(null);
+  const [tasksError, setTasksError] = useState<string | null>(null);
+  const [badgeRequestsError, setBadgeRequestsError] = useState<string | null>(null);
+  const [setupRequestsError, setSetupRequestsError] = useState<string | null>(null);
+  const [incidentsError, setIncidentsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
     setLoading(true);
+    setError(null);
     const today = new Date().toISOString().slice(0, 10);
 
     const [fu, tk, br, setup, inc] = await Promise.all([
@@ -337,13 +362,46 @@ export function useWorkQueue() {
         .limit(20),
     ]);
 
-    if (!fu.error && fu.data) setFollowUps(fu.data as typeof followUps);
-    if (!tk.error && tk.data) setTasks(tk.data as typeof tasks);
-    if (!br.error && br.data) setBadgeRequests(br.data as typeof badgeRequests);
-    if (!setup.error && setup.data) setSetupRequests(setup.data as typeof setupRequests);
+    const failures: string[] = [];
+    const take = (label: string, result: { error: unknown }) => {
+      const msg = captureError(result.error, { where: `useWorkQueue.${label}` });
+      failures.push(msg);
+      return msg;
+    };
+
+    if (fu.error) {
+      setFollowUpsError(take('followUps', fu));
+    } else {
+      setFollowUpsError(null);
+      setFollowUps((fu.data ?? []) as typeof followUps);
+    }
+    if (tk.error) {
+      setTasksError(take('tasks', tk));
+    } else {
+      setTasksError(null);
+      setTasks((tk.data ?? []) as typeof tasks);
+    }
+    if (br.error) {
+      setBadgeRequestsError(take('badgeRequests', br));
+    } else {
+      setBadgeRequestsError(null);
+      setBadgeRequests((br.data ?? []) as typeof badgeRequests);
+    }
+    if (setup.error) {
+      setSetupRequestsError(take('setupRequests', setup));
+    } else {
+      setSetupRequestsError(null);
+      setSetupRequests((setup.data ?? []) as typeof setupRequests);
+    }
     // PostgREST types the embedded `organizations` relation as an array even
     // for a to-one join, so the cast has to go via `unknown`.
-    if (!inc.error && inc.data) setIncidents(inc.data as unknown as WebsiteIncidentRow[]);
+    if (inc.error) {
+      setIncidentsError(take('incidents', inc));
+    } else {
+      setIncidentsError(null);
+      setIncidents((inc.data ?? []) as unknown as WebsiteIncidentRow[]);
+    }
+    setError(failures.length ? failures.join(' · ') : null);
     setLoading(false);
   }, []);
 
@@ -351,15 +409,31 @@ export function useWorkQueue() {
     refetch();
   }, [refetch]);
 
-  return { followUps, tasks, badgeRequests, setupRequests, incidents, loading, refetch };
+  return {
+    followUps,
+    tasks,
+    badgeRequests,
+    setupRequests,
+    incidents,
+    followUpsError,
+    tasksError,
+    badgeRequestsError,
+    setupRequestsError,
+    incidentsError,
+    loading,
+    error,
+    refetch,
+  };
 }
 
 export function useExpiringBadges(mode: 'expiring' | 'expired') {
   const [rows, setRows] = useState<(VerificationBadge & { organizations: { name: string; id: string } })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
     const now = new Date().toISOString();
     const in30 = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -377,30 +451,39 @@ export function useExpiringBadges(mode: 'expiring' | 'expired') {
       query = query.gt('expires_at', now).lte('expires_at', in30);
     }
 
-    query.then(({ data, error }) => {
-      if (error) captureError(error, { where: 'useExpiringBadges' });
-      else if (data) setRows(data as typeof rows);
+    query.then(({ data, error: queryError }) => {
+      if (queryError) {
+        setError(captureError(queryError, { where: 'useExpiringBadges' }));
+        setRows([]);
+      } else {
+        setRows((data ?? []) as typeof rows);
+      }
       setLoading(false);
     });
   }, [mode]);
 
-  return { rows, loading };
+  return { rows, loading, error };
 }
 
 export function useOrganizationPayments(organizationId: string | undefined) {
   const [payments, setPayments] = useState<OrganizationPayment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
     if (!organizationId) return;
     setLoading(true);
-    const { data, error } = await supabase
+    setError(null);
+    const { data, error: queryError } = await supabase
       .from('organization_payments')
       .select('*')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false });
-    if (error) captureError(error, { where: 'useOrganizationPayments' });
-    else if (data) setPayments(data);
+    if (queryError) {
+      setError(captureError(queryError, { where: 'useOrganizationPayments' }));
+    } else {
+      setPayments(data ?? []);
+    }
     setLoading(false);
   }, [organizationId]);
 
@@ -408,7 +491,7 @@ export function useOrganizationPayments(organizationId: string | undefined) {
     refetch();
   }, [refetch]);
 
-  return { payments, loading, refetch };
+  return { payments, loading, error, refetch };
 }
 
 export function usePaymentsLedger(limit = 100) {
@@ -416,16 +499,21 @@ export function usePaymentsLedger(limit = 100) {
     (OrganizationPayment & { organizations: { name: string; payment_reference: string | null } })[]
   >([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    setError(null);
+    const { data, error: queryError } = await supabase
       .from('organization_payments')
       .select('*, organizations(name, payment_reference)')
       .order('created_at', { ascending: false })
       .limit(limit);
-    if (error) captureError(error, { where: 'usePaymentsLedger' });
-    else if (data) setPayments(data as typeof payments);
+    if (queryError) {
+      setError(captureError(queryError, { where: 'usePaymentsLedger' }));
+    } else {
+      setPayments((data ?? []) as typeof payments);
+    }
     setLoading(false);
   }, [limit]);
 
@@ -433,7 +521,7 @@ export function usePaymentsLedger(limit = 100) {
     refetch();
   }, [refetch]);
 
-  return { payments, loading, refetch };
+  return { payments, loading, error, refetch };
 }
 
 export async function findRegistryDuplicate(
@@ -441,11 +529,14 @@ export async function findRegistryDuplicate(
   externalId: string,
 ): Promise<Organization | null> {
   if (!sourceRegistry.trim() || !externalId.trim()) return null;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('organizations')
     .select('*')
     .eq('source_registry', sourceRegistry.trim())
     .eq('external_id', externalId.trim())
     .maybeSingle();
+  if (error) {
+    throw new Error(captureError(error, { where: 'findRegistryDuplicate' }));
+  }
   return data;
 }
