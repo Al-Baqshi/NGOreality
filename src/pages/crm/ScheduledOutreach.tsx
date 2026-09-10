@@ -33,6 +33,8 @@ import {
   type OutreachSchedule,
   type ScheduleRecipientStatus,
   type ScheduleSummary,
+  type AddRecipientsResult,
+  type AddRecipientSkip,
 } from '../../hooks/useOutreachSchedule';
 import { captureError } from '../../lib/errorReporting';
 import { draftOutreachEmailForOrg } from '../../lib/crmOutreach';
@@ -81,13 +83,14 @@ const RECIPIENT_STATUS_LABEL: Record<ScheduleRecipientStatus, string> = {
 
 const INITIAL_DRAFT = draftOutreachEmailForOrg('outreach_cold_invite', '{name}');
 
-function formatAddResult(result: {
-  added: number;
-  skipped_no_email: number;
-  skipped_suppressed: number;
-  skipped_dedupe: number;
-  skipped_on_roster: number;
-}): string {
+const SKIP_REASON_LABEL: Record<string, string> = {
+  no_email: 'No email',
+  suppressed: 'Suppressed',
+  on_roster: 'Already on roster',
+  already_emailed: 'Already emailed',
+};
+
+function formatAddResult(result: AddRecipientsResult): string {
   return (
     `Added ${result.added.toLocaleString()}` +
     ` · no email ${result.skipped_no_email}` +
@@ -95,6 +98,10 @@ function formatAddResult(result: {
     ` · already emailed ${result.skipped_dedupe}` +
     ` · already on roster ${result.skipped_on_roster}`
   );
+}
+
+function skipListFromResult(result: AddRecipientsResult): AddRecipientSkip[] {
+  return Array.isArray(result.skips) ? result.skips : [];
 }
 
 function formatSendTime(t: string): string {
@@ -140,6 +147,8 @@ export default function ScheduledOutreach() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [noticeIsError, setNoticeIsError] = useState(false);
+  const [skipDetails, setSkipDetails] = useState<AddRecipientSkip[]>([]);
+  const [skipsTruncated, setSkipsTruncated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const endsOn = useMemo(() => addDaysIso(startsOn, Math.max(1, durationDays) - 1), [startsOn, durationDays]);
@@ -161,6 +170,27 @@ export default function ScheduledOutreach() {
   function bumpListAndRoster() {
     setListRefreshKey((k) => k + 1);
     setRosterRefreshKey((k) => k + 1);
+  }
+
+  function applyAddOutcome(result: AddRecipientsResult, options?: { emptyHint?: string }) {
+    const msg = formatAddResult(result);
+    const skips = skipListFromResult(result);
+    setSkipDetails(skips);
+    setSkipsTruncated(Boolean(result.skips_truncated));
+    if (result.added === 0) {
+      setNoticeIsError(true);
+      setNotice(options?.emptyHint ? `${options.emptyHint} ${msg}.` : `Nothing added. ${msg}.`);
+    } else {
+      setNoticeIsError(false);
+      setNotice(msg);
+    }
+  }
+
+  function clearNotices() {
+    setNotice(null);
+    setNoticeIsError(false);
+    setSkipDetails([]);
+    setSkipsTruncated(false);
   }
 
   function applyTemplateDraft(t: OutreachEmailTemplate) {
@@ -410,8 +440,7 @@ export default function ScheduledOutreach() {
 
   async function handleAddFromSegment() {
     setBusy(true);
-    setNotice(null);
-    setNoticeIsError(false);
+    clearNotices();
     try {
       const id = await ensureScheduleSaved();
       const result = await addScheduleRecipientsByFilter(id, {
@@ -419,23 +448,18 @@ export default function ScheduledOutreach() {
         outreach,
         max: addCount,
       });
-      const msg = formatAddResult(result);
-      if (result.added === 0) {
-        setNoticeIsError(true);
-        setNotice(
-          `Nothing added from segment. ${msg}. ` +
-            (result.skipped_dedupe > 0
-              ? 'Many matches were skipped because they already have a recent/held email for this template — try search Add for specific orgs, or pick a different segment.'
-              : 'Try search below to pick organisations with a valid email.'),
-        );
-      } else {
-        setNotice(msg);
-      }
+      applyAddOutcome(result, {
+        emptyHint:
+          result.skipped_dedupe > 0
+            ? 'Nothing added from segment — many matches already have a recent/held email for this template. Try search Add for specific orgs, or a different segment.'
+            : 'Nothing added from segment.',
+      });
       bumpRoster();
       await refreshSummary(id);
       void load('soft', id);
     } catch (e) {
       setNoticeIsError(true);
+      setSkipDetails([]);
       setNotice(captureError(e, { where: 'ScheduledOutreach.add' }));
     } finally {
       setBusy(false);
@@ -445,35 +469,23 @@ export default function ScheduledOutreach() {
   async function handleAddFromSearch() {
     if (!searchSelected.size) {
       setNoticeIsError(true);
+      setSkipDetails([]);
       setNotice('Tick the checkbox next to each organisation, then click Add selected.');
       return;
     }
     setBusy(true);
-    setNotice(null);
-    setNoticeIsError(false);
+    clearNotices();
     try {
       const id = await ensureScheduleSaved();
       const result = await addScheduleRecipientsByIds(id, Array.from(searchSelected));
-      const msg = formatAddResult(result);
-      if (result.added === 0) {
-        setNoticeIsError(true);
-        setNotice(
-          `Nothing added. ${msg}. ` +
-            (result.skipped_on_roster > 0
-              ? 'Those organisations are already on this roster.'
-              : result.skipped_no_email > 0
-                ? 'Selected orgs need a valid email on the organisation record.'
-                : 'Check suppressed / already-emailed skips above.'),
-        );
-      } else {
-        setNotice(msg);
-        setSearchSelected(new Set());
-      }
+      applyAddOutcome(result);
+      if (result.added > 0) setSearchSelected(new Set());
       bumpRoster();
       await refreshSummary(id);
       void load('soft', id);
     } catch (e) {
       setNoticeIsError(true);
+      setSkipDetails([]);
       setNotice(captureError(e, { where: 'ScheduledOutreach.addSearch' }));
     } finally {
       setBusy(false);
@@ -482,16 +494,12 @@ export default function ScheduledOutreach() {
 
   async function handleAddOneFromSearch(orgId: string) {
     setBusy(true);
-    setNotice(null);
-    setNoticeIsError(false);
+    clearNotices();
     try {
       const id = await ensureScheduleSaved();
       const result = await addScheduleRecipientsByIds(id, [orgId]);
-      if (result.added === 0) {
-        setNoticeIsError(true);
-        setNotice(`Could not add that organisation. ${formatAddResult(result)}.`);
-      } else {
-        setNotice(`Added 1 organisation to the roster (held in Email queue).`);
+      applyAddOutcome(result, { emptyHint: 'Could not add that organisation.' });
+      if (result.added > 0) {
         setSearchSelected((prev) => {
           const next = new Set(prev);
           next.delete(orgId);
@@ -503,6 +511,7 @@ export default function ScheduledOutreach() {
       void load('soft', id);
     } catch (e) {
       setNoticeIsError(true);
+      setSkipDetails([]);
       setNotice(captureError(e, { where: 'ScheduledOutreach.addOne' }));
     } finally {
       setBusy(false);
@@ -671,11 +680,37 @@ export default function ScheduledOutreach() {
       {error && <QueryError message={error} />}
       {notice && (
         <p
-          className={`mb-4 font-mono text-2xs ${noticeIsError ? 'text-accent' : 'text-teal'}`}
+          className={`mb-2 font-mono text-2xs ${noticeIsError ? 'text-accent' : 'text-teal'}`}
           role="status"
         >
           {notice}
         </p>
+      )}
+      {skipDetails.length > 0 && (
+        <div
+          className="mb-4 border-2 border-amber-400 bg-amber-50 px-3 py-3 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-100"
+          role="status"
+        >
+          <p className="font-mono text-2xs uppercase tracking-wider mb-2">
+            Why these were skipped
+          </p>
+          <ul className="space-y-1.5 max-h-48 overflow-y-auto">
+            {skipDetails.map((s) => (
+              <li key={`${s.organization_id}-${s.reason}`} className="text-sm">
+                <span className="font-medium">{s.name}</span>
+                <span className="font-mono text-2xs mx-1.5 uppercase tracking-wide opacity-80">
+                  {SKIP_REASON_LABEL[s.reason] ?? s.reason}
+                </span>
+                <span className="text-ink-700 dark:text-amber-50/90">— {s.detail}</span>
+              </li>
+            ))}
+          </ul>
+          {skipsTruncated && (
+            <p className="mt-2 font-mono text-2xs opacity-80">
+              Showing first {skipDetails.length} skipped organisations; more were skipped (see counts above).
+            </p>
+          )}
+        </div>
       )}
 
       {!scheduleId && (
@@ -984,27 +1019,21 @@ export default function ScheduledOutreach() {
                   onClick={() => {
                     void (async () => {
                       setBusy(true);
-                      setNotice(null);
-                      setNoticeIsError(false);
+                      clearNotices();
                       try {
                         const id = await ensureScheduleSaved();
                         const result = await addScheduleRecipientsByIds(
                           id,
                           searchHits.map((h) => h.id),
                         );
-                        const msg = formatAddResult(result);
-                        if (result.added === 0) {
-                          setNoticeIsError(true);
-                          setNotice(`Nothing added from results. ${msg}.`);
-                        } else {
-                          setNotice(msg);
-                          setSearchSelected(new Set());
-                        }
+                        applyAddOutcome(result, { emptyHint: 'Nothing added from results.' });
+                        if (result.added > 0) setSearchSelected(new Set());
                         bumpRoster();
                         await refreshSummary(id);
                         void load('soft', id);
                       } catch (e) {
                         setNoticeIsError(true);
+                        setSkipDetails([]);
                         setNotice(captureError(e, { where: 'ScheduledOutreach.addAllHits' }));
                       } finally {
                         setBusy(false);

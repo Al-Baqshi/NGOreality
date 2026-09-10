@@ -55,6 +55,13 @@ export type ScheduleSummary = {
   next_send_preview: string | null;
 };
 
+export type AddRecipientSkip = {
+  organization_id: string;
+  name: string;
+  reason: 'no_email' | 'suppressed' | 'on_roster' | 'already_emailed' | string;
+  detail: string;
+};
+
 export type AddRecipientsResult = {
   added: number;
   skipped_no_email: number;
@@ -62,6 +69,8 @@ export type AddRecipientsResult = {
   skipped_dedupe: number;
   skipped_on_roster: number;
   cap: number;
+  skips?: AddRecipientSkip[];
+  skips_truncated?: boolean;
 };
 
 function siteBaseUrl(): string {
@@ -176,6 +185,8 @@ export async function addScheduleRecipientsByIds(
       skipped_dedupe: 0,
       skipped_on_roster: 0,
       cap: 0,
+      skips: [],
+      skips_truncated: false,
     };
   }
   const { data, error } = await supabase.rpc('outreach_schedule_add_recipients', {
