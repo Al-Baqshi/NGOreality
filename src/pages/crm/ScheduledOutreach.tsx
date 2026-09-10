@@ -10,6 +10,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Search,
   Trash2,
   XCircle,
 } from 'lucide-react';
@@ -19,6 +20,7 @@ import { useOutreachSegmentCounts, type OutreachSegment } from '../../hooks/useO
 import {
   addDaysIso,
   addScheduleRecipientsByFilter,
+  addScheduleRecipientsByIds,
   fetchScheduleSummary,
   listOutreachSchedules,
   nzTodayIso,
@@ -33,6 +35,7 @@ import {
 } from '../../hooks/useOutreachSchedule';
 import { captureError } from '../../lib/errorReporting';
 import { draftOutreachEmailForOrg } from '../../lib/crmOutreach';
+import { supabase } from '../../lib/supabase';
 import {
   NOTIFICATION_TEMPLATE_LABELS,
   OUTREACH_EMAIL_TEMPLATES,
@@ -41,6 +44,13 @@ import {
   type OutreachEmailTemplate,
   type OutreachStatus,
 } from '../../types';
+
+type SearchHit = {
+  id: string;
+  name: string;
+  email: string | null;
+  slug: string | null;
+};
 
 const SEGMENTS: { key: OutreachSegment; label: string }[] = [
   { key: 'all', label: 'All leads' },
@@ -84,6 +94,11 @@ export default function ScheduledOutreach() {
   const [segment, setSegment] = useState<OutreachSegment>('no_website');
   const [outreach, setOutreach] = useState<OutreachStatus | ''>('not_contacted');
   const [addCount, setAddCount] = useState(100);
+
+  const [orgSearch, setOrgSearch] = useState('');
+  const [searchHits, setSearchHits] = useState<SearchHit[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchSelected, setSearchSelected] = useState<Set<string>>(new Set());
 
   const [rosterPage, setRosterPage] = useState(1);
   const [selectedOrgIds, setSelectedOrgIds] = useState<Set<string>>(new Set());
@@ -331,6 +346,79 @@ export default function ScheduledOutreach() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleAddFromSearch() {
+    if (!scheduleId) {
+      setNotice('Save the schedule before adding contacts.');
+      return;
+    }
+    if (!searchSelected.size) {
+      setNotice('Select one or more organisations from the search results.');
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    try {
+      const result = await addScheduleRecipientsByIds(scheduleId, Array.from(searchSelected));
+      setNotice(
+        `Added ${result.added.toLocaleString()} from search · skipped no email ${result.skipped_no_email} · ` +
+          `suppressed ${result.skipped_suppressed} · already outreached ${result.skipped_dedupe} · ` +
+          `already on roster ${result.skipped_on_roster}`,
+      );
+      setSearchSelected(new Set());
+      setRefreshKey((k) => k + 1);
+      await refreshSummary(scheduleId);
+    } catch (e) {
+      setNotice(captureError(e, { where: 'ScheduledOutreach.addSearch' }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    const q = orgSearch.trim();
+    if (q.length < 2) {
+      setSearchHits([]);
+      setSearchLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      const safe = q.replace(/[%_,]/g, ' ').trim();
+      void supabase
+        .from('organizations')
+        .select('id, name, email, slug')
+        .eq('status', 'listed')
+        .eq('is_customer', false)
+        .or(`name.ilike.%${safe}%,email.ilike.%${safe}%`)
+        .order('name', { ascending: true })
+        .limit(25)
+        .then(({ data, error: qError }) => {
+          if (cancelled) return;
+          if (qError) {
+            setNotice(captureError(qError, { where: 'ScheduledOutreach.search' }));
+            setSearchHits([]);
+          } else {
+            setSearchHits((data ?? []) as SearchHit[]);
+          }
+          setSearchLoading(false);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [orgSearch]);
+
+  function toggleSearchHit(id: string) {
+    setSearchSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   async function handleRemoveSelected() {
@@ -693,9 +781,89 @@ export default function ScheduledOutreach() {
               onClick={() => void handleAddFromSegment()}
               className="btn-brutal-teal text-sm min-h-[44px] px-4 w-full inline-flex items-center justify-center gap-2"
             >
-              <Plus size={16} /> Add to roster
+              <Plus size={16} /> Add segment to roster
             </button>
           </div>
+        </div>
+
+        <div className="border-t-2 border-ink-100 pt-4 dark:border-border space-y-3">
+          <h3 className="font-mono text-2xs uppercase tracking-wider text-ink-500">
+            Or search and pick organisations
+          </h3>
+          <label className="block text-sm max-w-xl">
+            <span className="sr-only">Search organisations</span>
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden />
+              <input
+                value={orgSearch}
+                onChange={(e) => setOrgSearch(e.target.value)}
+                placeholder="Search by name or email…"
+                disabled={!scheduleId}
+                className="w-full border-2 border-ink-200 bg-white pl-10 pr-3 py-2 text-sm min-h-[44px] dark:bg-background dark:border-border"
+              />
+            </div>
+          </label>
+
+          {searchLoading && (
+            <p className="font-mono text-2xs text-ink-400 flex items-center gap-2">
+              <Loader2 size={14} className="animate-spin" /> Searching…
+            </p>
+          )}
+
+          {!searchLoading && orgSearch.trim().length >= 2 && searchHits.length === 0 && (
+            <p className="text-sm text-ink-500">No listed non-customer organisations match.</p>
+          )}
+
+          {searchHits.length > 0 && (
+            <div className="border-2 border-ink-200 dark:border-border overflow-hidden">
+              <div className="max-h-64 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-ink-50 dark:bg-muted">
+                    <tr className="text-left font-mono text-2xs uppercase tracking-wider text-ink-400">
+                      <th className="p-2 w-10" />
+                      <th className="p-2">Organisation</th>
+                      <th className="p-2">Email</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {searchHits.map((hit) => (
+                      <tr key={hit.id} className="border-t border-ink-100 dark:border-border">
+                        <td className="p-2">
+                          <input
+                            type="checkbox"
+                            checked={searchSelected.has(hit.id)}
+                            onChange={() => toggleSearchHit(hit.id)}
+                            aria-label={`Select ${hit.name}`}
+                          />
+                        </td>
+                        <td className="p-2 font-medium">{hit.name}</td>
+                        <td className="p-2 font-mono text-2xs">{hit.email ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="border-t-2 border-ink-200 dark:border-border p-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={busy || !scheduleId || searchSelected.size === 0}
+                  onClick={() => void handleAddFromSearch()}
+                  className="btn-brutal-teal text-sm min-h-[44px] px-4 inline-flex items-center gap-2"
+                >
+                  <Plus size={16} /> Add selected ({searchSelected.size})
+                </button>
+                {searchSelected.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchSelected(new Set())}
+                    className="btn-brutal-outline text-2xs min-h-[36px] px-3"
+                  >
+                    Clear selection
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -723,7 +891,7 @@ export default function ScheduledOutreach() {
             <Loader2 size={14} className="animate-spin" /> Loading roster…
           </p>
         ) : rows.length === 0 ? (
-          <p className="p-6 text-sm text-ink-500">No contacts yet. Add from a segment above.</p>
+          <p className="p-6 text-sm text-ink-500">No contacts yet. Add from a segment or search above.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
