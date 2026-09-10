@@ -36,6 +36,7 @@ export type ScheduleRecipient = {
   sort_order: number;
   status: ScheduleRecipientStatus;
   notification_event_id: string | null;
+  skip_reason: string | null;
   created_at: string;
   released_at: string | null;
   organizations?: { name: string; email: string | null; slug: string | null } | null;

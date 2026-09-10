@@ -1181,7 +1181,14 @@ export default function ScheduledOutreach() {
                       </Link>
                     </td>
                     <td className="p-3 font-mono text-2xs">{row.organizations?.email ?? '—'}</td>
-                    <td className="p-3 font-mono text-2xs">{RECIPIENT_STATUS_LABEL[row.status]}</td>
+                    <td className="p-3">
+                      <div className="font-mono text-2xs">{RECIPIENT_STATUS_LABEL[row.status]}</div>
+                      {row.status === 'skipped' && row.skip_reason && (
+                        <p className="mt-1 text-2xs text-ink-600 dark:text-muted-foreground max-w-xs">
+                          {row.skip_reason}
+                        </p>
+                      )}
+                    </td>
                     <td className="p-3 font-mono text-2xs text-ink-500">{row.sort_order}</td>
                   </tr>
                 ))}
