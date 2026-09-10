@@ -106,6 +106,7 @@ export default function ScheduledOutreach() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [noticeIsError, setNoticeIsError] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const endsOn = useMemo(() => addDaysIso(startsOn, Math.max(1, durationDays) - 1), [startsOn, durationDays]);
@@ -191,6 +192,7 @@ export default function ScheduledOutreach() {
   async function handleSave() {
     setBusy(true);
     setNotice(null);
+    setNoticeIsError(false);
     try {
       const saved = await upsertOutreachSchedule({
         id: scheduleId,
@@ -209,6 +211,7 @@ export default function ScheduledOutreach() {
       applyScheduleToForm(saved);
       setRefreshKey((k) => k + 1);
     } catch (e) {
+      setNoticeIsError(true);
       setNotice(captureError(e, { where: 'ScheduledOutreach.save' }));
     } finally {
       setBusy(false);
@@ -236,35 +239,6 @@ export default function ScheduledOutreach() {
     setNotice('New schedule — save to create, then add contacts to the roster.');
   }
 
-  async function handleArm() {
-    if (!scheduleId) {
-      setNotice('Save the schedule first.');
-      return;
-    }
-    const ok = await confirm({
-      title: 'Arm this schedule?',
-      description:
-        `Emails will send automatically at ${sendTime} New Zealand time each day from ${startsOn} to ${endsOn}, ` +
-        `up to ${dailyCap}/day, to new queued contacts only.\n\nArming is your permission to send.`,
-      confirmLabel: 'Arm schedule',
-    });
-    if (!ok) return;
-    setBusy(true);
-    setNotice(null);
-    try {
-      const saved = await handleSaveInternal();
-      const updated = await setOutreachScheduleStatus(saved.id, 'armed');
-      applyScheduleToForm(updated);
-      await refreshSummary(updated.id);
-      setNotice('Armed — will auto-send at the NZ time each day in the window.');
-      setRefreshKey((k) => k + 1);
-    } catch (e) {
-      setNotice(captureError(e, { where: 'ScheduledOutreach.arm' }));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function handleSaveInternal() {
     const saved = await upsertOutreachSchedule({
       id: scheduleId,
@@ -281,6 +255,40 @@ export default function ScheduledOutreach() {
     });
     applyScheduleToForm(saved);
     return saved;
+  }
+
+  /** Ensure a schedule row exists before roster mutations. */
+  async function ensureScheduleSaved(): Promise<string> {
+    if (scheduleId) return scheduleId;
+    const saved = await handleSaveInternal();
+    return saved.id;
+  }
+
+  async function handleArm() {
+    const ok = await confirm({
+      title: 'Arm this schedule?',
+      description:
+        `Emails will send automatically at ${sendTime} New Zealand time each day from ${startsOn} to ${endsOn}, ` +
+        `up to ${dailyCap}/day, to new queued contacts only.\n\nArming is your permission to send.`,
+      confirmLabel: 'Arm schedule',
+    });
+    if (!ok) return;
+    setBusy(true);
+    setNotice(null);
+    setNoticeIsError(false);
+    try {
+      const saved = await handleSaveInternal();
+      const updated = await setOutreachScheduleStatus(saved.id, 'armed');
+      applyScheduleToForm(updated);
+      await refreshSummary(updated.id);
+      setNotice('Armed — will auto-send at the NZ time each day in the window.');
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      setNoticeIsError(true);
+      setNotice(captureError(e, { where: 'ScheduledOutreach.arm' }));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handlePause() {
@@ -322,14 +330,12 @@ export default function ScheduledOutreach() {
   }
 
   async function handleAddFromSegment() {
-    if (!scheduleId) {
-      setNotice('Save the schedule before adding contacts.');
-      return;
-    }
     setBusy(true);
     setNotice(null);
+    setNoticeIsError(false);
     try {
-      const result = await addScheduleRecipientsByFilter(scheduleId, {
+      const id = await ensureScheduleSaved();
+      const result = await addScheduleRecipientsByFilter(id, {
         segment,
         outreach,
         max: addCount,
@@ -340,8 +346,9 @@ export default function ScheduledOutreach() {
           `already on roster ${result.skipped_on_roster}`,
       );
       setRefreshKey((k) => k + 1);
-      await refreshSummary(scheduleId);
+      await refreshSummary(id);
     } catch (e) {
+      setNoticeIsError(true);
       setNotice(captureError(e, { where: 'ScheduledOutreach.add' }));
     } finally {
       setBusy(false);
@@ -349,18 +356,17 @@ export default function ScheduledOutreach() {
   }
 
   async function handleAddFromSearch() {
-    if (!scheduleId) {
-      setNotice('Save the schedule before adding contacts.');
-      return;
-    }
     if (!searchSelected.size) {
+      setNoticeIsError(true);
       setNotice('Select one or more organisations from the search results.');
       return;
     }
     setBusy(true);
     setNotice(null);
+    setNoticeIsError(false);
     try {
-      const result = await addScheduleRecipientsByIds(scheduleId, Array.from(searchSelected));
+      const id = await ensureScheduleSaved();
+      const result = await addScheduleRecipientsByIds(id, Array.from(searchSelected));
       setNotice(
         `Added ${result.added.toLocaleString()} from search · skipped no email ${result.skipped_no_email} · ` +
           `suppressed ${result.skipped_suppressed} · already outreached ${result.skipped_dedupe} · ` +
@@ -368,8 +374,9 @@ export default function ScheduledOutreach() {
       );
       setSearchSelected(new Set());
       setRefreshKey((k) => k + 1);
-      await refreshSummary(scheduleId);
+      await refreshSummary(id);
     } catch (e) {
+      setNoticeIsError(true);
       setNotice(captureError(e, { where: 'ScheduledOutreach.addSearch' }));
     } finally {
       setBusy(false);
@@ -398,6 +405,7 @@ export default function ScheduledOutreach() {
         .then(({ data, error: qError }) => {
           if (cancelled) return;
           if (qError) {
+            setNoticeIsError(true);
             setNotice(captureError(qError, { where: 'ScheduledOutreach.search' }));
             setSearchHits([]);
           } else {
@@ -527,8 +535,17 @@ export default function ScheduledOutreach() {
 
       {error && <QueryError message={error} />}
       {notice && (
-        <p className="mb-4 font-mono text-2xs text-teal" role="status">
+        <p
+          className={`mb-4 font-mono text-2xs ${noticeIsError ? 'text-accent' : 'text-teal'}`}
+          role="status"
+        >
           {notice}
+        </p>
+      )}
+
+      {!scheduleId && (
+        <p className="mb-4 border-2 border-amber-400 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-100" role="status">
+          Tip: fill section 1, then use <strong>Add segment to roster</strong> or search below — the schedule is saved automatically when you add contacts.
         </p>
       )}
 
@@ -777,11 +794,11 @@ export default function ScheduledOutreach() {
           <div className="flex items-end">
             <button
               type="button"
-              disabled={busy || !scheduleId}
+              disabled={busy}
               onClick={() => void handleAddFromSegment()}
-              className="btn-brutal-teal text-sm min-h-[44px] px-4 w-full inline-flex items-center justify-center gap-2"
+              className="btn-brutal-teal text-sm min-h-[44px] px-4 w-full inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Plus size={16} /> Add segment to roster
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Add segment to roster
             </button>
           </div>
         </div>
@@ -797,8 +814,7 @@ export default function ScheduledOutreach() {
               <input
                 value={orgSearch}
                 onChange={(e) => setOrgSearch(e.target.value)}
-                placeholder="Search by name or email…"
-                disabled={!scheduleId}
+                placeholder="Search by name or email (min 2 characters)…"
                 className="w-full border-2 border-ink-200 bg-white pl-10 pr-3 py-2 text-sm min-h-[44px] dark:bg-background dark:border-border"
               />
             </div>
@@ -846,11 +862,11 @@ export default function ScheduledOutreach() {
               <div className="border-t-2 border-ink-200 dark:border-border p-3 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  disabled={busy || !scheduleId || searchSelected.size === 0}
+                  disabled={busy || searchSelected.size === 0}
                   onClick={() => void handleAddFromSearch()}
-                  className="btn-brutal-teal text-sm min-h-[44px] px-4 inline-flex items-center gap-2"
+                  className="btn-brutal-teal text-sm min-h-[44px] px-4 inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Plus size={16} /> Add selected ({searchSelected.size})
+                  {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Add selected ({searchSelected.size})
                 </button>
                 {searchSelected.size > 0 && (
                   <button
