@@ -554,10 +554,10 @@ export default function ScheduledOutreach() {
             Outreach worklist
           </Link>
           <Link
-            to="/email-notifications?status=pending"
+            to="/email-notifications?status=held"
             className="btn-brutal-outline text-sm inline-flex items-center gap-2 min-h-[44px]"
           >
-            <Mail size={16} /> Email queue
+            <Mail size={16} /> Email queue (scheduled)
           </Link>
           <button
             type="button"
@@ -783,8 +783,9 @@ export default function ScheduledOutreach() {
       <section className="card-brutal p-4 mb-6 space-y-4">
         <h2 className="font-display text-lg text-ink-950 dark:text-foreground">2. Add contacts to roster</h2>
         <p className="text-sm text-ink-600 dark:text-muted-foreground">
-          Only new people are added — skips no email, suppressed, already on this roster, or already emailed this
-          template in the last year.
+          Adding contacts stages a <strong>Scheduled (held)</strong> email in the Email queue. At the NZ send
+          time those become <strong>Pending</strong>, then <strong>Sent</strong> when delivered. Skips no email,
+          suppressed, already on this roster, or (for segment add) recently emailed this template.
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block text-sm">

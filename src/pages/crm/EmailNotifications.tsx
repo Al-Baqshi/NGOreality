@@ -50,7 +50,7 @@ function StatusBadge({ status }: { status: NotificationEvent['status'] }) {
 
 const FILTER_OPTIONS: { id: StatusFilter; label: string }[] = [
   { id: 'all', label: 'All' },
-  { id: 'held', label: 'Held' },
+  { id: 'held', label: 'Scheduled' },
   { id: 'pending', label: 'Pending' },
   { id: 'failed', label: 'Failed to send' },
   { id: 'sent', label: 'Sent' },
@@ -337,8 +337,8 @@ export default function EmailNotifications() {
         >
           <Mail size={16} className="text-violet-700 shrink-0 mt-0.5" aria-hidden />
           <p className="text-sm text-ink-800 dark:text-foreground flex-1 min-w-0">
-            <strong>{summary.held}</strong> outreach email{summary.held === 1 ? '' : 's'} held awaiting your approval.
-            Release them from Scheduled outreach — cron will not send held mail.
+            <strong>{summary.held}</strong> scheduled email{summary.held === 1 ? '' : 's'} waiting for NZ send time
+            (or manual release). Cron will not send held mail until it becomes pending.
           </p>
           <Link
             to="/outreach/scheduled"
@@ -411,7 +411,7 @@ export default function EmailNotifications() {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         <button type="button" onClick={() => setFilterAndUrl('held')} className="h-full min-h-[44px] text-left">
-          <MetricCard compact label="Held" value={summary ? summary.held ?? 0 : '—'} sub="Awaiting approval" />
+          <MetricCard compact label="Scheduled" value={summary ? summary.held ?? 0 : '—'} sub="Awaiting send time" />
         </button>
         <button type="button" onClick={() => setFilterAndUrl('pending')} className="h-full min-h-[44px] text-left">
           <MetricCard compact label="Pending" value={summary ? summary.pending ?? 0 : '—'} sub="In queue" />

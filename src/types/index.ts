@@ -178,7 +178,7 @@ export const NOTIFICATION_STATUS_LABELS: Record<NotificationStatus, string> = {
   failed: 'Failed',
   skipped: 'Cancelled',
   suppressed: 'Unsubscribed',
-  held: 'Held — awaiting approval',
+  held: 'Scheduled (held)',
 };
 
 export type OrgStatus =
