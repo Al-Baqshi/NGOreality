@@ -166,6 +166,7 @@ export async function addScheduleRecipientsByFilter(
 export async function addScheduleRecipientsByIds(
   scheduleId: string,
   ids: string[],
+  options?: { dedupeDays?: number },
 ): Promise<AddRecipientsResult> {
   if (!ids.length) {
     return {
@@ -185,7 +186,9 @@ export async function addScheduleRecipientsByIds(
     p_q: null,
     p_exclude: [],
     p_max: ids.length,
-    p_dedupe_days: 365,
+    // Explicit picks: staff chose these orgs — do not block on prior outreach
+    // (segment bulk still uses the long dedupe window).
+    p_dedupe_days: options?.dedupeDays ?? 0,
   });
   if (error) throw new Error(error.message);
   return data as AddRecipientsResult;

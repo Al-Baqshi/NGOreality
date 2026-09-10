@@ -358,7 +358,7 @@ export default function ScheduledOutreach() {
   async function handleAddFromSearch() {
     if (!searchSelected.size) {
       setNoticeIsError(true);
-      setNotice('Select one or more organisations from the search results.');
+      setNotice('Tick the checkbox next to each organisation, then click Add selected.');
       return;
     }
     setBusy(true);
@@ -367,17 +367,54 @@ export default function ScheduledOutreach() {
     try {
       const id = await ensureScheduleSaved();
       const result = await addScheduleRecipientsByIds(id, Array.from(searchSelected));
-      setNotice(
+      const msg =
         `Added ${result.added.toLocaleString()} from search · skipped no email ${result.skipped_no_email} · ` +
-          `suppressed ${result.skipped_suppressed} · already outreached ${result.skipped_dedupe} · ` +
-          `already on roster ${result.skipped_on_roster}`,
-      );
-      setSearchSelected(new Set());
+        `suppressed ${result.skipped_suppressed} · already outreached ${result.skipped_dedupe} · ` +
+        `already on roster ${result.skipped_on_roster}`;
+      if (result.added === 0) {
+        setNoticeIsError(true);
+        setNotice(
+          `Nothing added. ${msg}. Orgs with no email, suppressed addresses, or already on this roster are skipped.`,
+        );
+      } else {
+        setNotice(msg);
+        setSearchSelected(new Set());
+      }
       setRefreshKey((k) => k + 1);
       await refreshSummary(id);
     } catch (e) {
       setNoticeIsError(true);
       setNotice(captureError(e, { where: 'ScheduledOutreach.addSearch' }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleAddOneFromSearch(orgId: string) {
+    setBusy(true);
+    setNotice(null);
+    setNoticeIsError(false);
+    try {
+      const id = await ensureScheduleSaved();
+      const result = await addScheduleRecipientsByIds(id, [orgId]);
+      if (result.added === 0) {
+        setNoticeIsError(true);
+        setNotice(
+          `Could not add that organisation (no email ${result.skipped_no_email}, suppressed ${result.skipped_suppressed}, already on roster ${result.skipped_on_roster}).`,
+        );
+      } else {
+        setNotice(`Added 1 organisation to the roster.`);
+        setSearchSelected((prev) => {
+          const next = new Set(prev);
+          next.delete(orgId);
+          return next;
+        });
+      }
+      setRefreshKey((k) => k + 1);
+      await refreshSummary(id);
+    } catch (e) {
+      setNoticeIsError(true);
+      setNotice(captureError(e, { where: 'ScheduledOutreach.addOne' }));
     } finally {
       setBusy(false);
     }
@@ -836,15 +873,37 @@ export default function ScheduledOutreach() {
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-ink-50 dark:bg-muted">
                     <tr className="text-left font-mono text-2xs uppercase tracking-wider text-ink-400">
-                      <th className="p-2 w-10" />
+                      <th className="p-2 w-10">
+                        <input
+                          type="checkbox"
+                          checked={searchHits.length > 0 && searchHits.every((h) => searchSelected.has(h.id))}
+                          onChange={() => {
+                            const allSelected = searchHits.every((h) => searchSelected.has(h.id));
+                            setSearchSelected((prev) => {
+                              const next = new Set(prev);
+                              if (allSelected) searchHits.forEach((h) => next.delete(h.id));
+                              else searchHits.forEach((h) => next.add(h.id));
+                              return next;
+                            });
+                          }}
+                          aria-label="Select all search results"
+                        />
+                      </th>
                       <th className="p-2">Organisation</th>
                       <th className="p-2">Email</th>
+                      <th className="p-2 w-28" />
                     </tr>
                   </thead>
                   <tbody>
                     {searchHits.map((hit) => (
-                      <tr key={hit.id} className="border-t border-ink-100 dark:border-border">
-                        <td className="p-2">
+                      <tr
+                        key={hit.id}
+                        className={`border-t border-ink-100 dark:border-border cursor-pointer ${
+                          searchSelected.has(hit.id) ? 'bg-teal/10' : 'hover:bg-ink-50 dark:hover:bg-muted/40'
+                        }`}
+                        onClick={() => toggleSearchHit(hit.id)}
+                      >
+                        <td className="p-2" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={searchSelected.has(hit.id)}
@@ -854,6 +913,16 @@ export default function ScheduledOutreach() {
                         </td>
                         <td className="p-2 font-medium">{hit.name}</td>
                         <td className="p-2 font-mono text-2xs">{hit.email ?? '—'}</td>
+                        <td className="p-2" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void handleAddOneFromSearch(hit.id)}
+                            className="btn-brutal-outline text-2xs min-h-[36px] px-2 disabled:opacity-50"
+                          >
+                            Add
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -867,6 +936,45 @@ export default function ScheduledOutreach() {
                   className="btn-brutal-teal text-sm min-h-[44px] px-4 inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Add selected ({searchSelected.size})
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || searchHits.length === 0}
+                  onClick={() => {
+                    setSearchSelected(new Set(searchHits.map((h) => h.id)));
+                    // Defer add to next tick so state has the selection; call with ids directly instead
+                    void (async () => {
+                      setBusy(true);
+                      setNotice(null);
+                      setNoticeIsError(false);
+                      try {
+                        const id = await ensureScheduleSaved();
+                        const result = await addScheduleRecipientsByIds(
+                          id,
+                          searchHits.map((h) => h.id),
+                        );
+                        if (result.added === 0) {
+                          setNoticeIsError(true);
+                          setNotice(
+                            `Nothing added from results. Skipped no email ${result.skipped_no_email}, suppressed ${result.skipped_suppressed}, on roster ${result.skipped_on_roster}.`,
+                          );
+                        } else {
+                          setNotice(`Added ${result.added.toLocaleString()} organisation(s) from search results.`);
+                          setSearchSelected(new Set());
+                        }
+                        setRefreshKey((k) => k + 1);
+                        await refreshSummary(id);
+                      } catch (e) {
+                        setNoticeIsError(true);
+                        setNotice(captureError(e, { where: 'ScheduledOutreach.addAllHits' }));
+                      } finally {
+                        setBusy(false);
+                      }
+                    })();
+                  }}
+                  className="btn-brutal-outline text-sm min-h-[44px] px-4 disabled:opacity-50"
+                >
+                  Add all results ({searchHits.length})
                 </button>
                 {searchSelected.size > 0 && (
                   <button
