@@ -31,6 +31,7 @@ import {
   upsertOutreachSchedule,
   useScheduleRecipients,
   type OutreachSchedule,
+  type ScheduleRecipientStatus,
   type ScheduleSummary,
 } from '../../hooks/useOutreachSchedule';
 import { captureError } from '../../lib/errorReporting';
@@ -69,6 +70,17 @@ const STATUS_LABEL: Record<OutreachSchedule['status'], string> = {
   cancelled: 'Cancelled',
 };
 
+/** Roster status → staff-facing label (queued = held in email queue until NZ send time). */
+const RECIPIENT_STATUS_LABEL: Record<ScheduleRecipientStatus, string> = {
+  queued: 'Held (waiting)',
+  released: 'Released (sending)',
+  sent: 'Sent',
+  skipped: 'Skipped',
+  cancelled: 'Cancelled',
+};
+
+const INITIAL_DRAFT = draftOutreachEmailForOrg('outreach_cold_invite', '{name}');
+
 function formatSendTime(t: string): string {
   // "09:00:00" or "09:00"
   return t.slice(0, 5);
@@ -89,8 +101,8 @@ export default function ScheduledOutreach() {
   const [durationDays, setDurationDays] = useState(7);
   const [dailyCap, setDailyCap] = useState(100);
   const [template, setTemplate] = useState<OutreachEmailTemplate>('outreach_cold_invite');
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
+  const [subject, setSubject] = useState(INITIAL_DRAFT.subject);
+  const [body, setBody] = useState(INITIAL_DRAFT.body);
   const [segment, setSegment] = useState<OutreachSegment>('no_website');
   const [outreach, setOutreach] = useState<OutreachStatus | ''>('not_contacted');
   const [addCount, setAddCount] = useState(100);
@@ -102,7 +114,12 @@ export default function ScheduledOutreach() {
 
   const [rosterPage, setRosterPage] = useState(1);
   const [selectedOrgIds, setSelectedOrgIds] = useState<Set<string>>(new Set());
-  const [refreshKey, setRefreshKey] = useState(0);
+  /** Full reload (initial / Refresh / pick schedule) — may re-apply form from DB. */
+  const [listRefreshKey, setListRefreshKey] = useState(0);
+  /** Roster + segment counts only — does not wipe the form. */
+  const [rosterRefreshKey, setRosterRefreshKey] = useState(0);
+  /** True while editing a brand-new schedule that is not saved yet. */
+  const [composingNew, setComposingNew] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -110,24 +127,35 @@ export default function ScheduledOutreach() {
   const [error, setError] = useState<string | null>(null);
 
   const endsOn = useMemo(() => addDaysIso(startsOn, Math.max(1, durationDays) - 1), [startsOn, durationDays]);
-  const { counts } = useOutreachSegmentCounts(refreshKey);
+  const { counts } = useOutreachSegmentCounts(rosterRefreshKey);
   const { rows, total, loading: rosterLoading, error: rosterError } = useScheduleRecipients(
     scheduleId,
     rosterPage,
-    refreshKey,
+    rosterRefreshKey,
   );
 
   const rosterPages = Math.max(1, Math.ceil(total / SCHEDULE_ROSTER_PAGE_SIZE));
   const pageAllSelected = rows.length > 0 && rows.every((r) => selectedOrgIds.has(r.organization_id));
   const editable = schedule?.status === 'draft' || schedule?.status === 'paused' || schedule?.status === 'armed' || !schedule;
 
-  useEffect(() => {
-    const draft = draftOutreachEmailForOrg(template, '{name}');
+  function bumpRoster() {
+    setRosterRefreshKey((k) => k + 1);
+  }
+
+  function bumpListAndRoster() {
+    setListRefreshKey((k) => k + 1);
+    setRosterRefreshKey((k) => k + 1);
+  }
+
+  function applyTemplateDraft(t: OutreachEmailTemplate) {
+    setTemplate(t);
+    const draft = draftOutreachEmailForOrg(t, '{name}');
     setSubject(draft.subject);
     setBody(draft.body);
-  }, [template]);
+  }
 
   const applyScheduleToForm = useCallback((s: OutreachSchedule) => {
+    setComposingNew(false);
     setSchedule(s);
     setScheduleId(s.id);
     setName(s.name);
@@ -148,22 +176,43 @@ export default function ScheduledOutreach() {
     setSelectedOrgIds(new Set());
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (
+    mode: 'full' | 'soft' = 'full',
+    preferId?: string | null,
+  ) => {
+    if (mode === 'full') setLoading(true);
     setError(null);
     try {
       const list = await listOutreachSchedules();
       setSchedules(list);
+
+      const effectiveId = preferId !== undefined ? preferId : scheduleId;
+
+      // Keep blank "New schedule" form; only refresh the schedule chips list.
+      if (composingNew && !effectiveId) {
+        setSummary(null);
+        return;
+      }
+
       const active =
-        (scheduleId && list.find((s) => s.id === scheduleId)) ||
-        list.find((s) => s.status === 'armed' || s.status === 'draft' || s.status === 'paused') ||
-        list[0] ||
-        null;
+        (effectiveId && list.find((s) => s.id === effectiveId)) ||
+        (mode === 'full' && !effectiveId
+          ? list.find((s) => s.status === 'armed' || s.status === 'draft' || s.status === 'paused') ||
+            list[0] ||
+            null
+          : null);
+
       if (active) {
-        applyScheduleToForm(active);
+        if (mode === 'full') {
+          applyScheduleToForm(active);
+        } else {
+          setComposingNew(false);
+          setSchedule(active);
+          setScheduleId(active.id);
+        }
         const sum = await fetchScheduleSummary(active.id);
         setSummary(sum);
-      } else {
+      } else if (mode === 'full') {
         setSchedule(null);
         setScheduleId(null);
         setSummary(null);
@@ -171,15 +220,15 @@ export default function ScheduledOutreach() {
     } catch (e) {
       setError(captureError(e, { where: 'ScheduledOutreach.load' }));
     } finally {
-      setLoading(false);
+      if (mode === 'full') setLoading(false);
     }
-  }, [applyScheduleToForm, scheduleId]);
+  }, [applyScheduleToForm, composingNew, scheduleId]);
 
   useEffect(() => {
-    void load();
-    // intentionally only on refreshKey — scheduleId changes via applyScheduleToForm
+    void load('full');
+    // intentionally only on listRefreshKey — scheduleId changes via applyScheduleToForm
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshKey]);
+  }, [listRefreshKey]);
 
   async function refreshSummary(id: string) {
     try {
@@ -209,7 +258,9 @@ export default function ScheduledOutreach() {
       });
       setNotice(`Saved schedule · ${formatSendTime(saved.send_time)} NZ · ${saved.starts_on} → ${saved.ends_on}`);
       applyScheduleToForm(saved);
-      setRefreshKey((k) => k + 1);
+      await refreshSummary(saved.id);
+      bumpRoster();
+      void load('soft', saved.id);
     } catch (e) {
       setNoticeIsError(true);
       setNotice(captureError(e, { where: 'ScheduledOutreach.save' }));
@@ -219,6 +270,7 @@ export default function ScheduledOutreach() {
   }
 
   async function handleNew() {
+    setComposingNew(true);
     setSchedule(null);
     setScheduleId(null);
     setSummary(null);
@@ -227,16 +279,14 @@ export default function ScheduledOutreach() {
     setStartsOn(todayNz);
     setDurationDays(7);
     setDailyCap(100);
-    setTemplate('outreach_cold_invite');
+    applyTemplateDraft('outreach_cold_invite');
     setSegment('no_website');
     setOutreach('not_contacted');
     setAddCount(100);
     setSelectedOrgIds(new Set());
     setRosterPage(1);
-    const draft = draftOutreachEmailForOrg('outreach_cold_invite', '{name}');
-    setSubject(draft.subject);
-    setBody(draft.body);
-    setNotice('New schedule — save to create, then add contacts to the roster.');
+    setNotice('New schedule — add contacts or save; draft is kept if you Refresh.');
+    setNoticeIsError(false);
   }
 
   async function handleSaveInternal() {
@@ -257,32 +307,40 @@ export default function ScheduledOutreach() {
     return saved;
   }
 
-  /** Ensure a schedule row exists before roster mutations. */
+  /** Persist current form (create or update) before roster mutations so held emails use latest draft. */
   async function ensureScheduleSaved(): Promise<string> {
-    if (scheduleId) return scheduleId;
     const saved = await handleSaveInternal();
     return saved.id;
   }
 
   async function handleArm() {
-    const ok = await confirm({
-      title: 'Arm this schedule?',
-      description:
-        `Emails will send automatically at ${sendTime} New Zealand time each day from ${startsOn} to ${endsOn}, ` +
-        `up to ${dailyCap}/day, to new queued contacts only.\n\nArming is your permission to send.`,
-      confirmLabel: 'Arm schedule',
-    });
-    if (!ok) return;
     setBusy(true);
     setNotice(null);
     setNoticeIsError(false);
     try {
       const saved = await handleSaveInternal();
+      const sum = await fetchScheduleSummary(saved.id);
+      setSummary(sum);
+      if ((sum.queued ?? 0) < 1) {
+        setNoticeIsError(true);
+        setNotice('Add at least one contact to the roster before arming.');
+        bumpRoster();
+        return;
+      }
+      const ok = await confirm({
+        title: 'Arm this schedule?',
+        description:
+          `Emails will send automatically at ${sendTime} New Zealand time each day from ${startsOn} to ${endsOn}, ` +
+          `up to ${dailyCap}/day, to new held contacts only.\n\nArming is your permission to send.`,
+        confirmLabel: 'Arm schedule',
+      });
+      if (!ok) return;
       const updated = await setOutreachScheduleStatus(saved.id, 'armed');
       applyScheduleToForm(updated);
       await refreshSummary(updated.id);
       setNotice('Armed — will auto-send at the NZ time each day in the window.');
-      setRefreshKey((k) => k + 1);
+      bumpRoster();
+      void load('soft', updated.id);
     } catch (e) {
       setNoticeIsError(true);
       setNotice(captureError(e, { where: 'ScheduledOutreach.arm' }));
@@ -299,7 +357,8 @@ export default function ScheduledOutreach() {
       applyScheduleToForm(updated);
       await refreshSummary(updated.id);
       setNotice('Paused — no further automatic sends until you arm again.');
-      setRefreshKey((k) => k + 1);
+      bumpRoster();
+      void load('soft', updated.id);
     } catch (e) {
       setNotice(captureError(e, { where: 'ScheduledOutreach.pause' }));
     } finally {
@@ -311,7 +370,7 @@ export default function ScheduledOutreach() {
     if (!scheduleId) return;
     const ok = await confirm({
       title: 'Cancel schedule?',
-      description: 'Stops all future sends. Queued roster contacts stay but will not be released.',
+      description: 'Stops all future sends. Held roster contacts stay but will not be released.',
       confirmLabel: 'Cancel schedule',
     });
     if (!ok) return;
@@ -321,7 +380,8 @@ export default function ScheduledOutreach() {
       applyScheduleToForm(updated);
       await refreshSummary(updated.id);
       setNotice('Schedule cancelled.');
-      setRefreshKey((k) => k + 1);
+      bumpRoster();
+      void load('soft', updated.id);
     } catch (e) {
       setNotice(captureError(e, { where: 'ScheduledOutreach.cancel' }));
     } finally {
@@ -345,8 +405,9 @@ export default function ScheduledOutreach() {
           `suppressed ${result.skipped_suppressed} · already outreached ${result.skipped_dedupe} · ` +
           `already on roster ${result.skipped_on_roster}`,
       );
-      setRefreshKey((k) => k + 1);
+      bumpRoster();
       await refreshSummary(id);
+      void load('soft', id);
     } catch (e) {
       setNoticeIsError(true);
       setNotice(captureError(e, { where: 'ScheduledOutreach.add' }));
@@ -380,8 +441,9 @@ export default function ScheduledOutreach() {
         setNotice(msg);
         setSearchSelected(new Set());
       }
-      setRefreshKey((k) => k + 1);
+      bumpRoster();
       await refreshSummary(id);
+      void load('soft', id);
     } catch (e) {
       setNoticeIsError(true);
       setNotice(captureError(e, { where: 'ScheduledOutreach.addSearch' }));
@@ -403,15 +465,16 @@ export default function ScheduledOutreach() {
           `Could not add that organisation (no email ${result.skipped_no_email}, suppressed ${result.skipped_suppressed}, already on roster ${result.skipped_on_roster}).`,
         );
       } else {
-        setNotice(`Added 1 organisation to the roster.`);
+        setNotice(`Added 1 organisation to the roster (held in Email queue).`);
         setSearchSelected((prev) => {
           const next = new Set(prev);
           next.delete(orgId);
           return next;
         });
       }
-      setRefreshKey((k) => k + 1);
+      bumpRoster();
       await refreshSummary(id);
+      void load('soft', id);
     } catch (e) {
       setNoticeIsError(true);
       setNotice(captureError(e, { where: 'ScheduledOutreach.addOne' }));
@@ -471,10 +534,11 @@ export default function ScheduledOutreach() {
     setBusy(true);
     try {
       const result = await removeScheduleRecipients(scheduleId, Array.from(selectedOrgIds));
-      setNotice(`Removed ${result.removed.toLocaleString()} queued contact(s).`);
+      setNotice(`Removed ${result.removed.toLocaleString()} held contact(s).`);
       setSelectedOrgIds(new Set());
-      setRefreshKey((k) => k + 1);
+      bumpRoster();
       await refreshSummary(scheduleId);
+      void load('soft', scheduleId);
     } catch (e) {
       setNotice(captureError(e, { where: 'ScheduledOutreach.remove' }));
     } finally {
@@ -486,7 +550,7 @@ export default function ScheduledOutreach() {
     const ok = await confirm({
       title: 'Run due schedules now?',
       description:
-        'If the NZ send time has already passed today for an armed schedule, this releases today’s slice immediately. Otherwise nothing happens.',
+        'If the NZ send time has already passed today for an armed schedule, this releases today’s slice immediately (held → pending). Otherwise nothing happens.',
       confirmLabel: 'Run now',
     });
     if (!ok) return;
@@ -496,7 +560,8 @@ export default function ScheduledOutreach() {
       setNotice(
         `Runner: ${result.schedules_run} schedule(s) · released ${result.released} · completed expired ${result.completed_expired}`,
       );
-      setRefreshKey((k) => k + 1);
+      bumpRoster();
+      void load('soft', scheduleId);
     } catch (e) {
       setNotice(captureError(e, { where: 'ScheduledOutreach.runNow' }));
     } finally {
@@ -542,7 +607,7 @@ export default function ScheduledOutreach() {
         <div>
           <h1 className="page-title">Scheduled outreach</h1>
           <p className="text-sm text-ink-600 dark:text-muted-foreground mt-1 max-w-2xl">
-            Daily auto-send at a New Zealand time. Build a roster of contacts; each day only new queued people
+            Daily auto-send at a New Zealand time. Build a roster of contacts; each day only new held people
             are emailed — never repeats.
           </p>
         </div>
@@ -561,7 +626,14 @@ export default function ScheduledOutreach() {
           </Link>
           <button
             type="button"
-            onClick={() => setRefreshKey((k) => k + 1)}
+            onClick={() => {
+              if (composingNew && !scheduleId) {
+                void load('soft');
+                bumpRoster();
+              } else {
+                bumpListAndRoster();
+              }
+            }}
             className="btn-brutal-outline text-sm inline-flex items-center gap-2 min-h-[44px]"
             disabled={loading || busy}
           >
@@ -593,8 +665,9 @@ export default function ScheduledOutreach() {
               key={s.id}
               type="button"
               onClick={() => {
+                setComposingNew(false);
                 applyScheduleToForm(s);
-                setRefreshKey((k) => k + 1);
+                bumpListAndRoster();
               }}
               className={`btn-brutal-outline text-2xs min-h-[36px] px-3 ${
                 s.id === scheduleId ? '!border-teal !text-teal' : ''
@@ -607,7 +680,7 @@ export default function ScheduledOutreach() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <MetricCard compact label="Queued" value={summary ? summary.queued : '—'} sub="Waiting to send" />
+        <MetricCard compact label="Held" value={summary ? summary.queued : '—'} sub="Waiting for NZ send" />
         <MetricCard compact label="Released" value={summary ? summary.released : '—'} sub="Already sliced" />
         <MetricCard
           compact
@@ -700,7 +773,7 @@ export default function ScheduledOutreach() {
           <span className="font-mono text-2xs uppercase tracking-wider text-ink-500">Email template</span>
           <select
             value={template}
-            onChange={(e) => setTemplate(e.target.value as OutreachEmailTemplate)}
+            onChange={(e) => applyTemplateDraft(e.target.value as OutreachEmailTemplate)}
             className="mt-1 w-full border-2 border-ink-200 bg-white px-3 py-2 text-sm dark:bg-background dark:border-border"
           >
             {OUTREACH_EMAIL_TEMPLATES.map((t) => (
@@ -739,10 +812,10 @@ export default function ScheduledOutreach() {
           >
             {busy ? <Loader2 size={16} className="animate-spin inline" /> : null} Save schedule
           </button>
-          {schedule?.status !== 'armed' && schedule?.status !== 'completed' && schedule?.status !== 'cancelled' && (
+          {(!schedule || (schedule.status !== 'armed' && schedule.status !== 'completed' && schedule.status !== 'cancelled')) && (
             <button
               type="button"
-              disabled={busy || !scheduleId}
+              disabled={busy}
               onClick={() => void handleArm()}
               className="btn-brutal-teal text-sm min-h-[44px] px-4 inline-flex items-center gap-2"
             >
@@ -963,8 +1036,9 @@ export default function ScheduledOutreach() {
                           setNotice(`Added ${result.added.toLocaleString()} organisation(s) from search results.`);
                           setSearchSelected(new Set());
                         }
-                        setRefreshKey((k) => k + 1);
+                        bumpRoster();
                         await refreshSummary(id);
+                        void load('soft', id);
                       } catch (e) {
                         setNoticeIsError(true);
                         setNotice(captureError(e, { where: 'ScheduledOutreach.addAllHits' }));
@@ -1003,7 +1077,7 @@ export default function ScheduledOutreach() {
             onClick={() => void handleRemoveSelected()}
             className="btn-brutal-outline text-2xs min-h-[36px] px-3 inline-flex items-center gap-1 !border-gold !text-gold"
           >
-            <Trash2 size={14} /> Remove selected queued ({selectedOrgIds.size})
+            <Trash2 size={14} /> Remove selected held ({selectedOrgIds.size})
           </button>
         </div>
 
@@ -1052,7 +1126,7 @@ export default function ScheduledOutreach() {
                       </Link>
                     </td>
                     <td className="p-3 font-mono text-2xs">{row.organizations?.email ?? '—'}</td>
-                    <td className="p-3 font-mono text-2xs uppercase">{row.status}</td>
+                    <td className="p-3 font-mono text-2xs">{RECIPIENT_STATUS_LABEL[row.status]}</td>
                     <td className="p-3 font-mono text-2xs text-ink-500">{row.sort_order}</td>
                   </tr>
                 ))}
