@@ -81,6 +81,22 @@ const RECIPIENT_STATUS_LABEL: Record<ScheduleRecipientStatus, string> = {
 
 const INITIAL_DRAFT = draftOutreachEmailForOrg('outreach_cold_invite', '{name}');
 
+function formatAddResult(result: {
+  added: number;
+  skipped_no_email: number;
+  skipped_suppressed: number;
+  skipped_dedupe: number;
+  skipped_on_roster: number;
+}): string {
+  return (
+    `Added ${result.added.toLocaleString()}` +
+    ` · no email ${result.skipped_no_email}` +
+    ` · suppressed ${result.skipped_suppressed}` +
+    ` · already emailed ${result.skipped_dedupe}` +
+    ` · already on roster ${result.skipped_on_roster}`
+  );
+}
+
 function formatSendTime(t: string): string {
   // "09:00:00" or "09:00"
   return t.slice(0, 5);
@@ -310,6 +326,9 @@ export default function ScheduledOutreach() {
   /** Persist current form (create or update) before roster mutations so held emails use latest draft. */
   async function ensureScheduleSaved(): Promise<string> {
     const saved = await handleSaveInternal();
+    // Ensure roster queries use this id even before the next React paint.
+    setScheduleId(saved.id);
+    setComposingNew(false);
     return saved.id;
   }
 
@@ -400,11 +419,18 @@ export default function ScheduledOutreach() {
         outreach,
         max: addCount,
       });
-      setNotice(
-        `Added ${result.added.toLocaleString()} · skipped no email ${result.skipped_no_email} · ` +
-          `suppressed ${result.skipped_suppressed} · already outreached ${result.skipped_dedupe} · ` +
-          `already on roster ${result.skipped_on_roster}`,
-      );
+      const msg = formatAddResult(result);
+      if (result.added === 0) {
+        setNoticeIsError(true);
+        setNotice(
+          `Nothing added from segment. ${msg}. ` +
+            (result.skipped_dedupe > 0
+              ? 'Many matches were skipped because they already have a recent/held email for this template — try search Add for specific orgs, or pick a different segment.'
+              : 'Try search below to pick organisations with a valid email.'),
+        );
+      } else {
+        setNotice(msg);
+      }
       bumpRoster();
       await refreshSummary(id);
       void load('soft', id);
@@ -428,14 +454,16 @@ export default function ScheduledOutreach() {
     try {
       const id = await ensureScheduleSaved();
       const result = await addScheduleRecipientsByIds(id, Array.from(searchSelected));
-      const msg =
-        `Added ${result.added.toLocaleString()} from search · skipped no email ${result.skipped_no_email} · ` +
-        `suppressed ${result.skipped_suppressed} · already outreached ${result.skipped_dedupe} · ` +
-        `already on roster ${result.skipped_on_roster}`;
+      const msg = formatAddResult(result);
       if (result.added === 0) {
         setNoticeIsError(true);
         setNotice(
-          `Nothing added. ${msg}. Orgs with no email, suppressed addresses, or already on this roster are skipped.`,
+          `Nothing added. ${msg}. ` +
+            (result.skipped_on_roster > 0
+              ? 'Those organisations are already on this roster.'
+              : result.skipped_no_email > 0
+                ? 'Selected orgs need a valid email on the organisation record.'
+                : 'Check suppressed / already-emailed skips above.'),
         );
       } else {
         setNotice(msg);
@@ -461,9 +489,7 @@ export default function ScheduledOutreach() {
       const result = await addScheduleRecipientsByIds(id, [orgId]);
       if (result.added === 0) {
         setNoticeIsError(true);
-        setNotice(
-          `Could not add that organisation (no email ${result.skipped_no_email}, suppressed ${result.skipped_suppressed}, already on roster ${result.skipped_on_roster}).`,
-        );
+        setNotice(`Could not add that organisation. ${formatAddResult(result)}.`);
       } else {
         setNotice(`Added 1 organisation to the roster (held in Email queue).`);
         setSearchSelected((prev) => {
@@ -943,6 +969,65 @@ export default function ScheduledOutreach() {
 
           {searchHits.length > 0 && (
             <div className="border-2 border-ink-200 dark:border-border overflow-hidden">
+              <div className="border-b-2 border-ink-200 dark:border-border p-3 flex flex-wrap items-center gap-2 bg-ink-50 dark:bg-muted">
+                <button
+                  type="button"
+                  disabled={busy || searchSelected.size === 0}
+                  onClick={() => void handleAddFromSearch()}
+                  className="btn-brutal-teal text-sm min-h-[44px] px-4 inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Add selected ({searchSelected.size})
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || searchHits.length === 0}
+                  onClick={() => {
+                    void (async () => {
+                      setBusy(true);
+                      setNotice(null);
+                      setNoticeIsError(false);
+                      try {
+                        const id = await ensureScheduleSaved();
+                        const result = await addScheduleRecipientsByIds(
+                          id,
+                          searchHits.map((h) => h.id),
+                        );
+                        const msg = formatAddResult(result);
+                        if (result.added === 0) {
+                          setNoticeIsError(true);
+                          setNotice(`Nothing added from results. ${msg}.`);
+                        } else {
+                          setNotice(msg);
+                          setSearchSelected(new Set());
+                        }
+                        bumpRoster();
+                        await refreshSummary(id);
+                        void load('soft', id);
+                      } catch (e) {
+                        setNoticeIsError(true);
+                        setNotice(captureError(e, { where: 'ScheduledOutreach.addAllHits' }));
+                      } finally {
+                        setBusy(false);
+                      }
+                    })();
+                  }}
+                  className="btn-brutal-outline text-sm min-h-[44px] px-4 disabled:opacity-50"
+                >
+                  Add all results ({searchHits.length})
+                </button>
+                {searchSelected.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchSelected(new Set())}
+                    className="btn-brutal-outline text-2xs min-h-[36px] px-3"
+                  >
+                    Clear selection
+                  </button>
+                )}
+                <span className="font-mono text-2xs text-ink-500">
+                  Or use Add on a row. Tick boxes then Add selected.
+                </span>
+              </div>
               <div className="max-h-64 overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-ink-50 dark:bg-muted">
@@ -1001,65 +1086,6 @@ export default function ScheduledOutreach() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-              <div className="border-t-2 border-ink-200 dark:border-border p-3 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  disabled={busy || searchSelected.size === 0}
-                  onClick={() => void handleAddFromSearch()}
-                  className="btn-brutal-teal text-sm min-h-[44px] px-4 inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Add selected ({searchSelected.size})
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || searchHits.length === 0}
-                  onClick={() => {
-                    setSearchSelected(new Set(searchHits.map((h) => h.id)));
-                    // Defer add to next tick so state has the selection; call with ids directly instead
-                    void (async () => {
-                      setBusy(true);
-                      setNotice(null);
-                      setNoticeIsError(false);
-                      try {
-                        const id = await ensureScheduleSaved();
-                        const result = await addScheduleRecipientsByIds(
-                          id,
-                          searchHits.map((h) => h.id),
-                        );
-                        if (result.added === 0) {
-                          setNoticeIsError(true);
-                          setNotice(
-                            `Nothing added from results. Skipped no email ${result.skipped_no_email}, suppressed ${result.skipped_suppressed}, on roster ${result.skipped_on_roster}.`,
-                          );
-                        } else {
-                          setNotice(`Added ${result.added.toLocaleString()} organisation(s) from search results.`);
-                          setSearchSelected(new Set());
-                        }
-                        bumpRoster();
-                        await refreshSummary(id);
-                        void load('soft', id);
-                      } catch (e) {
-                        setNoticeIsError(true);
-                        setNotice(captureError(e, { where: 'ScheduledOutreach.addAllHits' }));
-                      } finally {
-                        setBusy(false);
-                      }
-                    })();
-                  }}
-                  className="btn-brutal-outline text-sm min-h-[44px] px-4 disabled:opacity-50"
-                >
-                  Add all results ({searchHits.length})
-                </button>
-                {searchSelected.size > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchSelected(new Set())}
-                    className="btn-brutal-outline text-2xs min-h-[36px] px-3"
-                  >
-                    Clear selection
-                  </button>
-                )}
               </div>
             </div>
           )}
