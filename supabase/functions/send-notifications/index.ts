@@ -220,14 +220,19 @@ Deno.serve(async (req: Request) => {
         "Content-Type": "application/json",
       };
 
+      const rawBody = typeof ev.body_text === "string" ? ev.body_text : "";
+      const bodyText = isOutreach && !rawBody.includes("+64 27 338 8500")
+        ? `${rawBody.trimEnd()}\n\n—\nNGOreality is New Zealand owned and operated.\nPhone: +64 27 338 8500`
+        : rawBody;
+
       const payload: Record<string, unknown> = {
         from: fromEmail,
         to: [to],
         subject: ev.subject,
-        // Body is exactly what staff queued — no appended compliance footer.
+        // Outreach bodies get a NZ ownership/contact footer at send time if missing.
         // Opt-out is handled via List-Unsubscribe headers below (Gmail/Outlook
         // show a native Unsubscribe control; the link is not duplicated in text).
-        text: ev.body_text,
+        text: bodyText,
       };
       if (replyTo) payload.reply_to = replyTo;
 

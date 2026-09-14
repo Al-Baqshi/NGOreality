@@ -10,6 +10,21 @@ export type NotificationTemplate =
   | 'badge_request_received'
   | OutreachEmailTemplate;
 
+/** NZ ownership / contact line on every outreach email. */
+export const OUTREACH_NZ_FOOTER = [
+  `—`,
+  `NGOreality is New Zealand owned and operated.`,
+  `Phone: +64 27 338 8500`,
+].join('\n');
+
+/** Append the NZ footer unless the phone line is already present. */
+export function withOutreachNzFooter(body: string): string {
+  const text = (body ?? '').trimEnd();
+  if (!text) return OUTREACH_NZ_FOOTER;
+  if (text.includes('+64 27 338 8500')) return text;
+  return `${text}\n\n${OUTREACH_NZ_FOOTER}`;
+}
+
 function portalSignupUrl(organizationId?: string): string {
   const base = (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/$/, '');
   const root = base || 'https://www.ngoreality.com';
@@ -115,7 +130,7 @@ function buildMessage(
           ``,
           `Reply to this email if you have questions — we are happy to walk you through it.`,
           ``,
-          `— NGOreality outreach`,
+          OUTREACH_NZ_FOOTER,
         ].join('\n'),
       };
     case 'outreach_no_website':
@@ -131,7 +146,7 @@ function buildMessage(
           ``,
           `There is no obligation — reply if you would like a short call about options.`,
           ``,
-          `— NGOreality`,
+          OUTREACH_NZ_FOOTER,
         ].join('\n'),
       };
     case 'outreach_website_help':
@@ -147,7 +162,7 @@ function buildMessage(
           `If you would like support, reply to this email or claim your profile:`,
           signupUrl,
           ``,
-          `— NGOreality`,
+          OUTREACH_NZ_FOOTER,
         ].join('\n'),
       };
     default:
