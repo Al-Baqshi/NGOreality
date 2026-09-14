@@ -161,7 +161,12 @@ export default function ScheduledOutreach() {
 
   const rosterPages = Math.max(1, Math.ceil(total / SCHEDULE_ROSTER_PAGE_SIZE));
   const pageAllSelected = rows.length > 0 && rows.every((r) => selectedOrgIds.has(r.organization_id));
-  const editable = schedule?.status === 'draft' || schedule?.status === 'paused' || schedule?.status === 'armed' || !schedule;
+  const editable =
+    schedule?.status === 'draft' ||
+    schedule?.status === 'paused' ||
+    schedule?.status === 'armed' ||
+    schedule?.status === 'completed' ||
+    !schedule;
 
   function bumpRoster() {
     setRosterRefreshKey((k) => k + 1);
@@ -379,8 +384,9 @@ export default function ScheduledOutreach() {
       const ok = await confirm({
         title: 'Arm this schedule?',
         description:
-          `Emails will send automatically at ${sendTime} New Zealand time each day from ${startsOn} to ${endsOn}, ` +
-          `up to ${dailyCap}/day, to new held contacts only.\n\nArming is your permission to send.`,
+          `Emails release only in a short New Zealand window at ${sendTime} each day from ${startsOn} to ${endsOn} ` +
+          `(about 20 minutes from that time), up to ${dailyCap}/day, to new held contacts only.\n\n` +
+          `Arming after today’s window waits until the next day’s ${sendTime} NZ.\n\nArming is your permission to send.`,
         confirmLabel: 'Arm schedule',
       });
       if (!ok) return;
@@ -585,7 +591,7 @@ export default function ScheduledOutreach() {
     const ok = await confirm({
       title: 'Run due schedules now?',
       description:
-        'If the NZ send time has already passed today for an armed schedule, this releases today’s slice immediately (held → pending). Otherwise nothing happens.',
+        'Only works during today’s NZ send window (send time plus about 20 minutes). Outside that window nothing is released — wait for the next day’s slot.',
       confirmLabel: 'Run now',
     });
     if (!ok) return;
@@ -631,7 +637,7 @@ export default function ScheduledOutreach() {
 
   const nextPreview =
     summary?.next_send_preview && schedule
-      ? `Next send: ${summary.next_send_preview} at ${formatSendTime(schedule.send_time)} NZ · up to ${schedule.daily_cap} new contacts · Day ${summary.day_index} of ${summary.total_days}`
+      ? `Next send: ${summary.next_send_preview} around ${formatSendTime(schedule.send_time)} NZ (20‑min window) · up to ${schedule.daily_cap} new contacts · Day ${summary.day_index} of ${summary.total_days}`
       : schedule?.status === 'armed'
         ? 'No further send days in this window (or roster empty).'
         : 'Arm the schedule to auto-send at the NZ time.';
@@ -642,8 +648,9 @@ export default function ScheduledOutreach() {
         <div>
           <h1 className="page-title">Scheduled outreach</h1>
           <p className="text-sm text-ink-600 dark:text-muted-foreground mt-1 max-w-2xl">
-            Daily auto-send at a New Zealand time. Build a roster of contacts; each day only new held people
-            are emailed — never repeats.
+            Daily auto-send at a New Zealand time. Each day releases only inside a short window at that
+            time (e.g. 9:00–9:20 NZ) — not earlier, and not later the same day if you arm after the slot.
+            Top up the roster anytime during the date window.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -873,14 +880,17 @@ export default function ScheduledOutreach() {
           >
             {busy ? <Loader2 size={16} className="animate-spin inline" /> : null} Save schedule
           </button>
-          {(!schedule || (schedule.status !== 'armed' && schedule.status !== 'completed' && schedule.status !== 'cancelled')) && (
+          {(!schedule ||
+            schedule.status === 'draft' ||
+            schedule.status === 'paused' ||
+            schedule.status === 'completed') && (
             <button
               type="button"
               disabled={busy}
               onClick={() => void handleArm()}
               className="btn-brutal-teal text-sm min-h-[44px] px-4 inline-flex items-center gap-2"
             >
-              <Play size={16} /> Arm (auto-send)
+              <Play size={16} /> {schedule?.status === 'completed' ? 'Re-arm (auto-send)' : 'Arm (auto-send)'}
             </button>
           )}
           {schedule?.status === 'armed' && (
@@ -893,7 +903,7 @@ export default function ScheduledOutreach() {
               <Pause size={16} /> Pause
             </button>
           )}
-          {schedule && schedule.status !== 'cancelled' && schedule.status !== 'completed' && (
+          {schedule && schedule.status !== 'cancelled' && (
             <button
               type="button"
               disabled={busy}
@@ -919,7 +929,8 @@ export default function ScheduledOutreach() {
         <p className="text-sm text-ink-600 dark:text-muted-foreground">
           Adding contacts stages a <strong>Scheduled (held)</strong> email in the Email queue. At the NZ send
           time those become <strong>Pending</strong>, then <strong>Sent</strong> when delivered. Skips no email,
-          suppressed, already on this roster, or (for segment add) recently emailed this template.
+          suppressed, already on this roster, or (for segment add) recently emailed this template. Add more
+          contacts anytime for later days — the campaign stays open until the end date.
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block text-sm">
