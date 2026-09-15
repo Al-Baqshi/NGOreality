@@ -25,13 +25,6 @@ export function withOutreachNzFooter(body: string): string {
   return `${text}\n\n${OUTREACH_NZ_FOOTER}`;
 }
 
-function portalSignupUrl(organizationId?: string): string {
-  const base = (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/$/, '');
-  const root = base || 'https://www.ngoreality.com';
-  if (organizationId) return `${root}/ngo/signup?org=${encodeURIComponent(organizationId)}`;
-  return `${root}/ngo/signup`;
-}
-
 /** Absolute URL of an organisation's public directory page (`/public/org/<slug>`). */
 export function publicProfileUrl(slug?: string | null): string | null {
   const clean = slug?.trim();
@@ -44,7 +37,6 @@ function buildMessage(
   organizationName: string,
   extra?: Record<string, string>,
 ): { subject: string; body: string } {
-  const signupUrl = portalSignupUrl(extra?.organizationId);
   switch (template) {
     case 'site_down':
       return {
@@ -115,54 +107,93 @@ function buildMessage(
     }
     case 'outreach_cold_invite':
       return {
-        subject: `[NGOreality] Claim your organisation profile — ${organizationName}`,
+        subject: `[NGOreality] A note for ${organizationName}`,
         body: [
-          `Kia ora,`,
+          `Kia ora ${organizationName},`,
           ``,
-          `We are reaching out from NGOreality because ${organizationName} is listed on the New Zealand charities register and may benefit from a verified public profile, optional website support, and trust standards that funders recognise.`,
+          `We came across ${organizationName} on the New Zealand Charities Register and wanted to introduce NGOreality.`,
           ``,
-          `Claim and onboard your organisation here (free to start):`,
+          `Your organisation already has a public presence online, so our suggestion isn't about replacing what you have.`,
+          ``,
+          `NGOreality gives New Zealand charities another way to demonstrate their organisation's public information and trust standards through a verified Reality Badge and profile.`,
+          ``,
+          `You can claim and onboard your organisation here:`,
           `{page}`,
           ``,
-          `Once claimed, you can pay by bank transfer for:`,
-          `• Reality Badge membership — NZD $70 / year (badge + website monitoring)`,
-          `• Trust landing page package — NZD $650 one-off (we build a standards-ready page)`,
+          `Reality Badge membership is NZD $70 per year and includes the badge and website monitoring.`,
           ``,
-          `Reply to this email if you have questions — we are happy to walk you through it.`,
+          `If you'd like to know whether it would be useful for ${organizationName}, simply reply to this email and we'll explain it.`,
           ``,
-          OUTREACH_NZ_FOOTER,
+          `—`,
+          `NGOreality is New Zealand owned and operated.`,
+          ``,
+          `Learn more:`,
+          `https://www.ngoreality.com/public/about`,
+          ``,
+          `CEO: Al Baqshi`,
+          `Phone: +64 27 338 8500`,
         ].join('\n'),
       };
     case 'outreach_no_website':
       return {
-        subject: `[NGOreality] A simple web presence for ${organizationName}`,
+        subject: `[NGOreality] A note for ${organizationName}`,
         body: [
-          `Kia ora,`,
+          `Kia ora ${organizationName},`,
           ``,
-          `We noticed ${organizationName} does not currently have a public website listed. Many charities use NGOreality for a lightweight trust landing page (NZD $650), verified registry details, and optional Reality Badge membership (NZD $70 / year) with monitoring.`,
+          `We came across ${organizationName} while looking at New Zealand charities and noticed there isn't a public website listed.`,
           ``,
-          `Start here when it suits you:`,
-          signupUrl,
+          `We're not suggesting you need an expensive new website.`,
           ``,
-          `There is no obligation — reply if you would like a short call about options.`,
+          `Sometimes a clear public profile, updated organisation information, and a simple trust-focused page are enough to make it much easier for people to understand who you are and what your organisation does.`,
           ``,
-          OUTREACH_NZ_FOOTER,
+          `If that would help ${organizationName}, a trust landing page with us is NZD $650, one-off. We build it at that fixed price.`,
+          ``,
+          `You can claim your NGOreality profile here:`,
+          `{page}`,
+          ``,
+          `If you'd like, reply to this email and we can explain what we would recommend for ${organizationName} and what it would cost.`,
+          ``,
+          `No pressure — we're happy to have a conversation first.`,
+          ``,
+          `—`,
+          `NGOreality is New Zealand owned and operated.`,
+          ``,
+          `Learn more:`,
+          `https://www.ngoreality.com/public/about`,
+          ``,
+          `CEO: Al Baqshi`,
+          `Phone: +64 27 338 8500`,
         ].join('\n'),
       };
     case 'outreach_website_help':
       return {
-        subject: `[NGOreality] Website help for ${organizationName}`,
+        subject: `[NGOreality] A note for ${organizationName}`,
         body: [
-          `Kia ora,`,
+          `Kia ora ${organizationName},`,
           ``,
-          `Our systems flagged that the website for ${organizationName} may be unreachable or returning errors${extra?.errorDetail ? ` (${extra.errorDetail})` : ''}.`,
+          `We came across ${organizationName} while looking at New Zealand charities and noticed your website does not appear to be loading at the moment.`,
           ``,
-          `NGOreality members receive monitoring alerts with Reality Badge membership (NZD $70 / year). We can also help fix or replace a site with our trust landing page package (NZD $650).`,
+          `That happens more often than people think, and it is not a criticism. When a site is down, it is simply harder for people to find you and understand the work you do.`,
           ``,
-          `If you would like support, reply to this email or claim your profile:`,
-          signupUrl,
+          `We're not suggesting you need an expensive new website.`,
           ``,
-          OUTREACH_NZ_FOOTER,
+          `Sometimes a clear public profile and a simple trust-focused page are enough — and if you would like us to build that for ${organizationName}, a trust landing page is NZD $650, one-off. We build it at that fixed price.`,
+          ``,
+          `You can claim your NGOreality profile here:`,
+          `{page}`,
+          ``,
+          `If you'd like, reply to this email and we can explain what we would recommend for ${organizationName} and what it would cost.`,
+          ``,
+          `No pressure — we're happy to have a conversation first.`,
+          ``,
+          `—`,
+          `NGOreality is New Zealand owned and operated.`,
+          ``,
+          `Learn more:`,
+          `https://www.ngoreality.com/public/about`,
+          ``,
+          `CEO: Al Baqshi`,
+          `Phone: +64 27 338 8500`,
         ].join('\n'),
       };
     default:
