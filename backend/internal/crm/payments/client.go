@@ -32,6 +32,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -123,9 +124,9 @@ func (c *Client) bearer(ctx context.Context) (string, error) {
 	}
 
 	var out struct {
-		AccessToken string `json:"access_token"`
-		TokenType   string `json:"token_type"`
-		ExpiresIn   int64  `json:"expires_in"`
+		AccessToken string        `json:"access_token"`
+		TokenType   string        `json:"token_type"`
+		ExpiresIn   flexibleInt64 `json:"expires_in"`
 	}
 	if err := json.Unmarshal(body, &out); err != nil {
 		return "", fmt.Errorf("paymark token: decode: %w", err)
@@ -144,6 +145,27 @@ func (c *Client) bearer(ctx context.Context) (string, error) {
 	c.token = out.AccessToken
 	c.tokenExp = time.Now().Add(ttl - tokenSkew)
 	return c.token, nil
+}
+
+// flexibleInt64 decodes a JSON number or a numeric string.
+//
+// Paymark's /bearer (an Apigee token endpoint) sends expires_in as a string —
+// "3599", not 3599. Decoding strictly into int64 failed every token request,
+// so no payment could ever start. Accept both, since the docs show neither.
+type flexibleInt64 int64
+
+func (f *flexibleInt64) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(strings.TrimSpace(string(b)), `"`)
+	if s == "" || s == "null" {
+		*f = 0
+		return nil
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return fmt.Errorf("expected an integer, got %s", b)
+	}
+	*f = flexibleInt64(n)
+	return nil
 }
 
 // IntentRequest is one payment to start.
