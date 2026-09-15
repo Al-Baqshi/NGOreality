@@ -151,6 +151,16 @@ export async function setOutreachScheduleStatus(
   return data as OutreachSchedule;
 }
 
+export async function deleteOutreachSchedule(
+  scheduleId: string,
+): Promise<{ deleted: boolean; held_cancelled: number }> {
+  const { data, error } = await supabase.rpc('outreach_schedule_delete', {
+    p_schedule_id: scheduleId,
+  });
+  if (error) throw new Error(error.message);
+  return data as { deleted: boolean; held_cancelled: number };
+}
+
 export async function addScheduleRecipientsByFilter(
   scheduleId: string,
   options: {

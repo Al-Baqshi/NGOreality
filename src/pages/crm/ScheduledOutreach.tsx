@@ -21,6 +21,7 @@ import {
   addDaysIso,
   addScheduleRecipientsByFilter,
   addScheduleRecipientsByIds,
+  deleteOutreachSchedule,
   fetchScheduleSummary,
   listOutreachSchedules,
   nzTodayIso,
@@ -439,6 +440,34 @@ export default function ScheduledOutreach() {
       void load('soft', updated.id);
     } catch (e) {
       setNotice(captureError(e, { where: 'ScheduledOutreach.cancel' }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!scheduleId) return;
+    const ok = await confirm({
+      title: 'Delete this schedule?',
+      description:
+        `Permanently removes “${name}”, its roster, and cancels held emails waiting to send. ` +
+        'Emails already released to the queue may still deliver.',
+      confirmLabel: 'Delete schedule',
+    });
+    if (!ok) return;
+    setBusy(true);
+    clearNotices();
+    try {
+      const result = await deleteOutreachSchedule(scheduleId);
+      setNotice(
+        `Schedule deleted${result.held_cancelled ? ` · ${result.held_cancelled} held email(s) cancelled` : ''}.`,
+      );
+      setNoticeIsError(false);
+      await handleNew();
+      bumpListAndRoster();
+    } catch (e) {
+      setNoticeIsError(true);
+      setNotice(captureError(e, { where: 'ScheduledOutreach.delete' }));
     } finally {
       setBusy(false);
     }
@@ -911,6 +940,16 @@ export default function ScheduledOutreach() {
               className="btn-brutal-outline text-sm min-h-[44px] px-4 inline-flex items-center gap-2 text-accent"
             >
               <XCircle size={16} /> Cancel
+            </button>
+          )}
+          {scheduleId && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void handleDelete()}
+              className="btn-brutal-outline text-sm min-h-[44px] px-4 inline-flex items-center gap-2 text-accent"
+            >
+              <Trash2 size={16} /> Delete schedule
             </button>
           )}
           <button
