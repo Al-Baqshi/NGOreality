@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // AUTHORISED is the status Online EFTPOS actually returns for a successful
@@ -183,6 +184,47 @@ func TestCreateIntentSendsExpectedRequest(t *testing.T) {
 	}
 	if body["integrationMode"] != "HOSTED" {
 		t.Errorf("integrationMode = %v, want HOSTED", body["integrationMode"])
+	}
+}
+
+// Paymark's sandbox /bearer really returns expires_in as a string. Decoding it
+// as a number failed every token request and no payment could start.
+func TestBearerAcceptsStringExpiresIn(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Shape captured from apitest.paymark.nz/bearer, token replaced.
+		_, _ = w.Write([]byte(`{"issued_at":"1789434697239","status":"approved","expires_in":"3599","token_type":"BearerToken","access_token":"tok-abc"}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(Sandbox, "k", "s", "m")
+	c.baseOverride = srv.URL
+
+	tok, err := c.bearer(context.Background())
+	if err != nil {
+		t.Fatalf("bearer: %v", err)
+	}
+	if tok != "tok-abc" {
+		t.Fatalf("token = %q", tok)
+	}
+	if left := time.Until(c.tokenExp); left < 50*time.Minute || left > time.Hour {
+		t.Fatalf("token cached for %v, want about 58m", left)
+	}
+}
+
+func TestFlexibleInt64(t *testing.T) {
+	cases := map[string]int64{`3599`: 3599, `"3599"`: 3599, `""`: 0, `null`: 0}
+	for in, want := range cases {
+		var f flexibleInt64
+		if err := json.Unmarshal([]byte(in), &f); err != nil {
+			t.Fatalf("%s: %v", in, err)
+		}
+		if int64(f) != want {
+			t.Errorf("%s = %d, want %d", in, f, want)
+		}
+	}
+	var f flexibleInt64
+	if err := json.Unmarshal([]byte(`"soon"`), &f); err == nil {
+		t.Error(`"soon" should not decode`)
 	}
 }
 
