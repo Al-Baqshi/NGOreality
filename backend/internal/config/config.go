@@ -21,6 +21,7 @@ type Config struct {
 	MonitorStatuses       []string
 	ResendAPIKey          string
 	NotifyFromEmail       string
+	NotifyReplyTo         string
 	NotifyStaffEmail      string
 	TurnstileSecretKey    string
 	AllowedOrigins        []string
@@ -94,6 +95,7 @@ func Load() (Config, error) {
 		// The verified Resend domain is contact.ngoreality.com, NOT the apex.
 		// Sending from an unverified domain is rejected outright by Resend.
 		NotifyFromEmail:    envString("NOTIFY_FROM_EMAIL", "NGOreality <notifications@contact.ngoreality.com>"),
+		NotifyReplyTo:      envString("NOTIFY_REPLY_TO", "hello@ngoreality.com"),
 		NotifyStaffEmail:   strings.TrimSpace(os.Getenv("NOTIFY_STAFF_EMAIL")),
 		TurnstileSecretKey: strings.TrimSpace(os.Getenv("TURNSTILE_SECRET_KEY")),
 		AllowedOrigins:     trimmedOrigins,

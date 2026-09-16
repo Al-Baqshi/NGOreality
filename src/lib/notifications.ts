@@ -10,10 +10,14 @@ export type NotificationTemplate =
   | 'badge_request_received'
   | OutreachEmailTemplate;
 
+/** Inbox charities should reply to. Also set as Resend reply_to on send. */
+export const OUTREACH_REPLY_EMAIL = 'hello@ngoreality.com';
+
 /** NZ ownership / contact line on every outreach email. */
 export const OUTREACH_NZ_FOOTER = [
   `—`,
   `NGOreality is New Zealand owned and operated.`,
+  `Email: ${OUTREACH_REPLY_EMAIL}`,
   `Phone: +64 27 338 8500`,
 ].join('\n');
 
@@ -21,6 +25,16 @@ export const OUTREACH_NZ_FOOTER = [
 export function withOutreachNzFooter(body: string): string {
   const text = (body ?? '').trimEnd();
   if (!text) return OUTREACH_NZ_FOOTER;
+  if (text.includes(OUTREACH_REPLY_EMAIL)) {
+    if (text.includes('+64 27 338 8500')) return text;
+    return `${text}\n\n${OUTREACH_NZ_FOOTER}`;
+  }
+  if (text.includes('Phone: +64 27 338 8500')) {
+    return text.replace(
+      'Phone: +64 27 338 8500',
+      `Email: ${OUTREACH_REPLY_EMAIL}\nPhone: +64 27 338 8500`,
+    );
+  }
   if (text.includes('+64 27 338 8500')) return text;
   return `${text}\n\n${OUTREACH_NZ_FOOTER}`;
 }
@@ -131,6 +145,7 @@ function buildMessage(
           `https://www.ngoreality.com/public/about`,
           ``,
           `CEO: Al Baqshi`,
+          `Email: ${OUTREACH_REPLY_EMAIL}`,
           `Phone: +64 27 338 8500`,
         ].join('\n'),
       };
@@ -162,6 +177,7 @@ function buildMessage(
           `https://www.ngoreality.com/public/about`,
           ``,
           `CEO: Al Baqshi`,
+          `Email: ${OUTREACH_REPLY_EMAIL}`,
           `Phone: +64 27 338 8500`,
         ].join('\n'),
       };
@@ -193,6 +209,7 @@ function buildMessage(
           `https://www.ngoreality.com/public/about`,
           ``,
           `CEO: Al Baqshi`,
+          `Email: ${OUTREACH_REPLY_EMAIL}`,
           `Phone: +64 27 338 8500`,
         ].join('\n'),
       };

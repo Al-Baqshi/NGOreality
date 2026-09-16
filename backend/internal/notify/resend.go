@@ -14,14 +14,16 @@ import (
 type ResendClient struct {
 	apiKey     string
 	from       string
+	replyTo    string
 	staffBCC   string
 	httpClient *http.Client
 }
 
-func NewResendClient(apiKey, from, staffBCC string) *ResendClient {
+func NewResendClient(apiKey, from, replyTo, staffBCC string) *ResendClient {
 	return &ResendClient{
 		apiKey:   strings.TrimSpace(apiKey),
 		from:     strings.TrimSpace(from),
+		replyTo:  strings.TrimSpace(replyTo),
 		staffBCC: strings.TrimSpace(staffBCC),
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
@@ -36,6 +38,7 @@ func (c *ResendClient) Enabled() bool {
 type sendPayload struct {
 	From    string   `json:"from"`
 	To      []string `json:"to"`
+	ReplyTo string   `json:"reply_to,omitempty"`
 	BCC     []string `json:"bcc,omitempty"`
 	Subject string   `json:"subject"`
 	Text    string   `json:"text"`
@@ -53,6 +56,7 @@ func (c *ResendClient) Send(ctx context.Context, to, subject, text string) error
 	body := sendPayload{
 		From:    c.from,
 		To:      []string{to},
+		ReplyTo: c.replyTo,
 		Subject: subject,
 		Text:    text,
 	}

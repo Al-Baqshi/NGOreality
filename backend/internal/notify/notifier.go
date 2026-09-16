@@ -20,7 +20,7 @@ func New(log *slog.Logger, cfg config.Config) *Notifier {
 	}
 	return &Notifier{
 		log:    log,
-		resend: NewResendClient(cfg.ResendAPIKey, cfg.NotifyFromEmail, cfg.NotifyStaffEmail),
+		resend: NewResendClient(cfg.ResendAPIKey, cfg.NotifyFromEmail, cfg.NotifyReplyTo, cfg.NotifyStaffEmail),
 	}
 }
 

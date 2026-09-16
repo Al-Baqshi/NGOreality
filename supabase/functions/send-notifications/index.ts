@@ -34,6 +34,7 @@ const MAX_ATTEMPTS = 5;
 // function parks as 'failed' — so getting this wrong means every email silently
 // dies. Keep in step with what is verified in the Resend dashboard.
 const DEFAULT_FROM = "NGOreality <notifications@contact.ngoreality.com>";
+const DEFAULT_REPLY_TO = "hello@ngoreality.com";
 
 interface NotificationEvent {
   id: string;
@@ -51,6 +52,19 @@ function secretsMatch(a: string, b: string): boolean {
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
+}
+
+/** Ensure outreach mail names the inbox people should write to. */
+function withOutreachReplyDetails(body: string): string {
+  const text = (body ?? "").trimEnd();
+  if (text.includes("hello@ngoreality.com")) return text;
+  if (text.includes("Phone: +64 27 338 8500")) {
+    return text.replace(
+      "Phone: +64 27 338 8500",
+      "Email: hello@ngoreality.com\nPhone: +64 27 338 8500",
+    );
+  }
+  return `${text}\n\n—\nNGOreality is New Zealand owned and operated.\nEmail: hello@ngoreality.com\nPhone: +64 27 338 8500`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -87,7 +101,7 @@ Deno.serve(async (req: Request) => {
 
   const resendKey = Deno.env.get("RESEND_API_KEY");
   const fromEmail = Deno.env.get("NOTIFY_FROM_EMAIL") ?? DEFAULT_FROM;
-  const replyTo = Deno.env.get("NOTIFY_REPLY_TO") ?? "";
+  const replyTo = (Deno.env.get("NOTIFY_REPLY_TO") ?? "").trim() || DEFAULT_REPLY_TO;
   const unsubBase = Deno.env.get("NOTIFY_UNSUBSCRIBE_URL") ??
     `${Deno.env.get("SUPABASE_URL") ?? ""}/functions/v1/unsubscribe`;
 
@@ -117,7 +131,7 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         from: fromEmail,
         to: [testTo],
-        ...(replyTo ? { reply_to: replyTo } : {}),
+        reply_to: replyTo,
         subject: "[NGOreality] Email delivery test",
         text:
           "This is a delivery test from the NGOreality notification pipeline.\n\n" +
@@ -221,9 +235,7 @@ Deno.serve(async (req: Request) => {
       };
 
       const rawBody = typeof ev.body_text === "string" ? ev.body_text : "";
-      const bodyText = isOutreach && !rawBody.includes("+64 27 338 8500")
-        ? `${rawBody.trimEnd()}\n\n—\nNGOreality is New Zealand owned and operated.\nPhone: +64 27 338 8500`
-        : rawBody;
+      const bodyText = isOutreach ? withOutreachReplyDetails(rawBody) : rawBody;
 
       const payload: Record<string, unknown> = {
         from: fromEmail,
@@ -233,8 +245,8 @@ Deno.serve(async (req: Request) => {
         // Opt-out is handled via List-Unsubscribe headers below (Gmail/Outlook
         // show a native Unsubscribe control; the link is not duplicated in text).
         text: bodyText,
+        reply_to: replyTo,
       };
-      if (replyTo) payload.reply_to = replyTo;
 
       // RFC 8058 one-click. Mailbox providers surface this as a native
       // "unsubscribe" control, and its absence on bulk mail is itself a
