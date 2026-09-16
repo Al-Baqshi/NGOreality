@@ -249,6 +249,7 @@ Deno.serve(async (req) => {
     event = new Webhook(hookSecret).verify(payload, headers) as HookPayload;
   } catch (err) {
     const message = err instanceof Error ? err.message : "invalid signature";
+    console.error("auth-send-email: webhook verify failed", message);
     return json({ error: { http_code: 401, message } }, 401);
   }
 
@@ -294,6 +295,7 @@ Deno.serve(async (req) => {
 
   if (!res.ok) {
     const detail = (await res.text()).slice(0, 500);
+    console.error("auth-send-email: resend failed", action, res.status, detail);
     return json({
       error: {
         http_code: res.status,
@@ -302,5 +304,6 @@ Deno.serve(async (req) => {
     }, 500);
   }
 
+  console.log("auth-send-email: sent", action);
   return json({});
 });

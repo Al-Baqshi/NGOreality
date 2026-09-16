@@ -216,6 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fullName: string,
       extraMetadata?: Record<string, unknown>,
     ) => {
+      const emailRedirectTo = `${window.location.origin}/ngo/signup`;
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -238,7 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           //
           // window.location.origin so preview deploys confirm back to
           // themselves instead of production.
-          emailRedirectTo: `${window.location.origin}/ngo/signup`,
+          emailRedirectTo,
         },
       });
       // Email-enumeration protection: an existing account still returns 200
@@ -246,6 +247,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // sent. Treat that as "already registered" so the form does not claim
       // we just emailed them.
       const alreadyRegistered = Boolean(data?.user) && (data.user?.identities?.length ?? 0) === 0;
+
+      // Repeating signup for an unconfirmed address does not send mail again.
+      // confirmation_sent_at is fresh only when THIS call actually queued one.
+      // Anything older (or missing) is a retry — resend so they are not stuck
+      // on "check your email" with an empty inbox.
+      if (!error && !data.session) {
+        const sentAt = data.user?.confirmation_sent_at;
+        const justSent = Boolean(sentAt) && Date.now() - Date.parse(sentAt) < 20_000;
+        if (!justSent) {
+          await supabase.auth.resend({
+            type: 'signup',
+            email: email.trim(),
+            options: { emailRedirectTo },
+          });
+        }
+      }
+
       return { error: error?.message ?? null, alreadyRegistered };
     },
     [],
