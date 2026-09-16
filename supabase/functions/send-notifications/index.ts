@@ -35,6 +35,8 @@ const MAX_ATTEMPTS = 5;
 // dies. Keep in step with what is verified in the Resend dashboard.
 const DEFAULT_FROM = "NGOreality <notifications@contact.ngoreality.com>";
 const DEFAULT_REPLY_TO = "hello@ngoreality.com";
+const LINKEDIN_COMPANY_URL = "https://www.linkedin.com/company/ngoreality";
+const LINKEDIN_FOLLOW = `Follow us on LinkedIn:\n${LINKEDIN_COMPANY_URL}`;
 
 interface NotificationEvent {
   id: string;
@@ -54,17 +56,34 @@ function secretsMatch(a: string, b: string): boolean {
   return diff === 0;
 }
 
-/** Ensure outreach mail names the inbox people should write to. */
+/** Ensure outreach mail names the inbox people should write to, and LinkedIn. */
 function withOutreachReplyDetails(body: string): string {
-  const text = (body ?? "").trimEnd();
-  if (text.includes("hello@ngoreality.com")) return text;
-  if (text.includes("Phone: +64 27 338 8500")) {
+  let text = (body ?? "").trimEnd();
+  if (!text.includes("hello@ngoreality.com")) {
+    if (text.includes("Phone: +64 27 338 8500")) {
+      text = text.replace(
+        "Phone: +64 27 338 8500",
+        "Email: hello@ngoreality.com\nPhone: +64 27 338 8500",
+      );
+    } else {
+      text =
+        `${text}\n\n—\nNGOreality is New Zealand owned and operated.\nEmail: hello@ngoreality.com\nPhone: +64 27 338 8500`;
+    }
+  }
+  if (text.includes("linkedin.com/company/ngoreality")) return text;
+  if (text.includes("https://www.ngoreality.com/public/about")) {
     return text.replace(
-      "Phone: +64 27 338 8500",
-      "Email: hello@ngoreality.com\nPhone: +64 27 338 8500",
+      "https://www.ngoreality.com/public/about",
+      `https://www.ngoreality.com/public/about\n\n${LINKEDIN_FOLLOW}`,
     );
   }
-  return `${text}\n\n—\nNGOreality is New Zealand owned and operated.\nEmail: hello@ngoreality.com\nPhone: +64 27 338 8500`;
+  if (text.includes("Email: hello@ngoreality.com")) {
+    return text.replace(
+      "Email: hello@ngoreality.com",
+      `Email: hello@ngoreality.com\nLinkedIn: ${LINKEDIN_COMPANY_URL}`,
+    );
+  }
+  return `${text}\n\n${LINKEDIN_FOLLOW}`;
 }
 
 Deno.serve(async (req: Request) => {

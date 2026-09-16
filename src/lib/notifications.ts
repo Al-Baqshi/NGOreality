@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { SITE_URL } from '../config/site';
+import { LINKEDIN_COMPANY_URL, SITE_URL } from '../config/site';
 import { captureEmptyMutation, captureError } from './errorReporting';
 import type { OutreachEmailTemplate } from '../types';
 
@@ -13,30 +13,62 @@ export type NotificationTemplate =
 /** Inbox charities should reply to. Also set as Resend reply_to on send. */
 export const OUTREACH_REPLY_EMAIL = 'hello@ngoreality.com';
 
+const OUTREACH_LINKEDIN_LINES = [
+  `Follow us on LinkedIn:`,
+  LINKEDIN_COMPANY_URL,
+].join('\n');
+
 /** NZ ownership / contact line on every outreach email. */
 export const OUTREACH_NZ_FOOTER = [
   `—`,
   `NGOreality is New Zealand owned and operated.`,
+  `Learn more:`,
+  `https://www.ngoreality.com/public/about`,
+  ``,
+  OUTREACH_LINKEDIN_LINES,
+  ``,
+  `CEO: Al Baqshi`,
   `Email: ${OUTREACH_REPLY_EMAIL}`,
   `Phone: +64 27 338 8500`,
 ].join('\n');
+
+function withLinkedInFollow(text: string): string {
+  if (text.includes('linkedin.com/company/ngoreality')) return text;
+  if (text.includes('https://www.ngoreality.com/public/about')) {
+    return text.replace(
+      'https://www.ngoreality.com/public/about',
+      `https://www.ngoreality.com/public/about\n\n${OUTREACH_LINKEDIN_LINES}`,
+    );
+  }
+  if (text.includes(`Email: ${OUTREACH_REPLY_EMAIL}`)) {
+    return text.replace(
+      `Email: ${OUTREACH_REPLY_EMAIL}`,
+      `Email: ${OUTREACH_REPLY_EMAIL}\nLinkedIn: ${LINKEDIN_COMPANY_URL}`,
+    );
+  }
+  return `${text}\n\n${OUTREACH_LINKEDIN_LINES}`;
+}
 
 /** Append the NZ footer unless the phone line is already present. */
 export function withOutreachNzFooter(body: string): string {
   const text = (body ?? '').trimEnd();
   if (!text) return OUTREACH_NZ_FOOTER;
   if (text.includes(OUTREACH_REPLY_EMAIL)) {
-    if (text.includes('+64 27 338 8500')) return text;
-    return `${text}\n\n${OUTREACH_NZ_FOOTER}`;
+    const withPhone = text.includes('+64 27 338 8500')
+      ? text
+      : `${text}\n\n${OUTREACH_NZ_FOOTER}`;
+    return withLinkedInFollow(withPhone);
   }
   if (text.includes('Phone: +64 27 338 8500')) {
-    return text.replace(
-      'Phone: +64 27 338 8500',
-      `Email: ${OUTREACH_REPLY_EMAIL}\nPhone: +64 27 338 8500`,
+    return withLinkedInFollow(
+      text.replace(
+        'Phone: +64 27 338 8500',
+        `Email: ${OUTREACH_REPLY_EMAIL}\nPhone: +64 27 338 8500`,
+      ),
     );
   }
-  if (text.includes('+64 27 338 8500')) return text;
-  return `${text}\n\n${OUTREACH_NZ_FOOTER}`;
+  if (text.includes('+64 27 338 8500')) return withLinkedInFollow(text);
+  return withLinkedInFollow(`${text}\n\n${OUTREACH_NZ_FOOTER}`);
 }
 
 /** Absolute URL of an organisation's public directory page (`/public/org/<slug>`). */
@@ -63,6 +95,7 @@ function buildMessage(
           `As an NGOreality member you receive this alert automatically. If you need hands-on help fixing the issue, reply to this email — support is billed separately from your annual membership.`,
           ``,
           `— NGOreality monitoring`,
+          `Follow us on LinkedIn: ${LINKEDIN_COMPANY_URL}`,
         ].join('\n'),
       };
     case 'badge_issued':
@@ -75,6 +108,7 @@ function buildMessage(
           `Your membership includes website monitoring for one year. We will email you if your site goes down.`,
           ``,
           `— NGOreality`,
+          `Follow us on LinkedIn: ${LINKEDIN_COMPANY_URL}`,
         ]
           .filter(Boolean)
           .join('\n'),
@@ -94,6 +128,7 @@ function buildMessage(
           `Consulting, custom sites, and hands-on support are available separately.`,
           ``,
           `— NGOreality`,
+          `Follow us on LinkedIn: ${LINKEDIN_COMPANY_URL}`,
         ].join('\n'),
       };
     case 'badge_request_received': {
@@ -116,6 +151,7 @@ function buildMessage(
           `Paymark (Online EFTPOS) and Airwallex payments are coming soon to the portal.`,
           ``,
           `— NGOreality`,
+          `Follow us on LinkedIn: ${LINKEDIN_COMPANY_URL}`,
         ].join('\n'),
       };
     }
@@ -143,6 +179,9 @@ function buildMessage(
           ``,
           `Learn more:`,
           `https://www.ngoreality.com/public/about`,
+          ``,
+          `Follow us on LinkedIn:`,
+          LINKEDIN_COMPANY_URL,
           ``,
           `CEO: Al Baqshi`,
           `Email: ${OUTREACH_REPLY_EMAIL}`,
@@ -176,6 +215,9 @@ function buildMessage(
           `Learn more:`,
           `https://www.ngoreality.com/public/about`,
           ``,
+          `Follow us on LinkedIn:`,
+          LINKEDIN_COMPANY_URL,
+          ``,
           `CEO: Al Baqshi`,
           `Email: ${OUTREACH_REPLY_EMAIL}`,
           `Phone: +64 27 338 8500`,
@@ -207,6 +249,9 @@ function buildMessage(
           ``,
           `Learn more:`,
           `https://www.ngoreality.com/public/about`,
+          ``,
+          `Follow us on LinkedIn:`,
+          LINKEDIN_COMPANY_URL,
           ``,
           `CEO: Al Baqshi`,
           `Email: ${OUTREACH_REPLY_EMAIL}`,

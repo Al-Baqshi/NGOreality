@@ -52,7 +52,8 @@ interface AuthContextValue {
     password: string,
     fullName: string,
     extraMetadata?: Record<string, unknown>,
-  ) => Promise<{ error: string | null }>;
+  ) => Promise<{ error: string | null; alreadyRegistered: boolean }>;
+  resendSignupEmail: (email: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -215,7 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fullName: string,
       extraMetadata?: Record<string, unknown>,
     ) => {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -240,10 +241,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           emailRedirectTo: `${window.location.origin}/ngo/signup`,
         },
       });
-      return { error: error?.message ?? null };
+      // Email-enumeration protection: an existing account still returns 200
+      // with a user object whose identities array is empty, and no mail is
+      // sent. Treat that as "already registered" so the form does not claim
+      // we just emailed them.
+      const alreadyRegistered = Boolean(data?.user) && (data.user?.identities?.length ?? 0) === 0;
+      return { error: error?.message ?? null, alreadyRegistered };
     },
     [],
   );
+
+  const resendSignupEmail = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: { emailRedirectTo: `${window.location.origin}/ngo/signup` },
+    });
+    return { error: error?.message ?? null };
+  }, []);
 
   // Sign out of BOTH issuers. A user who has been on each at different times
   // must not be left half signed-in, still holding a usable refresh token.
@@ -275,11 +290,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signInAsStaff,
       signUp,
+      resendSignupEmail,
       signOut,
     }),
     [
       user, session, centralUser, isAuthenticated, profile, isStaff,
-      loading, profileLoading, profileError, refetchProfile, signIn, signInAsStaff, signUp, signOut,
+      loading, profileLoading, profileError, refetchProfile, signIn, signInAsStaff, signUp,
+      resendSignupEmail, signOut,
     ],
   );
 

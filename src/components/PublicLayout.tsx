@@ -1,8 +1,9 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
-import { LogIn, Menu, X } from 'lucide-react';
+import { LogIn, Linkedin, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import BrandLogo from './BrandLogo';
 import ThemeToggle from './ThemeToggle';
+import { LINKEDIN_COMPANY_URL } from '../config/site';
 
 // "Home" is gone — the logo already links there, and every slot the menu
 // gives up makes the rest read less like a site map. "Verified" stays out for
@@ -181,6 +182,15 @@ export default function PublicLayout() {
                 <NavLink to="/public/privacy" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Privacy Policy</NavLink>
                 <NavLink to="/public/terms" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Terms of Service</NavLink>
                 <NavLink to="/public/data-processing" className="block text-xs text-ink-400 hover:text-white transition-colors py-0.5">Data Processing</NavLink>
+                <a
+                  href={LINKEDIN_COMPANY_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-ink-400 hover:text-white transition-colors py-0.5 min-h-[44px] sm:min-h-0"
+                >
+                  <Linkedin size={12} aria-hidden />
+                  LinkedIn
+                </a>
               </div>
             </div>
           </div>

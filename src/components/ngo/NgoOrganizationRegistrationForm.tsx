@@ -104,7 +104,7 @@ export default function NgoOrganizationRegistrationForm({
   compact = false,
   prefillOrgId = null,
 }: NgoOrganizationRegistrationFormProps) {
-  const { signUp, user } = useAuth();
+  const { signUp, resendSignupEmail, user } = useAuth();
   const [mode, setMode] = useState<SignupMode>('existing');
   const [selectedOrg, setSelectedOrg] = useState<ClaimSearchOrganization | null>(null);
   const [prefillLoading, setPrefillLoading] = useState(Boolean(prefillOrgId));
@@ -122,6 +122,9 @@ export default function NgoOrganizationRegistrationForm({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [resendError, setResendError] = useState('');
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [alreadyManaged, setAlreadyManaged] = useState<AlreadyManagedState | null>(null);
   const [resuming, setResuming] = useState(false);
@@ -323,7 +326,7 @@ export default function NgoOrganizationRegistrationForm({
       // Carry the chosen organisation through the email-confirmation
       // round-trip: if no session comes back, the first login resumes it.
       const pending = pendingRegistrationMetadata();
-      const { error: signUpError } = await signUp(
+      const { error: signUpError, alreadyRegistered: emailTaken } = await signUp(
         form.email,
         form.password,
         form.fullName,
@@ -339,6 +342,7 @@ export default function NgoOrganizationRegistrationForm({
       userId = sessionData.session?.user?.id;
 
       if (!userId) {
+        setAlreadyRegistered(emailTaken);
         setCheckEmail(true);
         setSubmitting(false);
         return;
@@ -366,19 +370,70 @@ export default function NgoOrganizationRegistrationForm({
     }
   };
 
+  const handleResendConfirmation = async () => {
+    if (resendState === 'sending') return;
+    setResendState('sending');
+    setResendError('');
+    const { error: resendErr } = await resendSignupEmail(form.email);
+    if (resendErr) {
+      setResendState('error');
+      setResendError(resendErr);
+      return;
+    }
+    setResendState('sent');
+    window.setTimeout(() => setResendState('idle'), 30_000);
+  };
+
   if (checkEmail) {
+    const orgLine =
+      mode === 'existing' && selectedOrg
+        ? ` ${selectedOrg.name} will be linked to your account automatically.`
+        : ' your organization will be set up automatically.';
+
     return (
       <div className={`card-brutal text-center ${compact ? 'p-5' : 'p-6 sm:p-8'}`}>
-        <h2 className="text-lg font-black uppercase tracking-tight mb-3">Check your email</h2>
-        <p className="text-sm text-ink-500 mb-6">
-          We sent a confirmation link to <strong>{form.email}</strong>. After confirming, sign in —
-          {mode === 'existing' && selectedOrg
-            ? ` ${selectedOrg.name} will be linked to your account automatically.`
-            : ' your organization will be set up automatically.'}
+        <h2 className="text-lg font-black uppercase tracking-tight mb-3">
+          {alreadyRegistered ? 'Account already exists' : 'Check your email'}
+        </h2>
+        <p className="text-sm text-ink-500 mb-4">
+          {alreadyRegistered ? (
+            <>
+              <strong>{form.email}</strong> is already registered. Sign in if you have confirmed
+              this address. If you never got the confirmation email, resend it below.
+            </>
+          ) : (
+            <>
+              We sent a confirmation link to <strong>{form.email}</strong>. After confirming, sign
+              in —{orgLine}
+            </>
+          )}
         </p>
-        <Link to="/ngo/login" className="btn-brutal-accent inline-block min-h-[44px] px-6 leading-[44px]">
-          Go to sign in
-        </Link>
+        <p className="text-xs text-ink-400 mb-6">
+          Check spam and promotions if it is not in your inbox. The link comes from
+          notifications@contact.ngoreality.com.
+        </p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => void handleResendConfirmation()}
+            disabled={resendState === 'sending' || resendState === 'sent'}
+            className="btn-brutal-outline inline-block min-h-[44px] px-6 text-sm disabled:opacity-60"
+          >
+            {resendState === 'sending'
+              ? 'Sending…'
+              : resendState === 'sent'
+                ? 'Link sent'
+                : 'Resend confirmation'}
+          </button>
+          <Link to="/ngo/login" className="btn-brutal-accent inline-block min-h-[44px] px-6 leading-[44px]">
+            Go to sign in
+          </Link>
+        </div>
+        {resendError ? (
+          <p className="mt-4 text-sm text-accent" role="alert">
+            {resendError}
+          </p>
+        ) : null}
       </div>
     );
   }

@@ -2,6 +2,9 @@
 /** Vercel serves production on www; apex redirects to www. Do not add www→apex redirects in vercel.json. */
 export const SITE_URL = (import.meta.env.VITE_SITE_URL || 'https://www.ngoreality.com').replace(/\/$/, '');
 
+/** Company page charities are invited to follow from outreach and the public site. */
+export const LINKEDIN_COMPANY_URL = 'https://www.linkedin.com/company/ngoreality';
+
 export function absoluteUrl(path = ''): string {
   if (!path || path === '/') return SITE_URL;
   return `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`;
