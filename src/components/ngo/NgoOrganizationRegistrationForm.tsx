@@ -395,11 +395,11 @@ export default function NgoOrganizationRegistrationForm({
         <h2 className="text-lg font-black uppercase tracking-tight mb-3">
           {alreadyRegistered ? 'Account already exists' : 'Check your email'}
         </h2>
-        <p className="text-sm text-ink-500 mb-4">
+        <p className="text-sm text-ink-500 mb-6">
           {alreadyRegistered ? (
             <>
-              <strong>{form.email}</strong> is already registered. Sign in if you have confirmed
-              this address. If you never got the confirmation email, resend it below.
+              <strong>{form.email}</strong> is already registered and confirmed. There is no
+              confirmation email to send. Sign in with this address and the password you set.
             </>
           ) : (
             <>
@@ -408,23 +408,27 @@ export default function NgoOrganizationRegistrationForm({
             </>
           )}
         </p>
-        <p className="text-xs text-ink-400 mb-6">
-          Check spam and promotions if it is not in your inbox. The link comes from
-          notifications@contact.ngoreality.com.
-        </p>
+        {!alreadyRegistered ? (
+          <p className="text-xs text-ink-400 mb-6">
+            Check spam and promotions if it is not in your inbox. The link comes from
+            notifications@contact.ngoreality.com.
+          </p>
+        ) : null}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={() => void handleResendConfirmation()}
-            disabled={resendState === 'sending' || resendState === 'sent'}
-            className="btn-brutal-outline inline-block min-h-[44px] px-6 text-sm disabled:opacity-60"
-          >
-            {resendState === 'sending'
-              ? 'Sending…'
-              : resendState === 'sent'
-                ? 'Link sent'
-                : 'Resend confirmation'}
-          </button>
+          {!alreadyRegistered ? (
+            <button
+              type="button"
+              onClick={() => void handleResendConfirmation()}
+              disabled={resendState === 'sending' || resendState === 'sent'}
+              className="btn-brutal-outline inline-block min-h-[44px] px-6 text-sm disabled:opacity-60"
+            >
+              {resendState === 'sending'
+                ? 'Sending…'
+                : resendState === 'sent'
+                  ? 'Link sent'
+                  : 'Resend confirmation'}
+            </button>
+          ) : null}
           <Link to="/ngo/login" className="btn-brutal-accent inline-block min-h-[44px] px-6 leading-[44px]">
             Go to sign in
           </Link>

@@ -252,7 +252,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // confirmation_sent_at is fresh only when THIS call actually queued one.
       // Anything older (or missing) is a retry — resend so they are not stuck
       // on "check your email" with an empty inbox.
-      if (!error && !data.session) {
+      //
+      // Skip when identities is empty: that is a confirmed account (email
+      // enumeration fake). resend({ type: 'signup' }) then returns 200 and
+      // sends nothing.
+      if (!error && !data.session && !alreadyRegistered) {
         const sentAt = data.user?.confirmation_sent_at;
         const justSent =
           typeof sentAt === 'string' && Date.now() - Date.parse(sentAt) < 20_000;
