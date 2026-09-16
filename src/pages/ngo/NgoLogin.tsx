@@ -2,11 +2,9 @@ import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getIdentity, CrmApiError } from '../../lib/crmApi';
 import { supabase } from '../../lib/supabase';
 import { getPendingRegistration } from '../../lib/ngoSignup';
 import { captureError } from '../../lib/errorReporting';
-import { BAQSHI_FORGOT_PASSWORD_URL } from '../../lib/baqshiAuth';
 import SEO from '../../components/SEO';
 import BrandLogo from '../../components/BrandLogo';
 import ThemeToggle from '../../components/ThemeToggle';
@@ -82,19 +80,6 @@ export default function NgoLogin() {
           destination = '/ngo/signup';
         }
       }
-    } else {
-      // Central-only account: no Supabase metadata, so the CRM seat is the
-      // only signal we have. A 403/404 means "no workspace", which the portal
-      // itself explains. Any other failure is not "signed in fine" — stay here.
-      try {
-        await getIdentity();
-      } catch (err) {
-        if (!(err instanceof CrmApiError && (err.status === 403 || err.status === 404))) {
-          setError(captureError(err, { where: 'NgoLogin.identity' }));
-          setSubmitting(false);
-          return;
-        }
-      }
     }
 
     setSubmitting(false);
@@ -129,13 +114,11 @@ export default function NgoLogin() {
             )}
 
             <div>
-              <label className="label-brutal" htmlFor="ngo-email">Email or username</label>
-              {/* type="text": the central service accepts either, and type="email"
-                  would have the browser reject a valid username before submit. */}
+              <label className="label-brutal" htmlFor="ngo-email">Email</label>
               <input
                 id="ngo-email"
-                type="text"
-                autoComplete="username"
+                type="email"
+                autoComplete="email"
                 className="input-brutal w-full text-base"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -156,14 +139,13 @@ export default function NgoLogin() {
             </div>
 
             <p className="text-right">
-              <a
-                href={BAQSHI_FORGOT_PASSWORD_URL}
-                target="_blank"
-                rel="noreferrer noopener"
+              <Link
+                to="/ngo/forgot-password"
+                state={{ email }}
                 className="text-xs text-ink-500 underline hover:text-ink-950"
               >
                 Forgot password?
-              </a>
+              </Link>
             </p>
 
             <button

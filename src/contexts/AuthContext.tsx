@@ -10,34 +10,46 @@ import {
 import type { Session, User } from '@supabase/supabase-js';
 import { fetchUserProfile, type UserProfile } from '../lib/profile';
 import { supabase } from '../lib/supabase';
-import {
-  centralSignIn,
-  centralSignOut,
-  onCentralAuthChange,
-  restoreCentralSession,
-  type CentralUser,
-} from '../lib/baqshiAuth';
 
 /**
- * Two issuers, deliberately.
+ * One issuer: Supabase Auth, for everyone.
  *
- * NGO users (clients) sign in through the central Baqshi identity service;
- * staff and the super admin stay on Supabase. The CRM API trusts both, so a
- * central token opens the workspace. `signInAsStaff` is untouched.
+ * NGO users and staff sign up, sign in, confirm their email and reset their
+ * password through Supabase. The portal reads Supabase directly under RLS on
+ * auth.uid(), so a session from anywhere else could never open it anyway.
  *
- * Note what a central-only session does NOT get: the portal screens that read
- * Supabase directly (badges, trust standards, memberships) are gated by RLS on
- * auth.uid(), which is null without a Supabase session. Those move behind the
- * Go API in a later step; until then a central user reaches their workspace,
- * not the whole portal.
+ * NGO sign-in briefly went through the central Baqshi service (auth.baqshi.com)
+ * while signup stayed here, which split every account in two: new users could
+ * not reset a password on a service they did not exist in. Keep all of the
+ * account lifecycle in one place.
  */
+
+export const RESET_PASSWORD_PATH = '/ngo/reset-password';
+
+// A recovery link is only useful on the page that sets the new password. If
+// Supabase's redirect allowlist (a dashboard setting no code can see) sends the
+// link somewhere else, the session is still established from the URL — so send
+// the user on. Subscribed at module scope, not in an effect: the client reads
+// the URL as soon as it is created, and an effect would subscribe too late to
+// see the event. The session is persisted before the event fires, so a full
+// navigation keeps it.
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY' && window.location.pathname !== RESET_PASSWORD_PATH) {
+    window.location.replace(RESET_PASSWORD_PATH);
+  }
+});
+
+// Sessions from the retired Baqshi sign-in kept a refresh token here. Nothing
+// reads it any more; do not leave a live credential behind in storage.
+try {
+  localStorage.removeItem('baqshi.refresh_token');
+} catch {
+  /* storage unavailable */
+}
 
 interface AuthContextValue {
   user: User | null;
   session: Session | null;
-  /** Set when signed in through the central Baqshi service. */
-  centralUser: CentralUser | null;
-  /** Signed in through EITHER issuer. Guards should use this, not `user`. */
   isAuthenticated: boolean;
   profile: UserProfile | null;
   isStaff: boolean;
@@ -54,6 +66,8 @@ interface AuthContextValue {
     extraMetadata?: Record<string, unknown>,
   ) => Promise<{ error: string | null; alreadyRegistered: boolean }>;
   resendSignupEmail: (email: string) => Promise<{ error: string | null }>;
+  requestPasswordReset: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -66,7 +80,6 @@ function normalizeStaffLogin(username: string): string {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [centralUser, setCentralUser] = useState<CentralUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -96,18 +109,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    // Restore both issuers before dropping the loading flag. Resolving only
-    // Supabase first would flash the login screen at a signed-in central user
-    // and bounce them out of a deep link.
     void (async () => {
-      const [{ data }, central] = await Promise.all([
-        supabase.auth.getSession(),
-        restoreCentralSession(),
-      ]);
+      const { data } = await supabase.auth.getSession();
       if (cancelled) return;
       setSession(data.session);
       setUser(data.session?.user ?? null);
-      setCentralUser(central);
       setLoading(false);
       void loadProfile(data.session?.user?.id);
     })();
@@ -119,64 +125,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void loadProfile(nextSession?.user?.id);
     });
 
-    // The client refreshes and clears sessions on its own (rotation, revoked
-    // families); mirror that into React rather than polling.
-    const offCentral = onCentralAuthChange(setCentralUser);
-
     return () => {
       cancelled = true;
       subscription.subscription.unsubscribe();
-      offCentral();
     };
   }, [loadProfile]);
 
-  /**
-   * Default sign-in for NGO users: central Baqshi auth, falling back to
-   * Supabase.
-   *
-   * Accepts a username or an email — the central service takes either, and NGO
-   * users were invited by email, so that is what they will type.
-   *
-   * WHY THE FALLBACK EXISTS. Sign-in moved to central while /ngo/signup still
-   * creates a SUPABASE account. Without this, anyone who signed up could not
-   * sign back in once their first session expired: the form asked a service
-   * they did not exist in, and "Forgot password?" sent them somewhere they had
-   * no account either. A dead end for every new user.
-   *
-   * This is not a workaround bolted on — the API already verifies both issuers
-   * (auth/central.go), so a login form that accepts both is the consistent
-   * shape for as long as two issuers exist. It goes away when signup moves to
-   * central and Supabase Auth is retired.
-   *
-   * Central is tried first because it is where users are going, not where they
-   * came from. Both services answer a bad credential identically, so trying
-   * two does not reveal which one holds an account.
-   */
-  const signIn = useCallback(async (usernameOrEmail: string, password: string) => {
-    let centralError: string | null = null;
-    try {
-      await centralSignIn(usernameOrEmail, password);
-      return { error: null };
-    } catch (err) {
-      centralError = err instanceof Error ? err.message : 'Could not sign in.';
-    }
-
-    // Supabase only understands an email address, so a username that failed
-    // centrally cannot succeed here — do not waste a round trip or a rate-limit
-    // slot on it.
-    if (!usernameOrEmail.includes('@')) {
-      return { error: centralError };
-    }
-
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
-      email: usernameOrEmail.trim(),
+      email: email.trim(),
       password,
     });
-    if (!error) return { error: null };
-
-    // Report the central failure: that is the system the user should be in,
-    // and the Supabase message would name a service they have never heard of.
-    return { error: centralError };
+    return { error: error?.message ?? null };
   }, []);
 
   const signInAsStaff = useCallback(
@@ -283,17 +243,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   }, []);
 
-  // Sign out of BOTH issuers. A user who has been on each at different times
-  // must not be left half signed-in, still holding a usable refresh token.
+  // The reset email goes out through the auth-send-email hook (Resend), like
+  // the signup confirmation. Supabase answers the same whether or not the
+  // address has an account, so the caller must not claim either way.
+  const requestPasswordReset = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}${RESET_PASSWORD_PATH}`,
+    });
+    return { error: error?.message ?? null };
+  }, []);
+
+  // Works for a recovery session (from the reset link) and for a user who is
+  // simply signed in and wants a new password.
+  const updatePassword = useCallback(async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    return { error: error?.message ?? null };
+  }, []);
+
   const signOut = useCallback(async () => {
-    await Promise.allSettled([supabase.auth.signOut(), centralSignOut()]);
+    await supabase.auth.signOut();
     setProfile(null);
     setProfileError(null);
-    setCentralUser(null);
   }, []);
 
   const isStaff = profile?.is_staff ?? false;
-  const isAuthenticated = Boolean(user || centralUser);
+  const isAuthenticated = Boolean(user);
   const refetchProfile = useCallback(async () => {
     await loadProfile(user?.id);
   }, [loadProfile, user?.id]);
@@ -302,7 +276,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       session,
-      centralUser,
       isAuthenticated,
       profile,
       isStaff,
@@ -314,12 +287,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInAsStaff,
       signUp,
       resendSignupEmail,
+      requestPasswordReset,
+      updatePassword,
       signOut,
     }),
     [
-      user, session, centralUser, isAuthenticated, profile, isStaff,
+      user, session, isAuthenticated, profile, isStaff,
       loading, profileLoading, profileError, refetchProfile, signIn, signInAsStaff, signUp,
-      resendSignupEmail, signOut,
+      resendSignupEmail, requestPasswordReset, updatePassword, signOut,
     ],
   );
 

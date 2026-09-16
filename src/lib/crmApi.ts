@@ -2,12 +2,11 @@
  * Client for the Go CRM service (Organisation Workspace).
  *
  * The CRM runs on its own Postgres, separate from Supabase — see
- * docs/CRM_SAAS.md. Authentication reuses whichever access token the user
- * already holds, so there is no second login.
+ * docs/CRM_SAAS.md. Authentication reuses the user's Supabase access token, so
+ * there is no second login.
  */
 
 import { supabase } from './supabase';
-import { getCentralAccessToken } from './baqshiAuth';
 import { captureError } from './errorReporting';
 import type {
   OrganizationRole,
@@ -88,20 +87,10 @@ export function setActiveTenant(tenantId: string | null): void {
 }
 
 /**
- * The bearer token for the CRM API.
- *
- * The Go service verifies both issuers, so either session works. Central goes
- * first because it is the NGO-user path: a client who has signed in centrally
- * should reach their workspace on that identity, not on a stale Supabase
- * session that may map to a different seat. Staff, who have no central session,
- * fall through to Supabase unchanged.
- *
- * getCentralAccessToken() refreshes when the token is missing or near expiry,
- * so callers never have to think about rotation.
+ * The bearer token for the CRM API: the Supabase session, for staff and NGO
+ * users alike. getSession() refreshes it when it is near expiry.
  */
 async function apiAccessToken(): Promise<string | null> {
-  const central = await getCentralAccessToken();
-  if (central) return central;
   const { data, error } = await supabase.auth.getSession();
   if (error) {
     captureError(error, { where: 'crmApi.getSession' });

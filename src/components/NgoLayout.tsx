@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { User, UserCircle } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { KeyRound, User } from 'lucide-react';
+import { RESET_PASSWORD_PATH, useAuth } from '../contexts/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import PortalNotificationBell from './notifications/PortalNotificationBell';
 import {
@@ -12,7 +12,6 @@ import {
 import { NgoAppSidebar } from './ngo/NgoAppSidebar';
 import { NavUser } from './nav-user';
 import { useNgoPortal } from '../hooks/useNgoPortal';
-import { BAQSHI_ACCOUNT_URL } from '../lib/baqshiAuth';
 import { SiteHeader } from './site-header';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -99,7 +98,7 @@ function NgoPortalFrame() {
               !onboarding
                 ? [
                     { title: 'Profile', url: '/ngo/profile', icon: User },
-                    { title: 'Account', url: BAQSHI_ACCOUNT_URL, icon: UserCircle },
+                    { title: 'Change password', url: RESET_PASSWORD_PATH, icon: KeyRound },
                   ]
                 : []
             }

@@ -27,7 +27,7 @@ function money(cents: number) {
 }
 
 export default function NgoServicesPage() {
-  const { user, centralUser, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { organization, refetch } = useNgoPortalContext();
   const [payments, setPayments] = useState<OrganizationPayment[]>([]);
   const [paymentsError, setPaymentsError] = useState<string | null>(null);
@@ -146,7 +146,7 @@ export default function NgoServicesPage() {
     setError(null);
     setMessage(null);
 
-    const recordedBy = user?.email ?? centralUser?.email ?? user?.id ?? centralUser?.id ?? 'ngo_portal';
+    const recordedBy = user?.email ?? user?.id ?? 'ngo_portal';
 
     try {
       const { payment, reference: ref, error: payError } = await createPendingBankPayment({

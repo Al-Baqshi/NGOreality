@@ -61,6 +61,8 @@ const ScheduledOutreach = lazy(() => import('./pages/crm/ScheduledOutreach'));
 // NGO Portal
 const NgoLogin = lazy(() => import('./pages/ngo/NgoLogin'));
 const NgoSignup = lazy(() => import('./pages/ngo/NgoSignup'));
+const NgoForgotPassword = lazy(() => import('./pages/ngo/NgoForgotPassword'));
+const NgoResetPassword = lazy(() => import('./pages/ngo/NgoResetPassword'));
 const NgoLayout = lazy(() => import('./components/NgoLayout'));
 const NgoPortalGate = lazy(() => import('./components/ngo/NgoPortalGate'));
 const NgoOverviewPage = lazy(() => import('./pages/ngo/portal/NgoOverviewPage'));
@@ -148,6 +150,10 @@ export default function App() {
           {/* NGO Portal */}
           <Route path="/ngo/login" element={<NgoLogin />} />
           <Route path="/ngo/signup" element={<NgoSignup />} />
+          <Route path="/ngo/forgot-password" element={<NgoForgotPassword />} />
+          {/* Outside NgoProtectedRoute: an expired reset link has no session,
+              and the page itself explains that instead of bouncing to login. */}
+          <Route path="/ngo/reset-password" element={<NgoResetPassword />} />
           <Route element={<NgoProtectedRoute />}>
             <Route path="/ngo" element={<NgoLayout />}>
               <Route element={<NgoPortalGate />}>

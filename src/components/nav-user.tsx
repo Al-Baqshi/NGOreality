@@ -30,14 +30,10 @@ export function NavUser({
   extraItems?: { title: string; url: string; icon: LucideIcon }[];
 }) {
   const navigate = useNavigate();
-  const { profile, user, centralUser } = useAuth();
+  const { profile, user } = useAuth();
 
-  const name =
-    profile?.full_name?.trim() ||
-    centralUser?.full_name?.trim() ||
-    centralUser?.username ||
-    'Account';
-  const email = user?.email ?? centralUser?.email ?? '';
+  const name = profile?.full_name?.trim() || 'Account';
+  const email = user?.email ?? '';
   const letters = initials(name);
 
   return (
