@@ -73,42 +73,36 @@ Deno.serve(async (req: Request) => {
     return json({ error: "invalid JSON" }, 400);
   }
 
-  const secret = Deno.env.get("TURNSTILE_SECRET_KEY");
+  const secret = Deno.env.get("TURNSTILE_SECRET_KEY")?.trim();
   const token = clean(body.turnstile_token, 4096);
 
-  // FAIL CLOSED. The previous client-side helper returned `true` when its API
-  // URL was unset, so a missing variable silently disabled spam protection —
-  // which is exactly how the inbox filled up without anyone noticing.
-  if (!secret) {
-    console.error("TURNSTILE_SECRET_KEY is not set; refusing submissions");
-    return json(
-      {
-        error: "The contact form is temporarily unavailable. Please email us directly.",
-        reason: "turnstile_not_configured",
-      },
-      503,
-    );
-  }
-  if (!token) return json({ error: "Please complete the verification challenge." }, 400);
+  // When the secret is set, Turnstile is required. When it is missing, still
+  // accept a valid enquiry — charities were blocked by a 503 after outreach.
+  // Re-enable spam protection with:
+  //   npx supabase secrets set TURNSTILE_SECRET_KEY=<cloudflare-secret>
+  if (secret) {
+    if (!token) return json({ error: "Please complete the verification challenge." }, 400);
 
-  // Cloudflare siteverify expects form-urlencoded (same as turnstile-verify).
-  const form = new URLSearchParams({ secret, response: token });
-  const forwardedFor = req.headers.get("x-forwarded-for");
-  const clientIp = req.headers.get("cf-connecting-ip") ??
-    (forwardedFor ? forwardedFor.split(",")[0].trim() : "");
-  if (clientIp) form.set("remoteip", clientIp);
+    const form = new URLSearchParams({ secret, response: token });
+    const forwardedFor = req.headers.get("x-forwarded-for");
+    const clientIp = req.headers.get("cf-connecting-ip") ??
+      (forwardedFor ? forwardedFor.split(",")[0].trim() : "");
+    if (clientIp) form.set("remoteip", clientIp);
 
-  const verifyRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: form.toString(),
-  }).catch(() => null);
+    const verifyRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    }).catch(() => null);
 
-  const verify = verifyRes?.ok ? await verifyRes.json().catch(() => null) : null;
+    const verify = verifyRes?.ok ? await verifyRes.json().catch(() => null) : null;
 
-  if (!verify?.success) {
-    console.warn("turnstile rejected", verify?.["error-codes"]);
-    return json({ error: "Verification failed. Please try again." }, 403);
+    if (!verify?.success) {
+      console.warn("turnstile rejected", verify?.["error-codes"]);
+      return json({ error: "Verification failed. Please try again." }, 403);
+    }
+  } else {
+    console.error("TURNSTILE_SECRET_KEY is not set; accepting enquiry without Turnstile");
   }
 
   const organizationName = clean(body.organization_name, 200);
