@@ -6,6 +6,7 @@ import { useCases, useClient, useWorkspaceIdentity } from '../../../hooks/useWor
 import * as crm from '../../../lib/crmApi';
 import { captureError } from '../../../lib/errorReporting';
 import SEO from '../../../components/SEO';
+import { formatNzDate } from '@/lib/formatDate';
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -87,7 +88,7 @@ export default function NgoWorkspaceClientDetailPage() {
         <h3 className="font-bold">Details</h3>
         <dl className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Preferred name" value={client.preferred_name} />
-          <Field label="Date of birth" value={client.date_of_birth?.slice(0, 10)} />
+          <Field label="Date of birth" value={client.date_of_birth ? formatNzDate(client.date_of_birth.slice(0, 10)) : undefined} />
           <Field label="Email" value={client.contact_email} />
           <Field label="Phone" value={client.contact_phone} />
           <Field

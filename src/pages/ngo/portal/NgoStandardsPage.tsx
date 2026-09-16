@@ -6,6 +6,7 @@ import {
   publicCriteriaScore,
 } from '../../../lib/criteria';
 import NgoPortalPageShell from '../../../components/ngo/NgoPortalPageShell';
+import NgoSetupReadinessGuide from '../../../components/ngo/NgoSetupReadinessGuide';
 
 export default function NgoStandardsPage() {
   const { criteria, error } = useNgoPortalContext();
@@ -73,6 +74,8 @@ export default function NgoStandardsPage() {
           </section>
         )}
       </div>
+
+      <NgoSetupReadinessGuide compact />
     </NgoPortalPageShell>
   );
 }

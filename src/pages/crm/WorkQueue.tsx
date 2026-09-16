@@ -11,6 +11,7 @@ import {
 import { Calendar, Award, AlertTriangle, Phone, CheckCircle2, Sparkles } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { captureEmptyMutation, captureError } from '../../lib/errorReporting';
+import { formatNzDate, formatNzDateTime } from '@/lib/formatDate';
 
 export default function WorkQueue() {
   const { stats, error: statsError, ready: statsReady, refetch: refetchStats } = useCrmDashboardStats();
@@ -92,7 +93,7 @@ export default function WorkQueue() {
                 to={`/organizations/${e.organization_id}`}
                 title={e.organizations?.name ?? 'Organization'}
                 meta={`${ENGAGEMENT_TYPE_LABELS[e.engagement_type]} · ${ENGAGEMENT_STATUS_LABELS[e.status]}`}
-                sub={e.next_follow_up_at ? new Date(e.next_follow_up_at).toLocaleString() : ''}
+                sub={e.next_follow_up_at ? formatNzDateTime(e.next_follow_up_at) : ''}
               />
             ))}
           </QueueSection>
@@ -103,7 +104,7 @@ export default function WorkQueue() {
                 <Link to={`/organizations/${t.organization_id}`} className="min-w-0 flex-1">
                   <div className="text-sm font-semibold truncate">{t.title}</div>
                   <div className="font-mono text-2xs text-ink-400 truncate">
-                    {t.organizations?.name} · due {t.due_date}
+                    {t.organizations?.name} · due {formatNzDate(t.due_date)}
                   </div>
                 </Link>
                 <button
@@ -183,7 +184,7 @@ export default function WorkQueue() {
                 to={`/organizations/${inc.organization_id}`}
                 title={inc.organizations?.name ?? 'Organization'}
                 meta={inc.error_message || 'Site unreachable'}
-                sub={new Date(inc.opened_at).toLocaleString()}
+                sub={formatNzDateTime(inc.opened_at)}
               />
             ))}
           </QueueSection>

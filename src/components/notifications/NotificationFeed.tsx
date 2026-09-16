@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { formatNzDateWithWeekday, formatNzDayMonthTime } from '@/lib/formatDate';
 
 function formatWhen(iso: string): string {
   const d = new Date(iso);
@@ -24,7 +25,7 @@ function formatWhen(iso: string): string {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   if (hours < 48) return 'Yesterday';
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return formatNzDayMonthTime(d);
 }
 
 function dayLabel(iso: string): string {
@@ -36,7 +37,7 @@ function dayLabel(iso: string): string {
   const days = Math.round((start.getTime() - then.getTime()) / 86_400_000);
   if (days <= 0) return 'Today';
   if (days === 1) return 'Yesterday';
-  return then.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  return formatNzDateWithWeekday(then);
 }
 
 function eventLabel(type: string): string {

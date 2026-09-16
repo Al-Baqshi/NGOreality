@@ -1,30 +1,83 @@
 import { Link } from 'react-router-dom';
+import { ArrowRight, CheckCircle } from 'lucide-react';
 import { useNgoPortalContext } from '../../../contexts/NgoPortalContext';
 import { OrgTrustStatusBadge, QueryError } from '../../../components/ui';
 import {
   getProfileCompletionItems,
   profileCompletionPercent,
 } from '../../../lib/ngoProfileCompletion';
-import { NgoPortalQuickLinks } from '../../../components/ngo/NgoPortalPageShell';
+import NgoSetupReadinessGuide, { NgoCustomWorkCard } from '../../../components/ngo/NgoSetupReadinessGuide';
 import SEO from '../../../components/SEO';
 import { getLatestMembership, getMembershipDisplayStatus } from '../../../lib/membership';
-import { allPublicCriteriaPass } from '../../../lib/criteria';
+import { allPublicCriteriaPass, publicCriteriaScore } from '../../../lib/criteria';
 import { BADGE_PIPELINE_NGO, getBadgePipelineStage } from '../../../lib/badgePipeline';
 
 export default function NgoOverviewPage() {
-  const { organization, badges, memberships, criteria, error } = useNgoPortalContext();
+  const { organization, badges, memberships, criteria, setupRequests, error } = useNgoPortalContext();
   if (!organization) return null;
 
   const activeBadge = badges.find((b) => b.is_active);
-  const profilePct = profileCompletionPercent(getProfileCompletionItems(organization));
+  const profileItems = getProfileCompletionItems(organization);
+  const profilePct = profileCompletionPercent(profileItems);
+  const profileMissing = profileItems.filter((i) => !i.complete).map((i) => i.label.toLowerCase());
+  const standardsPass = allPublicCriteriaPass(criteria);
+  const liveSetup = setupRequests.find((r) => r.status !== 'cancelled');
   const membershipStatus = getMembershipDisplayStatus(getLatestMembership(memberships));
   const hasActiveMembership =
     membershipStatus === 'active' || membershipStatus === 'expiring_soon';
   const badgeStage = getBadgePipelineStage({
     hasActiveBadge: Boolean(activeBadge),
     hasActiveMembership,
-    standardsPass: allPublicCriteriaPass(criteria),
+    standardsPass,
   });
+
+  const steps = [
+    {
+      to: '/ngo/profile',
+      title: 'Complete your profile',
+      body:
+        profilePct === 100
+          ? 'Mission, logo, website and contact details are all in.'
+          : `Add your mission, logo, website link and contact details. Missing: ${profileMissing.join(', ')}.`,
+      status: `${profilePct}%`,
+      done: profilePct === 100,
+    },
+    {
+      to: '/ngo/setup-request',
+      title: 'Request your website setup',
+      body: liveSetup
+        ? `Request ${liveSetup.status.replace(/_/g, ' ')}. We will follow up by email.`
+        : 'Order a trust landing page with your colours and contact details, or ask us to quote custom work.',
+      status: liveSetup ? liveSetup.status.replace(/_/g, ' ') : 'Not started',
+      done: Boolean(liveSetup),
+    },
+    {
+      to: '/ngo/services',
+      title: 'Pay for membership',
+      body: hasActiveMembership
+        ? 'Membership is active.'
+        : 'Pay by bank transfer, then press “I’ve made the payment” so we know to look for it.',
+      status: hasActiveMembership ? 'Active' : 'Unpaid',
+      done: hasActiveMembership,
+    },
+    {
+      to: '/ngo/standards',
+      title: 'Meet the trust standards',
+      body: 'We check your website, mission, contact details, privacy policy and security basics.',
+      status: `${publicCriteriaScore(criteria)}%`,
+      done: standardsPass,
+    },
+    {
+      to: '/ngo/badge',
+      title: 'Show your Reality Badge',
+      body: activeBadge
+        ? 'Your badge is live. Add it to your website.'
+        : 'Issued once membership is paid and the standards pass.',
+      status: activeBadge ? 'Live' : 'Locked',
+      done: Boolean(activeBadge),
+    },
+  ];
+  const nextStepIndex = steps.findIndex((s) => !s.done);
 
   return (
     <>
@@ -83,26 +136,64 @@ export default function NgoOverviewPage() {
           </div>
         )}
 
-        <p className="text-sm text-ink-600 dark:text-muted-foreground leading-relaxed">
-          Use the menu to manage your profile, pay for Reality Badge or a trust landing page, and track
-          your progress.
-        </p>
+        <section className="card-brutal p-5 sm:p-6" aria-labelledby="next-steps-title">
+          <h2 id="next-steps-title" className="text-lg font-black uppercase tracking-tight">
+            {nextStepIndex === -1 ? 'You’re all set' : 'Your next steps'}
+          </h2>
+          <p className="mt-1 text-sm text-ink-600 dark:text-muted-foreground">
+            {nextStepIndex === -1
+              ? 'Everything is done. Keep your profile current and we will keep monitoring your site.'
+              : `${steps.filter((st) => st.done).length} of ${steps.length} done. Work through these in order.`}
+          </p>
+          <ol className="mt-4 space-y-2">
+            {steps.map((step, i) => (
+              <li key={step.to}>
+                <Link
+                  to={step.to}
+                  className={
+                    'group flex items-start gap-3 border-2 p-3 sm:p-4 transition-colors ' +
+                    (i === nextStepIndex
+                      ? 'border-teal bg-teal/5 hover:bg-teal/10'
+                      : 'border-ink-100 hover:border-ink-300 dark:border-border')
+                  }
+                >
+                  <span
+                    className={
+                      'flex size-7 shrink-0 items-center justify-center border-2 font-mono text-xs font-bold ' +
+                      (step.done ? 'border-teal bg-teal text-white' : 'border-ink-300 dark:border-border')
+                    }
+                    aria-hidden
+                  >
+                    {step.done ? <CheckCircle size={14} /> : i + 1}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center justify-between gap-2">
+                      <span
+                        className={
+                          'font-semibold ' +
+                          (step.done ? 'text-ink-500 line-through decoration-1' : 'text-ink-950 dark:text-foreground')
+                        }
+                      >
+                        {step.title}
+                      </span>
+                      <span className="font-mono text-2xs uppercase text-ink-500">{step.status}</span>
+                    </span>
+                    <span className="mt-0.5 block text-xs text-ink-600 dark:text-muted-foreground">{step.body}</span>
+                  </span>
+                  <ArrowRight
+                    size={16}
+                    className="mt-1 shrink-0 text-ink-300 transition-transform group-hover:translate-x-0.5 group-hover:text-teal"
+                    aria-hidden
+                  />
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </section>
 
-        {!error && !activeBadge && badgeStage !== 'membership_active_badge_pending' && (
-          <Link
-            to="/ngo/services"
-            className="card-brutal block border-l-4 border-l-teal p-5 hover:bg-paper dark:hover:bg-muted/20"
-          >
-            <h2 className="text-lg font-black uppercase tracking-tight">Choose services</h2>
-            <p className="mt-1 text-sm text-ink-600 dark:text-muted-foreground">
-              Pay by bank transfer for Reality Badge membership ($70/yr) and/or the trust landing page
-              package ($650).
-            </p>
-            <span className="btn-brutal-teal mt-3 inline-block px-4 py-2 text-xs">Open services &amp; pay</span>
-          </Link>
-        )}
+        <NgoSetupReadinessGuide compact />
 
-        <NgoPortalQuickLinks />
+        <NgoCustomWorkCard />
       </div>
     </>
   );

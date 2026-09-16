@@ -19,6 +19,7 @@ import {
 import { SectionHeader, MetricCard, QueryError } from '../../components/ui';
 import { NOTIFICATION_PAGE_SIZE, useNotifications } from '../../hooks/useNotifications';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { formatNzDateTime } from '@/lib/formatDate';
 import {
   NOTIFICATION_STATUS_LABELS,
   notificationTemplateLabel,
@@ -597,8 +598,8 @@ export default function EmailNotifications() {
                     </p>
                   )}
                 <div className="flex flex-wrap items-center gap-2 font-mono text-2xs text-ink-400">
-                  <span>{new Date(e.created_at).toLocaleString()}</span>
-                  {e.sent_at && <span>Sent {new Date(e.sent_at).toLocaleString()}</span>}
+                  <span>{formatNzDateTime(e.created_at)}</span>
+                  {e.sent_at && <span>Sent {formatNzDateTime(e.sent_at)}</span>}
                   {e.status === 'pending' && (
                     <button
                       type="button"

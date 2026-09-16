@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { SectionHeader, EmptyState, FormField, Modal, QueryError } from '../../components/ui';
 import { Mail, Clock, CheckCircle, XCircle } from 'lucide-react';
 import type { InquirySubmission } from '../../types';
+import { formatNzDateTime } from '@/lib/formatDate';
 
 const statusIcons: Record<string, React.ReactNode> = {
   new: <Mail size={14} className="text-accent" />,
@@ -155,7 +156,7 @@ export default function Inquiries() {
               <div className="text-sm leading-relaxed">{selected.message || 'No message'}</div>
             </FormField>
             <FormField label="Submitted">
-              <div className="text-sm font-mono">{new Date(selected.created_at).toLocaleString()}</div>
+              <div className="text-sm font-mono">{formatNzDateTime(selected.created_at)}</div>
             </FormField>
           </div>
         )}

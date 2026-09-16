@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { LocationCitySelect } from '../CitySelect';
 import { Link } from 'react-router-dom';
 import { Users, UserPlus, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -674,12 +675,10 @@ export default function NgoOrganizationRegistrationForm({
             <label className="label-brutal" htmlFor="location">
               Location
             </label>
-            <input
+            <LocationCitySelect
               id="location"
-              className="input-brutal w-full text-base"
               value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
-              placeholder="City, Country"
+              onChange={(location) => setForm({ ...form, location })}
             />
           </div>
           <div>

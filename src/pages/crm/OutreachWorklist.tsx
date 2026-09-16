@@ -19,6 +19,7 @@ import SendEmailModal from '../../components/crm/SendEmailModal';
 import { supabase } from '../../lib/supabase';
 import { captureError } from '../../lib/errorReporting';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { formatNzDate } from '@/lib/formatDate';
 
 /**
  * The outreach worklist.
@@ -64,7 +65,7 @@ function MonitorCell({ lead }: { lead: OutreachLead }) {
   }
   if (lead.monitor_status === 'down') {
     return (
-      <span className="badge-failed whitespace-nowrap" title={lead.incident_opened_at ? `Down since ${new Date(lead.incident_opened_at).toLocaleDateString()}` : undefined}>
+      <span className="badge-failed whitespace-nowrap" title={lead.incident_opened_at ? `Down since ${formatNzDate(lead.incident_opened_at)}` : undefined}>
         Down{lead.consecutive_failures ? ` ×${lead.consecutive_failures}` : ''}
       </span>
     );

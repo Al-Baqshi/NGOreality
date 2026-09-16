@@ -5,6 +5,7 @@ import { SectionHeader, OrgTrustStatusBadge, QueryError } from '../../components
 import OrgOriginChip from '../../components/crm/OrgOriginChip';
 import RegistryMatchCheck from '../../components/crm/RegistryMatchCheck';
 import { updateBadgeRequestStatus, updateSetupRequestStatus } from '../../lib/crmRequests';
+import { formatNzDate } from '@/lib/formatDate';
 import {
   useRegistrations,
   type BadgeRequestRow,
@@ -129,7 +130,7 @@ export default function Registrations() {
                 name={r.organizations?.name ?? 'Organization'}
                 sourceRegistry={r.organizations?.source_registry ?? ''}
                 registrationNumber={r.organizations?.charity_registration_number ?? ''}
-                meta={`${BADGE_REQUEST_TYPE_LABELS[r.request_type]} · ${BADGE_REQUEST_STATUS_LABELS[r.status]} · ${new Date(r.created_at).toLocaleDateString()}`}
+                meta={`${BADGE_REQUEST_TYPE_LABELS[r.request_type]} · ${BADGE_REQUEST_STATUS_LABELS[r.status]} · ${formatNzDate(r.created_at)}`}
                 notes={r.notes}
                 busy={busyId === r.id}
                 actions={badgeActions(r, act)}
@@ -152,7 +153,7 @@ export default function Registrations() {
                 name={r.organizations?.name ?? 'Organization'}
                 sourceRegistry={r.organizations?.source_registry ?? ''}
                 registrationNumber={r.organizations?.charity_registration_number ?? ''}
-                meta={`${setupKindLabel(r)} · ${NGO_SETUP_REQUEST_STATUS_LABELS[r.status]} · ${new Date(r.created_at).toLocaleDateString()}`}
+                meta={`${setupKindLabel(r)} · ${NGO_SETUP_REQUEST_STATUS_LABELS[r.status]} · ${formatNzDate(r.created_at)}`}
                 notes={r.notes}
                 busy={busyId === r.id}
                 actions={setupActions(r, act)}
@@ -358,7 +359,7 @@ function SignupRow({ org }: { org: SignupOrg }) {
         <OrgTrustStatusBadge org={org} showHint={false} />
       </div>
       <div className="font-mono text-2xs text-ink-400 uppercase tracking-wider mt-1">
-        {org.claimed_at ? `Signed up ${new Date(org.claimed_at).toLocaleDateString()}` : ''}
+        {org.claimed_at ? `Signed up ${formatNzDate(org.claimed_at)}` : ''}
         {org.category ? ` · ${org.category}` : ''}
         {org.location ? ` · ${org.location}` : ''}
       </div>

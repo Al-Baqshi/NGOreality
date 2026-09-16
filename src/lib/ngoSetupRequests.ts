@@ -9,6 +9,15 @@ export type NgoSetupQuestionnaire = {
   has_existing_website: boolean;
   wants_landing_package: boolean;
   primary_goal?: string;
+  request_type?: 'landing_page' | 'custom_work';
+  current_website?: string;
+  page_email?: string;
+  page_phone?: string;
+  page_address?: string;
+  domain_status?: 'own' | 'need' | 'unsure';
+  domain_name?: string;
+  /** Readiness checklist keys the NGO says it already has (see SETUP_READINESS_ITEMS). */
+  ready?: string[];
 };
 
 export type SubmitNgoSetupInput = {
@@ -21,16 +30,18 @@ export type SubmitNgoSetupInput = {
   brandSecondary: string;
   notes: string;
   questionnaire: NgoSetupQuestionnaire;
+  /** Overrides the kind inferred from the package / logo flags. */
+  requestKind?: NgoSetupRequestKind;
 };
 
 export async function submitNgoSetupRequest(
   input: SubmitNgoSetupInput,
 ): Promise<{ error: string | null }> {
-  const kind: NgoSetupRequestKind = input.wantsLandingPackage
+  const kind: NgoSetupRequestKind = input.requestKind ?? (input.wantsLandingPackage
     ? 'landing_standards'
     : input.logoUrl.trim()
       ? 'brand_assets'
-      : 'general';
+      : 'general');
 
   const { data: reqRow, error: reqError } = await supabase.from('ngo_setup_requests').insert({
     organization_id: input.organizationId,

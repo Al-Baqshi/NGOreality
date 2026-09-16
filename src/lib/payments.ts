@@ -367,6 +367,23 @@ export async function createPendingBankPayment(input: {
 }
 
 /** Bank transfer instructions shown in CRM */
+/**
+ * NGO says the bank transfer has been sent. Stamps customer_reported_paid_at
+ * and raises a staff task; the payment stays pending until staff match it.
+ */
+export async function reportBankTransferSent(
+  paymentId: string,
+): Promise<{ payment: OrganizationPayment | null; error: string | null }> {
+  const { data, error } = await supabase.rpc('report_bank_transfer_sent', {
+    p_payment_id: paymentId,
+  });
+  if (error) {
+    return { payment: null, error: captureError(error, { where: 'reportBankTransferSent' }) };
+  }
+  const payment = (Array.isArray(data) ? data[0] : data) as OrganizationPayment | undefined;
+  return { payment: payment ?? null, error: null };
+}
+
 export const BANK_TRANSFER_INSTRUCTIONS = {
   accountName: NGO_BANK_ACCOUNT.accountName,
   accountNumber: NGO_BANK_ACCOUNT.accountNumber || '(set VITE_BANK_ACCOUNT_NUMBER in env)',

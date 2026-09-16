@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle, CreditCard, Layout, Shield } from 'lucide-react';
+import { Check, CheckCircle, Copy, CreditCard, Layout, Send, Shield } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNgoPortalContext } from '../../../contexts/NgoPortalContext';
 import NgoPortalPageShell from '../../../components/ngo/NgoPortalPageShell';
@@ -7,6 +7,7 @@ import {
   BANK_TRANSFER_INSTRUCTIONS,
   createPendingBankPayment,
   ensurePaymentReference,
+  reportBankTransferSent,
 } from '../../../lib/payments';
 import { submitNgoSetupRequest } from '../../../lib/ngoSetupRequests';
 import { MEMBERSHIP_ANNUAL_CENTS, GST_PRICE_SUFFIX, PRICING_CURRENCY } from '../../../config/pricing';
@@ -14,11 +15,42 @@ import {
   LANDING_STANDARDS_PACKAGE_CENTS,
   LANDING_STANDARDS_PACKAGE_LABEL,
 } from '../../../config/customerProducts';
-import { NGO_BANK_ACCOUNT } from '../../../config/billing';
+import { BANK_TRANSFER_PROCESSING_BUSINESS_DAYS, NGO_BANK_ACCOUNT } from '../../../config/billing';
+import { formatNzDateTime } from '../../../lib/formatDate';
 import { PAYMENT_PRODUCT_LABELS, type OrganizationPayment, type PaymentProductType } from '../../../types';
 import { supabase } from '../../../lib/supabase';
 import { captureError } from '../../../lib/errorReporting';
 import { cn } from '@/lib/utils';
+
+function CopyValue({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-ink-100 py-2 last:border-b-0 dark:border-border">
+      <div className="min-w-0">
+        <p className="font-mono text-2xs uppercase tracking-wider text-ink-500">{label}</p>
+        <p className="truncate font-mono text-sm font-bold text-ink-950 dark:text-foreground">{value || '…'}</p>
+      </div>
+      <button
+        type="button"
+        disabled={!value}
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(value);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 2000);
+          } catch {
+            // Clipboard can be blocked; the value is on screen to copy by hand.
+          }
+        }}
+        className="inline-flex min-h-[40px] shrink-0 items-center gap-1 border-2 border-ink-200 px-2.5 font-mono text-2xs uppercase hover:border-teal dark:border-border"
+        aria-label={`Copy ${label}`}
+      >
+        {copied ? <Check size={12} aria-hidden /> : <Copy size={12} aria-hidden />}
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    </div>
+  );
+}
 
 function money(cents: number) {
   return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: PRICING_CURRENCY }).format(
@@ -36,6 +68,7 @@ export default function NgoServicesPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [highlightBank, setHighlightBank] = useState(false);
+  const [reporting, setReporting] = useState<string | null>(null);
   const bankPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -90,6 +123,24 @@ export default function NgoServicesPage() {
     (p) => p.product_type === 'landing_standards_package' && p.status === 'pending',
   );
   const paymentsUnknown = Boolean(paymentsError) && payments.length === 0;
+  const pendingTransfers = payments.filter(
+    (p) => p.status === 'pending' && p.payment_method === 'bank_transfer',
+  );
+
+  const reportSent = async (payment: OrganizationPayment) => {
+    setReporting(payment.id);
+    setError(null);
+    const { error: reportError } = await reportBankTransferSent(payment.id);
+    setReporting(null);
+    if (reportError) {
+      setError(reportError);
+      return;
+    }
+    setMessage(
+      `Thanks — we will look for ${money(payment.amount_cents)} with reference ${payment.bank_transfer_reference || reference} and confirm by email.`,
+    );
+    await refreshPayments();
+  };
 
   const refreshPayments = async () => {
     const { data, error: listError } = await supabase
@@ -224,24 +275,75 @@ export default function NgoServicesPage() {
         <div
           ref={bankPanelRef}
           className={cn(
-            'card-brutal space-y-3 border-l-4 border-l-teal p-5 transition-shadow scroll-mt-24',
+            'card-brutal space-y-4 border-l-4 border-l-teal p-5 transition-shadow scroll-mt-24',
             highlightBank && 'ring-2 ring-teal shadow-brutal',
           )}
         >
           <h2 className="flex items-center gap-2 font-mono text-xs font-semibold uppercase tracking-wider">
-            <CreditCard size={14} /> Bank transfer
+            <CreditCard size={14} /> Pay by bank transfer
           </h2>
           {message ? (
             <p className="rounded-md border-2 border-teal/40 bg-teal/5 px-3 py-2 text-sm text-teal" role="status">
               {message}
             </p>
           ) : null}
-          <p className="text-sm text-ink-600 dark:text-muted-foreground">
-            Pay to <strong>{NGO_BANK_ACCOUNT.accountName}</strong> ({NGO_BANK_ACCOUNT.bankName}){' '}
-            <code className="font-mono font-bold">{NGO_BANK_ACCOUNT.accountNumber}</code>. Use this
-            reference exactly: <code className="font-mono font-bold">{reference || '…'}</code>
-          </p>
+
+          <ol className="grid gap-2 text-sm text-ink-600 sm:grid-cols-3 dark:text-muted-foreground">
+            <li><span className="font-mono font-bold text-ink-950 dark:text-foreground">1.</span> Choose a service below</li>
+            <li><span className="font-mono font-bold text-ink-950 dark:text-foreground">2.</span> Transfer from your bank with the reference</li>
+            <li><span className="font-mono font-bold text-ink-950 dark:text-foreground">3.</span> Press &ldquo;I&rsquo;ve made the payment&rdquo;</li>
+          </ol>
+
+          <div className="border-2 border-ink-100 px-3 dark:border-border">
+            <CopyValue label="Account name" value={NGO_BANK_ACCOUNT.accountName} />
+            <CopyValue label={`Account number (${NGO_BANK_ACCOUNT.bankName})`} value={NGO_BANK_ACCOUNT.accountNumber} />
+            <CopyValue label="Reference — use exactly" value={reference} />
+          </div>
           <p className="font-mono text-2xs text-ink-500">{BANK_TRANSFER_INSTRUCTIONS.referenceHint}</p>
+
+          {pendingTransfers.length > 0 ? (
+            <ul className="space-y-3">
+              {pendingTransfers.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex flex-col gap-3 border-2 border-gold/50 bg-gold-light/30 p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0 text-sm">
+                    <p className="font-semibold text-ink-950 dark:text-foreground">
+                      {PAYMENT_PRODUCT_LABELS[p.product_type]} — {money(p.amount_cents)}
+                    </p>
+                    <p className="font-mono text-2xs text-ink-500">
+                      Reference {p.bank_transfer_reference || reference || '…'}
+                    </p>
+                    {p.customer_reported_paid_at ? (
+                      <p className="mt-1 text-xs text-teal">
+                        You told us you paid on {formatNzDateTime(p.customer_reported_paid_at)}. We are
+                        checking our bank account — usually within {BANK_TRANSFER_PROCESSING_BUSINESS_DAYS}{' '}
+                        business days.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-ink-500">Waiting for your transfer.</p>
+                    )}
+                  </div>
+                  {p.customer_reported_paid_at ? (
+                    <span className="inline-flex min-h-[44px] shrink-0 items-center gap-2 font-mono text-2xs uppercase text-teal">
+                      <CheckCircle size={14} aria-hidden /> Payment reported
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={reporting !== null}
+                      onClick={() => void reportSent(p)}
+                      className="btn-brutal-teal inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 px-4 text-xs"
+                    >
+                      <Send size={14} aria-hidden />
+                      {reporting === p.id ? 'Sending…' : 'I’ve made the payment'}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
 
         {error && (

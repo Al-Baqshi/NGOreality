@@ -1,4 +1,5 @@
 import type { OrganizationMembership } from '../types';
+import { formatNzDateLong } from './formatDate';
 
 export type MembershipDisplayStatus = 'active' | 'expiring_soon' | 'expired' | 'pending_renewal' | 'none';
 
@@ -27,11 +28,7 @@ export function getMembershipDisplayStatus(
 }
 
 export function formatMembershipDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  return formatNzDateLong(iso);
 }
 
 export function daysUntilExpiry(expiresAt: string): number {

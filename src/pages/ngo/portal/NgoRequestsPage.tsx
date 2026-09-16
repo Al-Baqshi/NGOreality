@@ -13,6 +13,7 @@ import {
 import NgoPortalPageShell from '../../../components/ngo/NgoPortalPageShell';
 import VerificationSubmittedDialog from '../../../components/ngo/VerificationSubmittedDialog';
 import NgoBillingTopUpPanel from '../../../components/ngo/NgoBillingTopUpPanel';
+import { formatNzDate } from '@/lib/formatDate';
 
 export default function NgoRequestsPage() {
   const confirm = useConfirm();
@@ -190,7 +191,7 @@ export default function NgoRequestsPage() {
                   <div>
                     <p className="font-semibold text-sm">{BADGE_REQUEST_TYPE_LABELS[req.request_type]}</p>
                     <p className="font-mono text-2xs text-ink-400 uppercase">
-                      {new Date(req.created_at).toLocaleDateString()}
+                      {formatNzDate(req.created_at)}
                     </p>
                     {req.notes && <p className="text-xs text-ink-500 mt-1">{req.notes}</p>}
                   </div>

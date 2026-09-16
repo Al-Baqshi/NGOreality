@@ -40,6 +40,7 @@ import {
 import { captureError } from '../../lib/errorReporting';
 import { draftOutreachEmailForOrg } from '../../lib/crmOutreach';
 import { supabase } from '../../lib/supabase';
+import { formatNzDate } from '@/lib/formatDate';
 import {
   NOTIFICATION_TEMPLATE_LABELS,
   OUTREACH_EMAIL_TEMPLATES,
@@ -308,7 +309,7 @@ export default function ScheduledOutreach() {
         segment,
         outreachStatus: outreach,
       });
-      setNotice(`Saved schedule · ${formatSendTime(saved.send_time)} NZ · ${saved.starts_on} → ${saved.ends_on}`);
+      setNotice(`Saved schedule · ${formatSendTime(saved.send_time)} NZ · ${formatNzDate(saved.starts_on)} → ${formatNzDate(saved.ends_on)}`);
       applyScheduleToForm(saved);
       await refreshSummary(saved.id);
       bumpRoster();
@@ -790,7 +791,7 @@ export default function ScheduledOutreach() {
           compact
           label="Window"
           value={summary ? `${summary.day_index}/${summary.total_days}` : '—'}
-          sub={schedule ? `${schedule.starts_on} → ${schedule.ends_on}` : 'Set dates below'}
+          sub={schedule ? `${formatNzDate(schedule.starts_on)} → ${formatNzDate(schedule.ends_on)}` : 'Set dates below'}
         />
       </div>
 

@@ -11,6 +11,8 @@ import type { Organization } from '../../types';
 import { CATEGORIES } from '../../types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import CitySelect, { cityFromLocation } from '../CitySelect';
+import LogoUploadField from './LogoUploadField';
 
 const COUNTRIES = [
   { code: 'NZ', name: 'New Zealand', dialCode: '+64', flag: '🇳🇿' },
@@ -242,7 +244,6 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
   const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
-    const cityFromLocation = organization.location?.split(',')[0]?.trim() || '';
     setProfileForm({
       mission_statement: organization.mission_statement ?? '',
       description: organization.description ?? '',
@@ -253,7 +254,7 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
       phone_number: phoneParts.number,
       email: organization.email ?? '',
       country: organization.country ?? 'NZ',
-      city: cityFromLocation,
+      city: cityFromLocation(organization.location),
     });
     setFieldErrors({});
     setSaveError('');
@@ -360,7 +361,9 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
   return (
     <div className="card-brutal space-y-6 p-5 sm:p-6">
       <p className="text-xs leading-relaxed text-ink-500">
-        Complete your public trust profile. Need a landing page or package? Use{' '}
+        This is what donors see on your directory listing, and what we use when we build your
+        landing page. Keep your mission, logo, website link and contact details current. Want us to
+        build or fix your site? Use{' '}
         <Link
           to="/ngo/setup-request"
           className="font-semibold text-ink-950 underline dark:text-foreground"
@@ -577,7 +580,7 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
           <div>
             <label className="label-brutal flex items-center gap-1" htmlFor="ngo-website">
               <Globe size={12} aria-hidden /> Website URL
@@ -596,24 +599,24 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
             />
             <FieldError id="err-website" message={fieldErrors.website_url} />
           </div>
-          <div>
-            <label className="label-brutal" htmlFor="ngo-logo">
-              Logo URL
-            </label>
-            <input
-              id="ngo-logo"
-              type="url"
-              inputMode="url"
-              className={inputClass(Boolean(fieldErrors.logo_url))}
-              value={profileForm.logo_url}
-              onChange={(e) => updateField('logo_url', e.target.value)}
-              onBlur={(e) => validateField('logo_url', e.target.value)}
-              placeholder="https://…/logo.png"
-              aria-invalid={Boolean(fieldErrors.logo_url)}
-              aria-describedby={fieldErrors.logo_url ? 'err-logo' : undefined}
-            />
-            <FieldError id="err-logo" message={fieldErrors.logo_url} />
-          </div>
+        </div>
+
+        <div>
+          <label className="label-brutal" htmlFor="ngo-logo">
+            Logo
+          </label>
+          <LogoUploadField
+            id="ngo-logo"
+            organizationId={organization.id}
+            value={profileForm.logo_url}
+            onChange={(url) => {
+              updateField('logo_url', url);
+              validateField('logo_url', url);
+            }}
+            invalid={Boolean(fieldErrors.logo_url)}
+            describedBy={fieldErrors.logo_url ? 'err-logo' : undefined}
+          />
+          <FieldError id="err-logo" message={fieldErrors.logo_url} />
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -623,7 +626,10 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
             </label>
             <Select
               value={profileForm.country}
-              onValueChange={(value) => updateField('country', value ?? 'NZ')}
+              onValueChange={(value) => {
+                if ((value ?? 'NZ') !== profileForm.country) updateField('city', '');
+                updateField('country', value ?? 'NZ');
+              }}
             >
               <SelectTrigger
                 id="ngo-country"
@@ -649,18 +655,14 @@ export default function NgoProfilePanel({ organization, onUpdated }: NgoProfileP
             <label className="label-brutal" htmlFor="ngo-city">
               City <span className="text-accent">*</span>
             </label>
-            <input
+            <CitySelect
               id="ngo-city"
-              type="text"
-              autoComplete="address-level2"
-              className={inputClass(Boolean(fieldErrors.city))}
+              country={profileForm.country}
               value={profileForm.city}
-              onChange={(e) => updateField('city', e.target.value)}
-              onBlur={(e) => validateField('city', e.target.value)}
-              placeholder="City or town"
-              maxLength={LIMITS.cityMax + 20}
-              aria-invalid={Boolean(fieldErrors.city)}
-              aria-describedby={fieldErrors.city ? 'err-city' : undefined}
+              onChange={(city) => updateField('city', city)}
+              onBlur={() => validateField('city')}
+              invalid={Boolean(fieldErrors.city)}
+              describedBy={fieldErrors.city ? 'err-city' : undefined}
             />
             <FieldError id="err-city" message={fieldErrors.city} />
           </div>

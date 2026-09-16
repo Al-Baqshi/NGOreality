@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { LocationCitySelect } from '../../components/CitySelect';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useOrganization, useContacts, useVerificationCriteria, useBadges, useActivityLog } from '../../hooks/useSupabase';
@@ -38,6 +39,7 @@ import { BADGE_PIPELINE_STAFF, getBadgePipelineStage } from '../../lib/badgePipe
 import { useOrganizationPayments } from '../../hooks/useCrm';
 import { hasActiveMembershipPayment } from '../../lib/payments';
 import { ArrowLeft, Globe, Mail, Phone, MapPin, CreditCard as Edit3, Save, X, Shield, Clock, User, Plus, Trash2, Award, CheckCheck } from 'lucide-react';
+import { formatNzDate } from '@/lib/formatDate';
 
 export default function OrganizationDetail() {
   const confirm = useConfirm();
@@ -440,7 +442,7 @@ export default function OrganizationDetail() {
             </div>
             {organization.claimed_at && (
               <p className="text-xs text-ink-600 mt-3">
-                Claimed through the NGO portal on {new Date(organization.claimed_at).toLocaleDateString()} — the
+                Claimed through the NGO portal on {formatNzDate(organization.claimed_at)} — the
                 accounts managing it are listed under Portal members below.
               </p>
             )}
@@ -486,7 +488,7 @@ export default function OrganizationDetail() {
             <div className="label-brutal">Origin — new submission</div>
             <p className="text-xs text-ink-600 mt-2">
               {organization.claimed_at
-                ? `Self-submitted through the NGO portal on ${new Date(organization.claimed_at).toLocaleDateString()} — not linked to a registry import.`
+                ? `Self-submitted through the NGO portal on ${formatNzDate(organization.claimed_at)} — not linked to a registry import.`
                 : 'Added manually in the CRM — not linked to a registry import.'}
             </p>
             <div className="mt-3">
@@ -511,7 +513,7 @@ export default function OrganizationDetail() {
               </select>
             </FormField>
             <FormField label="Location">
-              <input className="input-brutal w-full" value={editForm?.location || ''} onChange={(e) => setEditForm({ ...editForm!, location: e.target.value })} />
+              <LocationCitySelect country={editForm?.country || 'NZ'} value={editForm?.location || ''} onChange={(location) => setEditForm({ ...editForm!, location })} />
             </FormField>
             <FormField label="Website">
               <input className="input-brutal w-full" value={editForm?.website_url || ''} onChange={(e) => setEditForm({ ...editForm!, website_url: e.target.value })} />
@@ -971,7 +973,7 @@ export default function OrganizationDetail() {
                       </div>
                     </div>
                     <div className="font-mono text-2xs text-ink-400 mt-0.5">
-                      {b.level} &middot; Issued {new Date(b.issued_at).toLocaleDateString()}
+                      {b.level} &middot; Issued {formatNzDate(b.issued_at)}
                     </div>
                   </div>
                   ))}
@@ -1009,7 +1011,7 @@ export default function OrganizationDetail() {
                   <div key={e.id} className="px-6 py-3">
                     <div className="text-xs font-medium">{e.description}</div>
                     <div className="font-mono text-2xs text-ink-400 mt-0.5">
-                      {e.action} &middot; {new Date(e.created_at).toLocaleDateString()}
+                      {e.action} &middot; {formatNzDate(e.created_at)}
                     </div>
                   </div>
                   ))}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { LocationCitySelect } from '../CitySelect';
 import { Loader2, Save, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { captureError } from '../../lib/errorReporting';
@@ -214,10 +215,9 @@ export default function NewLeadDialog({
               </select>
             </FormField>
             <FormField label="Location">
-              <input
-                className="input-brutal w-full text-base"
+              <LocationCitySelect
                 value={form.location}
-                onChange={(e) => setForm({ ...form, location: e.target.value })}
+                onChange={(location) => setForm({ ...form, location })}
               />
             </FormField>
           </div>

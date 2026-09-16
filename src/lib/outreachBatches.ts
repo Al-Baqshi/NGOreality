@@ -1,3 +1,4 @@
+import { formatNzDateTime } from './formatDate';
 const STORAGE_KEY = 'ngoreality-outreach-batches';
 
 export type OutreachBatch = {
@@ -29,7 +30,7 @@ export function listOutreachBatches(): OutreachBatch[] {
 export function saveOutreachBatch(name: string, organizationIds: string[]): OutreachBatch {
   const batch: OutreachBatch = {
     id: crypto.randomUUID(),
-    name: name.trim() || `Batch ${new Date().toLocaleString()}`,
+    name: name.trim() || `Batch ${formatNzDateTime(new Date())}`,
     organizationIds: [...new Set(organizationIds)],
     createdAt: new Date().toISOString(),
   };

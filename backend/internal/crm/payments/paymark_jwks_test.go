@@ -10,6 +10,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -250,4 +251,117 @@ func splitToken(t *testing.T, token string) (string, string, string) {
 		t.Fatalf("token does not have three parts: %q", token)
 	}
 	return h, p, s
+}
+
+// The regression this file exists for: the shape Paymark's sandbox actually
+// POSTs. It carries paymentId, not transactionId, and nests the payment detail
+// under "oepayment" exactly as the create-intent request body does. Decoded by
+// struct tag alone every field here comes back empty, Verify rejects a
+// perfectly valid AUTHORISED notification as malformed, and the payment lands
+// in the bank while the platform records nothing.
+func TestVerifyRealSandboxShape(t *testing.T) {
+	key, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	if err != nil {
+		t.Fatalf("keygen: %v", err)
+	}
+	srv, kid := jwksServer(t, &key.PublicKey, "P-521")
+	v := newTestVerifier(t, srv.URL)
+
+	token := signES(t, key, "ES512", kid, map[string]any{
+		"paymentId":             "f0cb84d4-2ee8-48b9-b7bc-9947e38279c0",
+		"merchantTransactionId": "our-own-uuid",
+		"status":                "AUTHORISED",
+		"merchant": map[string]any{
+			"merchantId": "NGO-MERCHANT",
+		},
+		"oepayment": map[string]any{
+			"amount":    "0.01",
+			"currency":  "NZD",
+			"reference": "NGR-TEST",
+		},
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+
+	n, err := v.Verify(token)
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	// paymentId wins: it is what the merchant portal lists as the transaction
+	// id, so it is what staff can reconcile against. merchantTransactionId is
+	// ours and would reconcile against nothing.
+	if n.TransactionID != "f0cb84d4-2ee8-48b9-b7bc-9947e38279c0" {
+		t.Errorf("TransactionID = %q, want the paymentId", n.TransactionID)
+	}
+	if n.Reference != "NGR-TEST" {
+		t.Errorf("reference = %q, want it recovered from oepayment", n.Reference)
+	}
+	if n.MerchantID != "NGO-MERCHANT" {
+		t.Errorf("merchant id = %q", n.MerchantID)
+	}
+	if !n.Succeeded() {
+		t.Errorf("AUTHORISED should count as success")
+	}
+	cents, err := n.AmountCents()
+	if err != nil || cents != 1 {
+		t.Errorf("AmountCents() = %d, %v; want 1", cents, err)
+	}
+}
+
+// An amount that arrives as a JSON number rather than a decimal string must
+// still parse, and must not arrive in exponent notation.
+func TestVerifyNumericAmount(t *testing.T) {
+	key, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	if err != nil {
+		t.Fatalf("keygen: %v", err)
+	}
+	srv, kid := jwksServer(t, &key.PublicKey, "P-521")
+	v := newTestVerifier(t, srv.URL)
+
+	token := signES(t, key, "ES512", kid, map[string]any{
+		"paymentId": "txn-numeric",
+		"status":    "AUTHORISED",
+		"oepayment": map[string]any{"amount": 0.01, "currency": "NZD"},
+		"exp":       time.Now().Add(time.Hour).Unix(),
+	})
+
+	n, err := v.Verify(token)
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	cents, err := n.AmountCents()
+	if err != nil || cents != 1 {
+		t.Errorf("AmountCents() = %d, %v; want 1", cents, err)
+	}
+}
+
+// A token with no usable id is still refused — but the error must name the
+// claims that did arrive, because that log line is the only evidence of a
+// renamed field short of another live payment. Names only, never values.
+func TestVerifyMissingIDNamesClaims(t *testing.T) {
+	key, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	if err != nil {
+		t.Fatalf("keygen: %v", err)
+	}
+	srv, kid := jwksServer(t, &key.PublicKey, "P-521")
+	v := newTestVerifier(t, srv.URL)
+
+	token := signES(t, key, "ES512", kid, map[string]any{
+		"status":    "AUTHORISED",
+		"payerName": "A Person",
+		"oepayment": map[string]any{"amount": "0.01"},
+		"exp":       time.Now().Add(time.Hour).Unix(),
+	})
+
+	_, err = v.Verify(token)
+	if !errors.Is(err, ErrMalformed) {
+		t.Fatalf("Verify err = %v, want ErrMalformed", err)
+	}
+	for _, want := range []string{"oepayment.amount", "payerName", "status"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q should name the claim %q", err, want)
+		}
+	}
+	if strings.Contains(err.Error(), "A Person") {
+		t.Errorf("error must not leak claim values: %q", err)
+	}
 }

@@ -13,6 +13,7 @@ import { PAYMENT_PRODUCT_LABELS, PAYMENT_STATUS_LABELS } from '../../types';
 import { QueryError } from '../ui';
 import { captureError } from '../../lib/errorReporting';
 import { CreditCard, Copy, Check } from 'lucide-react';
+import { formatNzDate, formatNzDateTime } from '@/lib/formatDate';
 
 function formatMoney(cents: number, currency: string) {
   return new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(cents / 100);
@@ -144,7 +145,7 @@ export default function OrganizationPayments({
             {error
               ? 'Membership status could not be loaded'
               : membershipActive && latestMembership?.period_end
-                ? `Paid · active until ${new Date(latestMembership.period_end).toLocaleDateString()}`
+                ? `Paid · active until ${formatNzDate(latestMembership.period_end)}`
                 : 'Not paid — record payment after bank transfer clears'}
           </p>
           {membershipActive && (
@@ -261,7 +262,7 @@ export default function OrganizationPayments({
               <span>{formatMoney(p.amount_cents, p.currency)}</span>
               <span className="font-mono text-2xs uppercase">{PAYMENT_STATUS_LABELS[p.status]}</span>
               <span className="font-mono text-2xs text-ink-400 sm:ml-auto">
-                {p.paid_at ? new Date(p.paid_at).toLocaleString() : '—'} · {p.payment_method}
+                {formatNzDateTime(p.paid_at)} · {p.payment_method}
               </span>
             </div>
           ))

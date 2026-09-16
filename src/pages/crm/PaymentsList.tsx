@@ -12,6 +12,7 @@ import {
 import { MEMBERSHIP_ANNUAL_CENTS, GST_PRICE_SUFFIX, PRICING_CURRENCY } from '../../config/pricing';
 import { ArrowLeft, Check, Copy, CreditCard, Landmark, Search } from 'lucide-react';
 import { captureError } from '../../lib/errorReporting';
+import { formatNzDate } from '@/lib/formatDate';
 import {
   Select,
   SelectContent,
@@ -272,9 +273,7 @@ export default function PaymentsList() {
                   return (
                     <tr key={p.id} className="hover:bg-gold-light/30">
                       <td className="p-3 font-mono text-2xs whitespace-nowrap text-ink-600">
-                        {p.paid_at
-                          ? new Date(p.paid_at).toLocaleDateString()
-                          : new Date(p.created_at).toLocaleDateString()}
+                        {formatNzDate(p.paid_at || p.created_at)}
                       </td>
                       <td className="p-3 min-w-[12rem]">
                         <Link
@@ -309,6 +308,14 @@ export default function PaymentsList() {
                         >
                           {PAYMENT_STATUS_LABELS[p.status]}
                         </span>
+                        {p.status === 'pending' && p.customer_reported_paid_at && (
+                          <span
+                            className="mt-1 block font-mono text-2xs text-teal"
+                            title="The NGO pressed “I’ve made the payment”. Check the bank account before marking paid."
+                          >
+                            NGO says sent {formatNzDate(p.customer_reported_paid_at)}
+                          </span>
+                        )}
                         {p.status === 'pending' && (
                           <Link
                             to="/reconciliation"

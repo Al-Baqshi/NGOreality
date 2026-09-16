@@ -52,6 +52,8 @@ export interface OrganizationPayment {
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
   bank_transfer_reference: string | null;
+  /** NGO pressed "I've made the payment". Staff hint only — never proof of payment. */
+  customer_reported_paid_at?: string | null;
   paid_at: string | null;
   period_start: string | null;
   period_end: string | null;

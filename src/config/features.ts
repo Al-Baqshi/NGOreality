@@ -12,8 +12,10 @@ export const FINANCIAL_VERIFICATION_ENABLED = false;
  * Note this is a UI flag only. Access is enforced by Postgres RLS
  * (migration 027) — a member with no workspace role sees nothing regardless.
  */
-export const WORKSPACE_ENABLED =
-  import.meta.env.VITE_WORKSPACE_ENABLED === 'true';
+// Hidden from the member portal (2026-09-17): the case-management screens are
+// unfinished and confused members. Restore the env check to bring it back:
+//   import.meta.env.VITE_WORKSPACE_ENABLED === 'true'
+export const WORKSPACE_ENABLED = false;
 
 export function getVerificationLevelOptions(): { value: VerificationLevel; label: string }[] {
   return (Object.entries(VERIFICATION_LEVEL_LABELS) as [VerificationLevel, string][])

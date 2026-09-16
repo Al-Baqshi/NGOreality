@@ -53,8 +53,9 @@ function LiveClock() {
     return () => clearInterval(id);
   }, []);
 
-  const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const date = now.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  // Visitor's own clock, but read the NZ way: weekday, day, month, year.
+  const time = now.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const date = now.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone.replace(/_/g, ' ');
 
   return (

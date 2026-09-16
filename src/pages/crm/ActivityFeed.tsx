@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { captureEmptyMutation, captureError } from '../../lib/errorReporting';
 import { EmptyState, QueryError } from '../../components/ui';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { formatNzDate, formatNzDateTime, formatNzDateWithWeekday } from '@/lib/formatDate';
 
 /**
  * Cross-organisation history.
@@ -62,7 +63,7 @@ function when(iso: string): string {
   if (mins < 60) return `${mins}m ago`;
   if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
   if (mins < 10080) return `${Math.floor(mins / 1440)}d ago`;
-  return d.toLocaleDateString();
+  return formatNzDate(d);
 }
 
 /** Group rows by calendar day so the feed reads as a diary, not a wall. */
@@ -72,7 +73,7 @@ function dayLabel(iso: string): string {
   const yesterday = new Date(Date.now() - 86_400_000);
   if (d.toDateString() === today.toDateString()) return 'Today';
   if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  return formatNzDateWithWeekday(d);
 }
 
 /** Stable key for grouping — avoids "Today" collisions across pages. */
@@ -595,7 +596,7 @@ export default function ActivityFeed() {
                       <time
                         className="font-mono text-2xs text-ink-400 shrink-0 whitespace-nowrap"
                         dateTime={row.created_at}
-                        title={new Date(row.created_at).toLocaleString()}
+                        title={formatNzDateTime(row.created_at)}
                       >
                         {when(row.created_at)}
                       </time>

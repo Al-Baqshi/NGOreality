@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -63,9 +65,16 @@ func (e Environment) APIBase() string {
 
 // Notification is the subset of the callback payload we act on.
 //
-// Field names are best-effort against the published documentation and MUST be
-// confirmed against a real sandbox callback before go-live. Unknown fields are
-// preserved in Raw so nothing is lost while the shape is being confirmed.
+// The tags below are the flat, documented spelling. A real sandbox callback
+// does NOT use them: it carries paymentId rather than transactionId, and it
+// nests the payment detail under an "oepayment" object the same way the
+// create-intent request body does. Decoding by tag alone therefore yields an
+// empty TransactionID and the notification is rejected as malformed — which is
+// exactly what happened to the first sandbox payment, a verified AUTHORISED
+// callback answered with a 401.
+//
+// So the tags are a fast path only, and normalise() recovers whatever they
+// missed from Raw. Raw keeps the whole payload regardless.
 type Notification struct {
 	TransactionID string         `json:"transactionId"`
 	MerchantID    string         `json:"merchantId"`
@@ -76,6 +85,105 @@ type Notification struct {
 	IssuedAt      int64          `json:"iat"`
 	ExpiresAt     int64          `json:"exp"`
 	Raw           map[string]any `json:"-"`
+}
+
+// normalise backfills the fields the struct tags did not catch.
+//
+// Every field we depend on is looked up by a list of aliases rather than a
+// single tag, because Paymark's vocabulary differs between its request bodies,
+// its notification and its products. Matching generously here costs nothing
+// and survives the next rename; guessing one name and being wrong loses a
+// payment silently.
+func (n *Notification) normalise() {
+	if n.Raw == nil {
+		return
+	}
+	// paymentId is Paymark's own identifier and is what the merchant portal
+	// shows in its "Transaction ID" column, so it is both the right
+	// idempotency key and the value staff reconcile against. Prefer it.
+	// merchantTransactionId is OUR uuid from create-intent, useful only as a
+	// last resort.
+	n.TransactionID = firstNonEmpty(n.TransactionID,
+		claimString(n.Raw, "paymentId", "transactionId", "merchantTransactionId"))
+	n.MerchantID = firstNonEmpty(n.MerchantID, claimString(n.Raw, "merchantId"))
+	n.Reference = firstNonEmpty(n.Reference,
+		claimString(n.Raw, "merchantReference", "reference"))
+	n.Status = firstNonEmpty(n.Status,
+		claimString(n.Raw, "status", "transactionStatus", "paymentStatus"))
+	n.AmountString = firstNonEmpty(n.AmountString, claimString(n.Raw, "amount"))
+	n.Currency = firstNonEmpty(n.Currency, claimString(n.Raw, "currency"))
+}
+
+// claimString returns the first non-empty value among keys, as a string.
+func claimString(raw map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if s := lookupClaim(raw, key, true); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+// lookupClaim finds key at the top level, then one level down inside nested
+// objects. One level is enough for Paymark's shape and stops the search from
+// wandering into the payer and bank detail, where a "reference" could mean
+// something else entirely. Nested objects are visited in sorted key order so
+// the result never depends on Go's random map iteration.
+func lookupClaim(obj map[string]any, key string, descend bool) string {
+	if s := claimToString(obj[key]); s != "" {
+		return s
+	}
+	if !descend {
+		return ""
+	}
+	for _, name := range sortedKeys(obj) {
+		if child, ok := obj[name].(map[string]any); ok {
+			if s := lookupClaim(child, key, false); s != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+// claimToString renders a JSON scalar. Numbers are formatted without exponent
+// notation so an amount sent as 0.01 rather than "0.01" still parses.
+func claimToString(v any) string {
+	switch t := v.(type) {
+	case string:
+		return strings.TrimSpace(t)
+	case float64:
+		return strconv.FormatFloat(t, 'f', -1, 64)
+	case json.Number:
+		return t.String()
+	}
+	return ""
+}
+
+func sortedKeys(obj map[string]any) []string {
+	names := make([]string, 0, len(obj))
+	for name := range obj {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// claimPaths lists the claim names present, including one level of nesting, as
+// "parent.child". Names only, never values: the payload carries payer and bank
+// detail that has no business in a log line.
+func claimPaths(raw map[string]any) []string {
+	var paths []string
+	for _, name := range sortedKeys(raw) {
+		if child, ok := raw[name].(map[string]any); ok {
+			for _, sub := range sortedKeys(child) {
+				paths = append(paths, name+"."+sub)
+			}
+			continue
+		}
+		paths = append(paths, name)
+	}
+	return paths
 }
 
 // Succeeded reports whether this notification represents money received.
@@ -400,13 +508,19 @@ func (v *Verifier) Verify(token string) (*Notification, error) {
 	if err := json.Unmarshal(pb, &n); err != nil {
 		return nil, ErrMalformed
 	}
-	_ = json.Unmarshal(pb, &n.Raw) // keep everything while the shape is unconfirmed
+	_ = json.Unmarshal(pb, &n.Raw) // the whole payload, whatever its shape
+	n.normalise()
 
 	if n.ExpiresAt > 0 && time.Now().After(time.Unix(n.ExpiresAt, 0).Add(v.Leeway)) {
 		return nil, ErrExpired
 	}
 	if strings.TrimSpace(n.TransactionID) == "" {
-		return nil, fmt.Errorf("%w: no transaction id", ErrMalformed)
+		// Name the claims that did arrive. A token that passes signature
+		// verification and then fails to parse means Paymark renamed a field,
+		// and without the names in the log the only way to learn the new shape
+		// is another live payment.
+		return nil, fmt.Errorf("%w: no transaction id in claims [%s]",
+			ErrMalformed, strings.Join(claimPaths(n.Raw), " "))
 	}
 
 	return &n, nil

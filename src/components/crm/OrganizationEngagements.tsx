@@ -12,6 +12,7 @@ import {
   type StaffTaskType,
 } from '../../types';
 import { Plus, Calendar } from 'lucide-react';
+import { formatNzDate, formatNzDateTime } from '@/lib/formatDate';
 
 export default function OrganizationEngagements({ organizationId }: { organizationId: string }) {
   const { engagements, loading, error, refetch } = useServiceEngagements(organizationId);
@@ -146,7 +147,7 @@ export default function OrganizationEngagements({ organizationId }: { organizati
                 </div>
                 <div className="font-mono text-2xs text-ink-400 mt-1">
                   {formatFee(e.fee_cents, e.currency)}
-                  {e.next_follow_up_at && ` · Follow-up ${new Date(e.next_follow_up_at).toLocaleString()}`}
+                  {e.next_follow_up_at && ` · Follow-up ${formatNzDateTime(e.next_follow_up_at)}`}
                 </div>
                 {e.notes && <p className="text-xs text-ink-600 mt-1">{e.notes}</p>}
               </div>
@@ -196,7 +197,7 @@ export default function OrganizationEngagements({ organizationId }: { organizati
               <div key={t.id} className="px-4 py-3 flex justify-between gap-2">
                 <div>
                   <div className="text-sm font-semibold">{t.title}</div>
-                  <div className="font-mono text-2xs text-ink-400">{STAFF_TASK_TYPE_LABELS[t.task_type]} · {t.due_date}</div>
+                  <div className="font-mono text-2xs text-ink-400">{STAFF_TASK_TYPE_LABELS[t.task_type]} · {formatNzDate(t.due_date)}</div>
                 </div>
                 <span className={`font-mono text-2xs uppercase ${t.status === 'open' ? 'text-amber-600' : 'text-teal'}`}>
                   {t.status}

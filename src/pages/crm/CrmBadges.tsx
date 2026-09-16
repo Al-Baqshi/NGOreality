@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { QueryError, SectionHeader } from '../../components/ui';
 import { useCrmDashboardStats, useExpiringBadges } from '../../hooks/useCrm';
 import { Award } from 'lucide-react';
+import { formatNzDate } from '@/lib/formatDate';
 
 export default function CrmBadges() {
   const [tab, setTab] = useState<'expiring' | 'expired'>('expiring');
@@ -69,7 +70,7 @@ export default function CrmBadges() {
                   <div className="font-mono text-2xs text-ink-400">{b.verification_id}</div>
                 </div>
                 <div className="font-mono text-xs shrink-0 text-ink-600">
-                  {b.expires_at ? new Date(b.expires_at).toLocaleDateString() : '—'}
+                  {formatNzDate(b.expires_at)}
                 </div>
               </Link>
             ))}

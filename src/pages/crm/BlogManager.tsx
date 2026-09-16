@@ -5,6 +5,7 @@ import type { BlogPost } from '../../types';
 import { FileText, Plus, Pencil, Trash2, Eye, EyeOff, Search, Calendar, User } from 'lucide-react';
 import { QueryError } from '../../components/ui';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { formatNzDate, formatNzDateLong } from '@/lib/formatDate';
 
 export default function BlogManager() {
   const confirm = useConfirm();
@@ -227,7 +228,7 @@ export default function BlogManager() {
                       <span className="flex items-center gap-1 shrink-0"><User size={10} /> {post.author}</span>
                     )}
                     {post.published_at && (
-                      <span className="flex items-center gap-1 shrink-0"><Calendar size={10} /> {new Date(post.published_at).toLocaleDateString()}</span>
+                      <span className="flex items-center gap-1 shrink-0"><Calendar size={10} /> {formatNzDate(post.published_at)}</span>
                     )}
                   </div>
                 </div>
@@ -401,9 +402,7 @@ function BlogEditor({ post, saving, error, onSave, onCancel }: {
               <div>
                 <label className="label-brutal">Published</label>
                 <div className="font-mono text-xs text-ink-500">
-                  {new Date(post.published_at).toLocaleDateString('en-US', {
-                    year: 'numeric', month: 'long', day: 'numeric',
-                  })}
+                  {formatNzDateLong(post.published_at)}
                 </div>
               </div>
             )}

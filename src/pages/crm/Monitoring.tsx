@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useCrmDashboardStats, useWorkQueue } from '../../hooks/useCrm';
 import { SectionHeader, QueryError } from '../../components/ui';
 import { Activity, Globe } from 'lucide-react';
+import { formatNzDateTime } from '@/lib/formatDate';
 
 export default function Monitoring() {
   const { stats, error: statsError, ready: statsReady, websitePct, monitorPct, refetch } = useCrmDashboardStats();
@@ -68,7 +69,7 @@ export default function Monitoring() {
                   <div className="font-mono text-2xs text-ink-500 truncate">{inc.organizations?.website_url}</div>
                   <div className="text-xs text-accent mt-1">{inc.error_message || 'Unreachable'}</div>
                   <div className="font-mono text-2xs text-ink-400 mt-0.5">
-                    Since {new Date(inc.opened_at).toLocaleString()}
+                    Since {formatNzDateTime(inc.opened_at)}
                   </div>
                 </div>
               </Link>

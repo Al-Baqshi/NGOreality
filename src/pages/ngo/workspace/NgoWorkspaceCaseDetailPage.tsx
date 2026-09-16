@@ -6,6 +6,7 @@ import { useCase, useCaseNotes, useWorkspaceIdentity } from '../../../hooks/useW
 import * as crm from '../../../lib/crmApi';
 import { captureError } from '../../../lib/errorReporting';
 import SEO from '../../../components/SEO';
+import { formatNzDateTime } from '@/lib/formatDate';
 
 export default function NgoWorkspaceCaseDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -217,7 +218,7 @@ function NotesSection({
           {notes.data.map((n) => (
             <li key={n.id} className="border-l-2 border-foreground pl-3">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <time dateTime={n.created_at}>{new Date(n.created_at).toLocaleString()}</time>
+                <time dateTime={n.created_at}>{formatNzDateTime(n.created_at)}</time>
                 {n.visibility === 'restricted' && (
                   <span className="inline-flex items-center gap-1 rounded border border-foreground px-1.5 py-0.5">
                     <Lock className="h-3 w-3" aria-hidden />

@@ -4,6 +4,7 @@ import { Calendar, User, ArrowLeft } from 'lucide-react';
 import { QueryError } from '../../components/ui';
 import SEO, { ArticleJsonLd, BreadcrumbJsonLd } from '../../components/SEO';
 import { absoluteUrl } from '../../config/site';
+import { formatNzDateLong } from '@/lib/formatDate';
 
 export default function BlogDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -89,11 +90,7 @@ export default function BlogDetail() {
                 {post.published_at && (
                   <div className="flex items-center gap-1.5 font-mono text-2xs text-ink-500 uppercase tracking-wider">
                     <Calendar size={14} />
-                    {new Date(post.published_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
+                    {formatNzDateLong(post.published_at)}
                   </div>
                 )}
                 {post.author && (

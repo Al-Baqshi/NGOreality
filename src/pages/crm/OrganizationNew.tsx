@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { LocationCitySelect } from '../../components/CitySelect';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { findRegistryDuplicate } from '../../hooks/useCrm';
@@ -234,7 +235,7 @@ export default function OrganizationNew() {
           </select>
         </FormField>
         <FormField label="Location">
-          <input className="input-brutal w-full text-base" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+          <LocationCitySelect value={form.location} onChange={(location) => setForm({ ...form, location })} />
         </FormField>
         <FormField label="Website URL">
           <input className="input-brutal w-full text-base" value={form.website_url} onChange={(e) => setForm({ ...form, website_url: e.target.value })} />

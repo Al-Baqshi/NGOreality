@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle, History, Sparkles } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { AlertCircle, CheckCircle, History, Layout, Wrench } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { submitNgoSetupRequest, setupRequestSummary } from '../../lib/ngoSetupRequests';
+import { submitNgoSetupRequest } from '../../lib/ngoSetupRequests';
 import { LANDING_STANDARDS_PACKAGE_CENTS, LANDING_STANDARDS_PACKAGE_LABEL } from '../../config/customerProducts';
 import type { NgoSetupRequest, Organization } from '../../types';
 import { cn } from '@/lib/utils';
+import { formatNzDateTime } from '@/lib/formatDate';
+import LogoUploadField from './LogoUploadField';
+import NgoSetupReadinessGuide, { SETUP_READINESS_ITEMS, type ReadinessKey } from './NgoSetupReadinessGuide';
 
 type NgoSetupRequestPanelProps = {
   organization: Organization;
@@ -15,7 +18,17 @@ type NgoSetupRequestPanelProps = {
   onUpdated: () => void;
 };
 
-type FieldKey = 'logoUrl' | 'brandPrimary' | 'brandSecondary' | 'wantsLanding' | 'setupNotes';
+type RequestType = 'landing_page' | 'custom_work';
+type DomainStatus = 'own' | 'need' | 'unsure';
+
+type FieldKey =
+  | 'logoUrl'
+  | 'brandPrimary'
+  | 'brandSecondary'
+  | 'currentWebsite'
+  | 'pageEmail'
+  | 'domainName'
+  | 'setupNotes';
 type FieldErrors = Partial<Record<FieldKey, string>>;
 
 const NOTES_MAX = 1000;
@@ -63,6 +76,14 @@ function isValidHexColour(raw: string): boolean {
   return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(raw.trim());
 }
 
+/** <input type="color"> only accepts #rrggbb. */
+function toSixDigitHex(raw: string): string {
+  const v = raw.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) return v;
+  if (/^#[0-9a-fA-F]{3}$/.test(v)) return `#${v[1]}${v[1]}${v[2]}${v[2]}${v[3]}${v[3]}`;
+  return '#000000';
+}
+
 const STATUS_STYLES: Record<string, string> = {
   pending: 'border-ink-300 bg-ink-50 text-ink-700',
   in_review: 'border-gold/60 bg-gold-light text-ink-900',
@@ -70,6 +91,69 @@ const STATUS_STYLES: Record<string, string> = {
   completed: 'border-teal bg-teal-light text-teal',
   cancelled: 'border-ink-200 bg-ink-50 text-ink-500',
 };
+
+const REQUEST_KIND_LABELS: Record<string, string> = {
+  landing_standards: 'Trust landing page',
+  brand_assets: 'Brand assets',
+  general: 'Custom setup / work',
+};
+
+function SectionTitle({ step, children }: { step: number; children: React.ReactNode }) {
+  return (
+    <h3 className="flex items-center gap-2 font-mono text-xs font-semibold uppercase tracking-wider text-ink-700 dark:text-muted-foreground">
+      <span className="flex size-6 items-center justify-center border-2 border-ink-950 text-2xs dark:border-border">
+        {step}
+      </span>
+      {children}
+    </h3>
+  );
+}
+
+function ColourField({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  error,
+  required,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  error?: string;
+  required: boolean;
+}) {
+  return (
+    <div>
+      <label className="label-brutal" htmlFor={id}>
+        {label} {required ? <span className="text-accent">*</span> : null}
+      </label>
+      <div className="flex gap-2">
+        <input
+          type="color"
+          className="h-12 w-14 shrink-0 cursor-pointer border-2 border-ink-950 bg-transparent p-1 dark:border-border"
+          value={toSixDigitHex(value)}
+          onChange={(e) => onChange(e.target.value.toUpperCase())}
+          aria-label={`${label} picker`}
+        />
+        <input
+          id={id}
+          type="text"
+          className={inputClass(Boolean(error), 'flex-1 font-mono uppercase')}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `err-${id}` : undefined}
+        />
+      </div>
+      <FieldError id={`err-${id}`} message={error} />
+    </div>
+  );
+}
 
 export default function NgoSetupRequestPanel({
   organization,
@@ -79,13 +163,23 @@ export default function NgoSetupRequestPanel({
 }: NgoSetupRequestPanelProps) {
   const { user, isAuthenticated } = useAuth();
   const confirm = useConfirm();
-  const initialHasWebsite = Boolean(organization.website_url?.trim());
+  const [searchParams] = useSearchParams();
 
-  const [hasWebsite, setHasWebsite] = useState(initialHasWebsite);
-  const [wantsLanding, setWantsLanding] = useState(!initialHasWebsite);
+  const [requestType, setRequestType] = useState<RequestType>(
+    searchParams.get('type') === 'custom' ? 'custom_work' : 'landing_page',
+  );
+  const [currentWebsite, setCurrentWebsite] = useState(organization.website_url ?? '');
   const [logoUrl, setLogoUrl] = useState(organization.logo_url ?? '');
   const [brandPrimary, setBrandPrimary] = useState(organization.brand_primary ?? '');
   const [brandSecondary, setBrandSecondary] = useState(organization.brand_secondary ?? '');
+  const [pageEmail, setPageEmail] = useState(organization.email ?? '');
+  const [pagePhone, setPagePhone] = useState(organization.phone ?? '');
+  const [pageAddress, setPageAddress] = useState(organization.location ?? '');
+  const [domainStatus, setDomainStatus] = useState<DomainStatus>(
+    organization.website_url?.trim() ? 'own' : 'unsure',
+  );
+  const [domainName, setDomainName] = useState('');
+  const [ready, setReady] = useState<Set<ReadinessKey>>(new Set());
   const [setupNotes, setSetupNotes] = useState('');
   const [setupSubmitting, setSetupSubmitting] = useState(false);
   const [setupMessage, setSetupMessage] = useState('');
@@ -93,14 +187,22 @@ export default function NgoSetupRequestPanel({
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
-    setHasWebsite(Boolean(organization.website_url?.trim()));
+    setCurrentWebsite(organization.website_url ?? '');
     setLogoUrl(organization.logo_url ?? '');
     setBrandPrimary(organization.brand_primary ?? '');
     setBrandSecondary(organization.brand_secondary ?? '');
+    setPageEmail(organization.email ?? '');
+    setPagePhone(organization.phone ?? '');
+    setPageAddress(organization.location ?? '');
     setFieldErrors({});
   }, [organization.id, organization.updated_at]);
 
+  useEffect(() => {
+    if (searchParams.get('type') === 'custom') setRequestType('custom_work');
+  }, [searchParams]);
+
   const pendingSetup = setupRequests.find((r) => r.status === 'pending' || r.status === 'in_review');
+  const isLanding = requestType === 'landing_page';
 
   const clearFieldError = (key: FieldKey) => {
     setFieldErrors((prev) => {
@@ -109,37 +211,53 @@ export default function NgoSetupRequestPanel({
       delete next[key];
       return next;
     });
+    setSetupError('');
   };
 
   const validateForm = (): FieldErrors => {
     const errors: FieldErrors = {};
 
-    if (!logoUrl.trim()) {
-      errors.logoUrl = 'Logo URL is required.';
-    } else if (!isValidHttpUrl(logoUrl)) {
-      errors.logoUrl = 'Enter a valid logo URL (e.g. https://example.org/logo.png).';
+    if (currentWebsite.trim() && !isValidHttpUrl(currentWebsite)) {
+      errors.currentWebsite = 'Enter a valid website (e.g. https://example.org), or leave it blank.';
     }
 
-    if (!brandPrimary.trim()) {
-      errors.brandPrimary = 'Primary brand colour is required.';
-    } else if (!isValidHexColour(brandPrimary)) {
-      errors.brandPrimary = 'Use a hex colour like #041C3C or #EBB.';
+    if (isLanding) {
+      if (!logoUrl.trim()) {
+        errors.logoUrl = 'Upload your logo so we can put it on the page.';
+      } else if (!isValidHttpUrl(logoUrl)) {
+        errors.logoUrl = 'The logo link is not valid. Upload the file instead.';
+      }
+      if (!isValidHexColour(brandPrimary)) {
+        errors.brandPrimary = 'Pick a main colour (or type a hex code like #041C3C).';
+      }
+      if (!isValidHexColour(brandSecondary)) {
+        errors.brandSecondary = 'Pick an accent colour (or type a hex code like #EBBB57).';
+      }
+      if (!pageEmail.trim()) {
+        errors.pageEmail = 'Add the email people should use to contact you.';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(pageEmail.trim())) {
+        errors.pageEmail = 'Enter a valid email address.';
+      }
+    } else {
+      if (logoUrl.trim() && !isValidHttpUrl(logoUrl)) {
+        errors.logoUrl = 'The logo link is not valid. Upload the file instead.';
+      }
+      if (brandPrimary.trim() && !isValidHexColour(brandPrimary)) {
+        errors.brandPrimary = 'Use a hex colour like #041C3C.';
+      }
+      if (brandSecondary.trim() && !isValidHexColour(brandSecondary)) {
+        errors.brandSecondary = 'Use a hex colour like #EBBB57.';
+      }
+      if (!setupNotes.trim()) {
+        errors.setupNotes = 'Describe the work so we can quote it.';
+      }
     }
 
-    if (!brandSecondary.trim()) {
-      errors.brandSecondary = 'Secondary brand colour is required.';
-    } else if (!isValidHexColour(brandSecondary)) {
-      errors.brandSecondary = 'Use a hex colour like #EBBB57 or #FFF.';
+    if (domainStatus === 'own' && domainName.trim() && !isValidHttpUrl(domainName)) {
+      errors.domainName = 'Enter just the domain, e.g. yourorg.org.nz';
     }
 
-    if (!hasWebsite && !wantsLanding) {
-      errors.wantsLanding =
-        'Select the trust landing package, or choose “Yes — use our existing site” above.';
-    }
-
-    if (!setupNotes.trim()) {
-      errors.setupNotes = 'Add a short note so our team knows what you need.';
-    } else if (setupNotes.trim().length > NOTES_MAX) {
+    if (setupNotes.trim().length > NOTES_MAX) {
       errors.setupNotes = `Notes must be ${NOTES_MAX} characters or fewer.`;
     }
 
@@ -167,28 +285,6 @@ export default function NgoSetupRequestPanel({
       return;
     }
 
-    const wantsPackage = hasWebsite ? false : wantsLanding;
-    const summary = setupRequestSummary({
-      hasExistingWebsite: hasWebsite,
-      wantsLandingPackage: wantsPackage,
-    });
-    const ok = await confirm({
-      title: 'Send setup request?',
-      description: [
-        summary,
-        wantsPackage
-          ? `This queues the $${LANDING_STANDARDS_PACKAGE_CENTS / 100} trust landing package for our team.`
-          : null,
-        logoUrl.trim() ? `Logo: ${normalizeUrl(logoUrl)}` : null,
-        'Our team will follow up by email after you confirm.',
-      ]
-        .filter(Boolean)
-        .join('\n\n'),
-      confirmLabel: 'Send request',
-      cancelLabel: 'Go back',
-    });
-    if (!ok) return;
-
     if (loadError && !pendingSetup) {
       setSetupError(
         'Existing setup requests could not be loaded. Refresh before sending another so we do not duplicate one already in progress.',
@@ -196,20 +292,72 @@ export default function NgoSetupRequestPanel({
       return;
     }
 
+    const readyLabels = SETUP_READINESS_ITEMS.filter((i) => ready.has(i.key)).map((i) => i.title);
+    const missingLabels = SETUP_READINESS_ITEMS.filter((i) => !ready.has(i.key)).map((i) => i.title);
+
+    const ok = await confirm({
+      title: isLanding ? 'Request your trust landing page?' : 'Ask for a custom work quote?',
+      description: [
+        isLanding
+          ? `${LANDING_STANDARDS_PACKAGE_LABEL} — $${LANDING_STANDARDS_PACKAGE_CENTS / 100} NZD one-off. Pay on Services & pay; we start once the transfer arrives.`
+          : 'We will review your request and email a quote. No work starts until you accept it.',
+        missingLabels.length
+          ? `Not ready yet: ${missingLabels.join(', ')}. That is fine — we will help you set them up.`
+          : 'You have every account ready. Nice.',
+        'Our team will follow up by email.',
+      ].join('\n\n'),
+      confirmLabel: 'Send request',
+      cancelLabel: 'Go back',
+    });
+    if (!ok) return;
+
     setSetupSubmitting(true);
+
+    const website = currentWebsite.trim() ? normalizeUrl(currentWebsite) : '';
+    const domainLine =
+      domainStatus === 'own'
+        ? `Domain: own${domainName.trim() ? ` (${domainName.trim()})` : ''}`
+        : domainStatus === 'need'
+          ? 'Domain: needs one'
+          : 'Domain: not sure';
+
+    // Staff see `notes` in their task, so lead with the NGO's words and follow with the facts.
+    const notes = [
+      setupNotes.trim(),
+      [
+        isLanding ? 'Type: trust landing page' : 'Type: custom work (quote)',
+        website ? `Current site: ${website}` : 'Current site: none',
+        domainLine,
+        isLanding ? `Page contact: ${[pageEmail.trim(), pagePhone.trim(), pageAddress.trim()].filter(Boolean).join(' · ')}` : null,
+        `Ready: ${readyLabels.length ? readyLabels.join(', ') : 'none yet'}`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    ]
+      .filter(Boolean)
+      .join('\n\n');
 
     const { error } = await submitNgoSetupRequest({
       organizationId: organization.id,
       userId: user.id,
-      hasExistingWebsite: hasWebsite,
-      wantsLandingPackage: wantsPackage,
+      hasExistingWebsite: Boolean(website),
+      wantsLandingPackage: isLanding,
+      requestKind: isLanding ? 'landing_standards' : 'general',
       logoUrl: logoUrl.trim() ? normalizeUrl(logoUrl) : '',
       brandPrimary,
       brandSecondary,
-      notes: setupNotes,
+      notes,
       questionnaire: {
-        has_existing_website: hasWebsite,
-        wants_landing_package: wantsPackage,
+        has_existing_website: Boolean(website),
+        wants_landing_package: isLanding,
+        request_type: requestType,
+        current_website: website,
+        page_email: isLanding ? pageEmail.trim() : undefined,
+        page_phone: isLanding ? pagePhone.trim() : undefined,
+        page_address: isLanding ? pageAddress.trim() : undefined,
+        domain_status: domainStatus,
+        domain_name: domainName.trim() || undefined,
+        ready: [...ready],
       },
     });
 
@@ -218,7 +366,11 @@ export default function NgoSetupRequestPanel({
       setSetupError(error);
       return;
     }
-    setSetupMessage('Setup request sent. Our team will follow up by email.');
+    setSetupMessage(
+      isLanding
+        ? 'Request sent. Next: pay for the package on Services & pay so we can start.'
+        : 'Request sent. We will email you a quote.',
+    );
     setSetupNotes('');
     setFieldErrors({});
     onUpdated();
@@ -228,30 +380,44 @@ export default function NgoSetupRequestPanel({
 
   return (
     <div className="space-y-6">
-      <div className="card-brutal space-y-4 border-l-4 border-l-accent p-5 sm:p-6">
-        <div className="flex items-center gap-2">
-          <Sparkles size={18} className="text-accent" aria-hidden />
-          <h2 className="text-lg font-black uppercase tracking-tight">New setup request</h2>
+      <div className="card-brutal space-y-6 border-l-4 border-l-accent p-5 sm:p-6">
+        <div>
+          <h2 className="text-lg font-black uppercase tracking-tight">Request a website setup</h2>
+          <p className="mt-1 text-sm text-ink-600 dark:text-muted-foreground">
+            Tell us what you want built, how it should look, and which accounts you already have. We
+            use your{' '}
+            <Link to="/ngo/profile" className="font-semibold text-ink-950 underline dark:text-foreground">
+              profile
+            </Link>{' '}
+            for your mission and description, so keep that current too.
+          </p>
         </div>
 
-        <p className="text-xs leading-relaxed text-ink-500">
-          Tell us whether you have a website or need our trust landing package. Logo URL, brand
-          colours, and a short note are required so we can fulfill your request. You can also update
-          assets on{' '}
-          <Link
-            to="/ngo/profile"
-            className="font-semibold text-ink-950 underline dark:text-foreground"
+        {setupMessage ? (
+          <p
+            className="flex items-center gap-2 border-2 border-teal/40 bg-teal/5 px-3 py-2 text-sm text-teal"
+            role="status"
           >
-            Profile
-          </Link>
-          .
-        </p>
+            <CheckCircle size={16} aria-hidden />
+            <span>
+              {setupMessage}{' '}
+              {isLanding ? (
+                <Link to="/ngo/services" className="font-semibold underline">
+                  Go to Services &amp; pay
+                </Link>
+              ) : null}
+            </span>
+          </p>
+        ) : null}
 
         {pendingSetup ? (
           <div className="border-2 border-gold/50 bg-gold-light/40 px-3 py-3 text-sm text-ink-800">
-            You already have a setup request in progress (
-            <span className="font-semibold">{pendingSetup.status.replace('_', ' ')}</span>
-            ). Our team will contact you at {organization.email || 'your contact email'}.
+            You already have a{' '}
+            <span className="font-semibold">
+              {(REQUEST_KIND_LABELS[pendingSetup.request_kind] ?? 'setup').toLowerCase()}
+            </span>{' '}
+            request in progress ({pendingSetup.status.replace('_', ' ')}). Our team will contact you at{' '}
+            {organization.email || 'your contact email'}. Need to add something? Reply to our email.
           </div>
         ) : loadError ? (
           <div className="border-2 border-accent bg-accent-light px-3 py-3 text-sm text-accent" role="alert">
@@ -259,7 +425,7 @@ export default function NgoSetupRequestPanel({
             not duplicate one already in progress.
           </div>
         ) : (
-          <form onSubmit={submitSetup} className="space-y-4" noValidate>
+          <form onSubmit={submitSetup} className="space-y-8" noValidate>
             {errorCount > 0 ? (
               <div
                 id="setup-validation-summary"
@@ -279,167 +445,276 @@ export default function NgoSetupRequestPanel({
               </div>
             ) : null}
 
-            <fieldset className="space-y-2">
-              <legend className="label-brutal">
-                Do you already have a working website? <span className="text-accent">*</span>
+            <fieldset className="space-y-3">
+              <legend className="mb-3">
+                <SectionTitle step={1}>What do you need?</SectionTitle>
               </legend>
-              <label className="flex min-h-[44px] items-center gap-2 text-sm">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {(
+                  [
+                    {
+                      type: 'landing_page' as const,
+                      icon: Layout,
+                      title: 'Trust landing page',
+                      price: `$${LANDING_STANDARDS_PACKAGE_CENTS / 100} NZD one-off`,
+                      body: 'A one-page site with your logo, colours, mission, contact details and Reality Badge, on accounts you own.',
+                    },
+                    {
+                      type: 'custom_work' as const,
+                      icon: Wrench,
+                      title: 'Custom setup or work',
+                      price: 'Quoted per job',
+                      body: 'Domain or DNS moves, organisation email, hosting, fixes to your current site, donation pages and more.',
+                    },
+                  ]
+                ).map((opt) => (
+                  <label
+                    key={opt.type}
+                    className={cn(
+                      'flex cursor-pointer flex-col gap-1.5 border-2 p-4 transition-colors',
+                      requestType === opt.type
+                        ? 'border-teal bg-teal/5 ring-2 ring-teal/30'
+                        : 'border-ink-200 hover:border-ink-400 dark:border-border',
+                    )}
+                  >
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="request-type"
+                        checked={requestType === opt.type}
+                        onChange={() => {
+                          setRequestType(opt.type);
+                          setFieldErrors({});
+                        }}
+                      />
+                      <opt.icon size={16} className="text-teal" aria-hidden />
+                      <span className="font-semibold">{opt.title}</span>
+                    </span>
+                    <span className="font-mono text-2xs uppercase text-ink-500">{opt.price}</span>
+                    <span className="text-xs text-ink-600 dark:text-muted-foreground">{opt.body}</span>
+                  </label>
+                ))}
+              </div>
+              <div>
+                <label className="label-brutal" htmlFor="setup-current-website">
+                  Current website <span className="font-normal normal-case tracking-normal text-ink-400">(if you have one)</span>
+                </label>
                 <input
-                  type="radio"
-                  name="has-website"
-                  checked={hasWebsite}
-                  onChange={() => {
-                    setHasWebsite(true);
-                    setWantsLanding(false);
-                    clearFieldError('wantsLanding');
+                  id="setup-current-website"
+                  type="url"
+                  inputMode="url"
+                  className={inputClass(Boolean(fieldErrors.currentWebsite))}
+                  value={currentWebsite}
+                  onChange={(e) => {
+                    setCurrentWebsite(e.target.value);
+                    clearFieldError('currentWebsite');
                   }}
+                  placeholder="https://yourorg.org.nz"
+                  aria-invalid={Boolean(fieldErrors.currentWebsite)}
                 />
-                Yes — use our existing site
-              </label>
-              <label className="flex min-h-[44px] items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="has-website"
-                  checked={!hasWebsite}
-                  onChange={() => {
-                    setHasWebsite(false);
-                    setWantsLanding(true);
-                    clearFieldError('wantsLanding');
-                  }}
-                />
-                No — we need a trust landing page
-              </label>
+                <FieldError id="err-current-website" message={fieldErrors.currentWebsite} />
+              </div>
             </fieldset>
 
-            {!hasWebsite && (
+            <fieldset className="space-y-4">
+              <legend className="mb-3">
+                <SectionTitle step={2}>How it should look</SectionTitle>
+              </legend>
               <div>
-                <label
-                  className={cn(
-                    'flex items-start gap-2 border-2 p-3 text-sm',
-                    fieldErrors.wantsLanding ? 'border-accent bg-accent-light/40' : 'border-ink-200',
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={wantsLanding}
-                    onChange={(e) => {
-                      setWantsLanding(e.target.checked);
-                      clearFieldError('wantsLanding');
-                    }}
-                  />
-                  <span>
-                    <span className="block font-semibold">
-                      {LANDING_STANDARDS_PACKAGE_LABEL}{' '}
-                      <span className="text-accent">*</span>
-                    </span>
-                    <span className="text-xs text-ink-500">
-                      ${LANDING_STANDARDS_PACKAGE_CENTS / 100} NZD · includes education, checklist,
-                      and badge-ready landing page
-                    </span>
-                  </span>
+                <label className="label-brutal" htmlFor="setup-logo">
+                  Logo {isLanding ? <span className="text-accent">*</span> : null}
                 </label>
-                <FieldError id="err-landing" message={fieldErrors.wantsLanding} />
+                <LogoUploadField
+                  id="setup-logo"
+                  organizationId={organization.id}
+                  value={logoUrl}
+                  onChange={(url) => {
+                    setLogoUrl(url);
+                    clearFieldError('logoUrl');
+                  }}
+                  invalid={Boolean(fieldErrors.logoUrl)}
+                  describedBy={fieldErrors.logoUrl ? 'err-setup-logo' : undefined}
+                />
+                <FieldError id="err-setup-logo" message={fieldErrors.logoUrl} />
               </div>
-            )}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <ColourField
+                  id="setup-brand-primary"
+                  label="Main colour"
+                  value={brandPrimary}
+                  onChange={(v) => {
+                    setBrandPrimary(v);
+                    clearFieldError('brandPrimary');
+                  }}
+                  placeholder="#041C3C"
+                  error={fieldErrors.brandPrimary}
+                  required={isLanding}
+                />
+                <ColourField
+                  id="setup-brand-secondary"
+                  label="Accent colour"
+                  value={brandSecondary}
+                  onChange={(v) => {
+                    setBrandSecondary(v);
+                    clearFieldError('brandSecondary');
+                  }}
+                  placeholder="#EBBB57"
+                  error={fieldErrors.brandSecondary}
+                  required={isLanding}
+                />
+              </div>
+            </fieldset>
 
-            <p className="border-l-2 border-teal pl-3 font-mono text-xs text-ink-500">
-              {setupRequestSummary({
-                hasExistingWebsite: hasWebsite,
-                wantsLandingPackage: wantsLanding,
-              })}
-            </p>
-
-            <div>
-              <label className="label-brutal" htmlFor="setup-logo">
-                Logo URL <span className="text-accent">*</span>
-              </label>
-              <input
-                id="setup-logo"
-                type="url"
-                inputMode="url"
-                required
-                className={inputClass(Boolean(fieldErrors.logoUrl))}
-                value={logoUrl}
-                onChange={(e) => {
-                  setLogoUrl(e.target.value);
-                  clearFieldError('logoUrl');
-                  setSetupError('');
-                }}
-                placeholder="https://example.org/logo.png"
-                aria-invalid={Boolean(fieldErrors.logoUrl)}
-                aria-describedby={fieldErrors.logoUrl ? 'err-logo' : undefined}
-              />
-              <FieldError id="err-logo" message={fieldErrors.logoUrl} />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="label-brutal" htmlFor="setup-brand-primary">
-                  Brand colour <span className="text-accent">*</span>
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    id="setup-brand-primary"
-                    type="text"
-                    required
-                    className={inputClass(Boolean(fieldErrors.brandPrimary), 'flex-1')}
-                    value={brandPrimary}
-                    onChange={(e) => {
-                      setBrandPrimary(e.target.value);
-                      clearFieldError('brandPrimary');
-                    }}
-                    placeholder="#041C3C"
-                    aria-invalid={Boolean(fieldErrors.brandPrimary)}
-                    aria-describedby={fieldErrors.brandPrimary ? 'err-brand-primary' : undefined}
-                  />
-                  {isValidHexColour(brandPrimary) ? (
-                    <span
-                      className="size-12 shrink-0 border-3 border-ink-950"
-                      style={{ backgroundColor: brandPrimary.trim() }}
-                      aria-hidden
+            {isLanding ? (
+              <fieldset className="space-y-4">
+                <legend className="mb-3">
+                  <SectionTitle step={3}>Contact details for the page</SectionTitle>
+                </legend>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="label-brutal" htmlFor="setup-page-email">
+                      Public email <span className="text-accent">*</span>
+                    </label>
+                    <input
+                      id="setup-page-email"
+                      type="email"
+                      className={inputClass(Boolean(fieldErrors.pageEmail))}
+                      value={pageEmail}
+                      onChange={(e) => {
+                        setPageEmail(e.target.value);
+                        clearFieldError('pageEmail');
+                      }}
+                      placeholder="hello@yourorg.org.nz"
+                      aria-invalid={Boolean(fieldErrors.pageEmail)}
                     />
-                  ) : null}
-                </div>
-                <FieldError id="err-brand-primary" message={fieldErrors.brandPrimary} />
-              </div>
-              <div>
-                <label className="label-brutal" htmlFor="setup-brand-secondary">
-                  Secondary colour <span className="text-accent">*</span>
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    id="setup-brand-secondary"
-                    type="text"
-                    required
-                    className={inputClass(Boolean(fieldErrors.brandSecondary), 'flex-1')}
-                    value={brandSecondary}
-                    onChange={(e) => {
-                      setBrandSecondary(e.target.value);
-                      clearFieldError('brandSecondary');
-                    }}
-                    placeholder="#EBBB57"
-                    aria-invalid={Boolean(fieldErrors.brandSecondary)}
-                    aria-describedby={
-                      fieldErrors.brandSecondary ? 'err-brand-secondary' : undefined
-                    }
-                  />
-                  {isValidHexColour(brandSecondary) ? (
-                    <span
-                      className="size-12 shrink-0 border-3 border-ink-950"
-                      style={{ backgroundColor: brandSecondary.trim() }}
-                      aria-hidden
+                    <FieldError id="err-page-email" message={fieldErrors.pageEmail} />
+                  </div>
+                  <div>
+                    <label className="label-brutal" htmlFor="setup-page-phone">
+                      Public phone <span className="font-normal normal-case tracking-normal text-ink-400">(optional)</span>
+                    </label>
+                    <input
+                      id="setup-page-phone"
+                      type="tel"
+                      className={inputClass(false)}
+                      value={pagePhone}
+                      onChange={(e) => setPagePhone(e.target.value)}
+                      placeholder="+64 21 000 0000"
                     />
-                  ) : null}
+                  </div>
                 </div>
-                <FieldError id="err-brand-secondary" message={fieldErrors.brandSecondary} />
+                <div>
+                  <label className="label-brutal" htmlFor="setup-page-address">
+                    Address or area served <span className="font-normal normal-case tracking-normal text-ink-400">(optional)</span>
+                  </label>
+                  <input
+                    id="setup-page-address"
+                    type="text"
+                    className={inputClass(false)}
+                    value={pageAddress}
+                    onChange={(e) => setPageAddress(e.target.value)}
+                    placeholder="e.g. Serving South Auckland"
+                  />
+                </div>
+              </fieldset>
+            ) : null}
+
+            <fieldset className="space-y-4">
+              <legend className="mb-3">
+                <SectionTitle step={isLanding ? 4 : 3}>Your accounts</SectionTitle>
+              </legend>
+              <p className="text-xs text-ink-500">
+                Tick what you already have. Missing some is fine: we help you set them up, always
+                in your organisation&rsquo;s name.
+              </p>
+              <div className="space-y-2">
+                <span className="label-brutal">Domain name</span>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      ['own', 'We have a domain'],
+                      ['need', 'We need one'],
+                      ['unsure', 'Not sure'],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <label
+                      key={value}
+                      className={cn(
+                        'flex min-h-[44px] cursor-pointer items-center gap-2 border-2 px-3 text-sm',
+                        domainStatus === value ? 'border-teal bg-teal/5' : 'border-ink-200 dark:border-border',
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="domain-status"
+                        checked={domainStatus === value}
+                        onChange={() => {
+                          setDomainStatus(value);
+                          clearFieldError('domainName');
+                        }}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                {domainStatus === 'own' ? (
+                  <>
+                    <input
+                      type="text"
+                      className={inputClass(Boolean(fieldErrors.domainName))}
+                      value={domainName}
+                      onChange={(e) => {
+                        setDomainName(e.target.value);
+                        clearFieldError('domainName');
+                      }}
+                      placeholder="yourorg.org.nz"
+                      aria-label="Domain name"
+                    />
+                    <FieldError id="err-domain" message={fieldErrors.domainName} />
+                  </>
+                ) : null}
               </div>
-            </div>
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {SETUP_READINESS_ITEMS.filter((i) => i.key !== 'domain').map((item) => (
+                  <li key={item.key}>
+                    <label
+                      className={cn(
+                        'flex min-h-[44px] cursor-pointer items-start gap-2 border-2 p-3 text-sm',
+                        ready.has(item.key) ? 'border-teal bg-teal/5' : 'border-ink-200 dark:border-border',
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={ready.has(item.key)}
+                        onChange={(e) =>
+                          setReady((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(item.key);
+                            else next.delete(item.key);
+                            return next;
+                          })
+                        }
+                      />
+                      <span>
+                        <span className="block font-semibold">{item.title}</span>
+                        <span className="text-xs text-ink-500">{item.have}</span>
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </fieldset>
 
             <div>
               <div className="mb-2 flex items-end justify-between gap-2">
                 <label className="label-brutal mb-0" htmlFor="setup-notes">
-                  Notes for our team <span className="text-accent">*</span>
+                  {isLanding ? 'Anything else we should know?' : 'Describe the work'}{' '}
+                  {isLanding ? (
+                    <span className="font-normal normal-case tracking-normal text-ink-400">(optional)</span>
+                  ) : (
+                    <span className="text-accent">*</span>
+                  )}
                 </label>
                 <span className="font-mono text-2xs tabular-nums text-ink-400">
                   {setupNotes.trim().length}/{NOTES_MAX}
@@ -447,14 +722,17 @@ export default function NgoSetupRequestPanel({
               </div>
               <textarea
                 id="setup-notes"
-                required
-                className={inputClass(Boolean(fieldErrors.setupNotes), 'min-h-[80px]')}
+                className={inputClass(Boolean(fieldErrors.setupNotes), 'min-h-[96px]')}
                 value={setupNotes}
                 onChange={(e) => {
                   setSetupNotes(e.target.value);
                   clearFieldError('setupNotes');
                 }}
-                placeholder="e.g. preferred page sections, contact for brand files, deadline…"
+                placeholder={
+                  isLanding
+                    ? 'e.g. sections you want, photos to use, a deadline, who to talk to…'
+                    : 'e.g. move our domain from a volunteer’s account to ours, set up admin@ email…'
+                }
                 maxLength={NOTES_MAX}
                 aria-invalid={Boolean(fieldErrors.setupNotes)}
                 aria-describedby={fieldErrors.setupNotes ? 'err-notes' : undefined}
@@ -472,26 +750,22 @@ export default function NgoSetupRequestPanel({
               </div>
             ) : null}
 
-            {setupMessage ? (
-              <p
-                className="flex items-center gap-2 border-2 border-teal/40 bg-teal/5 px-3 py-2 text-sm text-teal"
-                role="status"
-              >
-                <CheckCircle size={16} aria-hidden />
-                {setupMessage}
-              </p>
-            ) : null}
-
             <button
               type="submit"
               disabled={setupSubmitting}
               className="btn-brutal-accent min-h-[48px] w-full px-8 disabled:opacity-60 sm:w-auto"
             >
-              {setupSubmitting ? 'Sending…' : 'Submit setup request'}
+              {setupSubmitting
+                ? 'Sending…'
+                : isLanding
+                  ? 'Request landing page'
+                  : 'Ask for a quote'}
             </button>
           </form>
         )}
       </div>
+
+      <NgoSetupReadinessGuide />
 
       <div className="card-brutal space-y-4 p-5 sm:p-6">
         <div className="flex items-center gap-2">
@@ -521,11 +795,11 @@ export default function NgoSetupRequestPanel({
                 className="flex flex-col gap-2 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0 space-y-0.5">
-                  <p className="text-sm font-semibold capitalize text-ink-950 dark:text-foreground">
-                    {req.request_kind.replace(/_/g, ' ')}
+                  <p className="text-sm font-semibold text-ink-950 dark:text-foreground">
+                    {REQUEST_KIND_LABELS[req.request_kind] ?? req.request_kind.replace(/_/g, ' ')}
                   </p>
                   <p className="font-mono text-2xs text-ink-500">
-                    Submitted {new Date(req.created_at).toLocaleString()}
+                    Submitted {formatNzDateTime(req.created_at)}
                   </p>
                 </div>
                 <span

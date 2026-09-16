@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Calendar, User, ArrowRight, FileText } from 'lucide-react';
 import { QueryError } from '../../components/ui';
 import SEO, { BreadcrumbJsonLd } from '../../components/SEO';
+import { formatNzDateShort } from '@/lib/formatDate';
 
 export default function Blog() {
   const { posts, loading, error } = useBlogPosts();
@@ -66,11 +67,7 @@ export default function Blog() {
                         {post.published_at && (
                           <div className="flex items-center gap-1.5 font-mono text-2xs text-ink-400 uppercase tracking-wider">
                             <Calendar size={12} />
-                            {new Date(post.published_at).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                            })}
+                            {formatNzDateShort(post.published_at)}
                           </div>
                         )}
                         {post.author && (
