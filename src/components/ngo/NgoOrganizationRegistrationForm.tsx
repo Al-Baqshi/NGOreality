@@ -54,7 +54,10 @@ function isValidDomain(url: string): boolean {
   }
 }
 
-function validateSignupForm(form: any, loggedIn: boolean): { valid: boolean; errors: string[] } {
+function validateSignupForm(
+  form: { fullName: string; email: string; password: string; websiteUrl: string },
+  loggedIn: boolean,
+): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   if (!loggedIn) {

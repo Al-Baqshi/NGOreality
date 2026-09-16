@@ -209,7 +209,7 @@ function validateProfileForm(form: ProfileForm): FieldErrors {
     errors.city = 'Enter a full city or town name.';
   } else if (city.length > LIMITS.cityMax) {
     errors.city = `City must be ${LIMITS.cityMax} characters or fewer.`;
-  } else if (!/^[\p{L}\p{M}\d\s.'’\-]+$/u.test(city)) {
+  } else if (!/^[\p{L}\p{M}\d\s.'’-]+$/u.test(city)) {
     errors.city = 'City can only include letters, numbers, spaces, and basic punctuation.';
   }
 
