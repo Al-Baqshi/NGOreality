@@ -3,20 +3,88 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { CATEGORIES } from '../../types';
 import { Send, CheckCircle, AlertCircle } from 'lucide-react';
 import SEO from '../../components/SEO';
-import Turnstile from '../../components/Turnstile';
+import Turnstile, { isTurnstileEnabled } from '../../components/Turnstile';
 import { usePublicOrganizationBySlug } from '../../hooks/useSupabase';
 import { captureError } from '../../lib/errorReporting';
 import { isRegistryListed } from '../../types';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '');
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+const FIELD_MAX = {
+  organization_name: 200,
+  contact_name: 120,
+  email: 254,
+  phone: 40,
+  message: 2000,
+} as const;
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+const PHONE_RE = /^\+?[\d\s\-().]+$/;
+const FIELD_ORDER = ['organization_name', 'contact_name', 'email', 'phone', 'message'] as const;
 
 function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  return EMAIL_RE.test(email.trim());
 }
 
 function isValidPhone(phone: string): boolean {
-  if (!phone.trim()) return true;
-  return /^[\d\s+\-()]{7,}$/.test(phone);
+  const trimmed = phone.trim();
+  if (!trimmed) return true;
+  const digits = trimmed.replace(/\D/g, '').length;
+  return digits >= 7 && digits <= 15 && PHONE_RE.test(trimmed);
+}
+
+type InquiryForm = {
+  organization_name: string;
+  contact_name: string;
+  email: string;
+  phone: string;
+  category: string;
+  message: string;
+};
+
+function validateInquiryForm(form: InquiryForm): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const org = form.organization_name.trim();
+  const contact = form.contact_name.trim();
+  const email = form.email.trim();
+  const phone = form.phone.trim();
+  const message = form.message.trim();
+  const category = form.category.trim();
+
+  if (!org) {
+    errors.organization_name = 'Organisation name is required';
+  } else if (org.length < 2) {
+    errors.organization_name = 'Organisation name must be at least 2 characters';
+  }
+
+  if (!contact) {
+    errors.contact_name = 'Contact name is required';
+  } else if (contact.length < 2) {
+    errors.contact_name = 'Contact name must be at least 2 characters';
+  }
+
+  if (!email) {
+    errors.email = 'Email is required';
+  } else if (!isValidEmail(email)) {
+    errors.email = 'Please enter a valid email address';
+  }
+
+  if (phone && !isValidPhone(phone)) {
+    errors.phone = 'Please enter a valid phone number';
+  }
+
+  if (category && !CATEGORIES.includes(category)) {
+    errors.category = 'Select a category from the list';
+  }
+
+  if (!message) {
+    errors.message = 'Message is required';
+  } else if (message.length < 20) {
+    errors.message = 'Message must be at least 20 characters';
+  }
+
+  return errors;
 }
 
 export default function Contact() {
@@ -51,58 +119,43 @@ export default function Contact() {
     }));
   }, [listedOrg]);
 
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!form.organization_name.trim()) {
-      newErrors.organization_name = 'Organization name is required';
-    }
-    if (!form.contact_name.trim()) {
-      newErrors.contact_name = 'Contact name is required';
-    }
-    if (!form.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!isValidEmail(form.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-    if (form.phone.trim() && !isValidPhone(form.phone)) {
-      newErrors.phone = 'Please enter a valid phone number';
-    }
-    if (!form.message.trim()) {
-      newErrors.message = 'Message is required';
-    } else if (form.message.trim().length < 20) {
-      newErrors.message = 'Message must be at least 20 characters';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
-    if (!validateForm()) return;
 
-    if (!turnstileToken) {
+    const newErrors = validateInquiryForm(form);
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      const first = FIELD_ORDER.find((key) => newErrors[key]) ?? 'category';
+      document.getElementById(`contact-${first}`)?.focus();
+      return;
+    }
+
+    if (isTurnstileEnabled() && !turnstileToken) {
       setError('Please complete the security check.');
       return;
     }
 
     setSubmitting(true);
 
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (SUPABASE_ANON_KEY) {
+      headers.Authorization = `Bearer ${SUPABASE_ANON_KEY}`;
+      headers.apikey = SUPABASE_ANON_KEY;
+    }
+
     let response: Response;
     try {
       response = await fetch(`${SUPABASE_URL}/functions/v1/submit-inquiry`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
-          organization_name: form.organization_name,
-          contact_name: form.contact_name,
-          email: form.email,
-          phone: form.phone,
-          message: form.message,
-          category: form.category,
+          organization_name: form.organization_name.trim(),
+          contact_name: form.contact_name.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+          message: form.message.trim(),
+          category: form.category.trim(),
           organization_id: organizationId,
           turnstile_token: turnstileToken,
         }),
@@ -116,7 +169,8 @@ export default function Contact() {
 
     if (!response.ok) {
       const detail = await response.json().catch(() => null);
-      const message = detail?.error ?? 'Something went wrong. Please try again.';
+      const message =
+        detail?.error ?? detail?.message ?? detail?.msg ?? 'Something went wrong. Please try again.';
       captureError(new Error(message), { where: 'Contact.submitInquiry', detail: { status: response.status } });
       setError(message);
       setTurnstileToken(null);
@@ -185,11 +239,17 @@ export default function Contact() {
               </p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="card-brutal p-6 md:p-8 space-y-5">
+            <form noValidate onSubmit={handleSubmit} className="card-brutal p-6 md:p-8 space-y-5">
               <div className="label-brutal">Organization Information</div>
               <div>
-                <label className="label-brutal">Organization Name *</label>
+                <label htmlFor="contact-organization_name" className="label-brutal">Organisation Name *</label>
                 <input
+                  id="contact-organization_name"
+                  name="organization_name"
+                  autoComplete="organization"
+                  maxLength={FIELD_MAX.organization_name}
+                  aria-invalid={Boolean(errors.organization_name)}
+                  aria-describedby={errors.organization_name ? 'contact-organization_name-error' : undefined}
                   className={`input-brutal w-full ${errors.organization_name ? 'border-accent' : ''}`}
                   value={form.organization_name}
                   onChange={(e) => {
@@ -198,14 +258,21 @@ export default function Contact() {
                   }}
                   required
                 />
-                {errors.organization_name && <p className="text-accent text-xs font-mono mt-1" role="alert">{errors.organization_name}</p>}
+                {errors.organization_name && <p id="contact-organization_name-error" className="text-accent text-xs font-mono mt-1" role="alert">{errors.organization_name}</p>}
               </div>
               <div>
-                <label className="label-brutal">Category</label>
+                <label htmlFor="contact-category" className="label-brutal">Category</label>
                 <select
-                  className="input-brutal w-full"
+                  id="contact-category"
+                  name="category"
+                  aria-invalid={Boolean(errors.category)}
+                  aria-describedby={errors.category ? 'contact-category-error' : undefined}
+                  className={`input-brutal w-full ${errors.category ? 'border-accent' : ''}`}
                   value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, category: e.target.value });
+                    if (errors.category) setErrors({ ...errors, category: '' });
+                  }}
                 >
                   <option value="">Select category</option>
                   {CATEGORIES.map((c) => (
@@ -214,14 +281,21 @@ export default function Contact() {
                     </option>
                   ))}
                 </select>
+                {errors.category && <p id="contact-category-error" className="text-accent text-xs font-mono mt-1" role="alert">{errors.category}</p>}
               </div>
 
               <div className="border-t-3 border-ink-950 pt-5 mt-5">
                 <div className="label-brutal">Contact Information</div>
               </div>
               <div>
-                <label className="label-brutal">Contact Name *</label>
+                <label htmlFor="contact-contact_name" className="label-brutal">Contact Name *</label>
                 <input
+                  id="contact-contact_name"
+                  name="contact_name"
+                  autoComplete="name"
+                  maxLength={FIELD_MAX.contact_name}
+                  aria-invalid={Boolean(errors.contact_name)}
+                  aria-describedby={errors.contact_name ? 'contact-contact_name-error' : undefined}
                   className={`input-brutal w-full ${errors.contact_name ? 'border-accent' : ''}`}
                   value={form.contact_name}
                   onChange={(e) => {
@@ -230,13 +304,20 @@ export default function Contact() {
                   }}
                   required
                 />
-                {errors.contact_name && <p className="text-accent text-xs font-mono mt-1" role="alert">{errors.contact_name}</p>}
+                {errors.contact_name && <p id="contact-contact_name-error" className="text-accent text-xs font-mono mt-1" role="alert">{errors.contact_name}</p>}
               </div>
               <div>
-                <label className="label-brutal">Email *</label>
+                <label htmlFor="contact-email" className="label-brutal">Email *</label>
                 <input
-                  className={`input-brutal w-full ${errors.email ? 'border-accent' : ''}`}
+                  id="contact-email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  maxLength={FIELD_MAX.email}
+                  aria-invalid={Boolean(errors.email)}
+                  aria-describedby={errors.email ? 'contact-email-error' : undefined}
+                  className={`input-brutal w-full ${errors.email ? 'border-accent' : ''}`}
                   value={form.email}
                   onChange={(e) => {
                     setForm({ ...form, email: e.target.value });
@@ -244,11 +325,19 @@ export default function Contact() {
                   }}
                   required
                 />
-                {errors.email && <p className="text-accent text-xs font-mono mt-1" role="alert">{errors.email}</p>}
+                {errors.email && <p id="contact-email-error" className="text-accent text-xs font-mono mt-1" role="alert">{errors.email}</p>}
               </div>
               <div>
-                <label className="label-brutal">Phone</label>
+                <label htmlFor="contact-phone" className="label-brutal">Phone</label>
                 <input
+                  id="contact-phone"
+                  name="phone"
+                  type="tel"
+                  autoComplete="tel"
+                  inputMode="tel"
+                  maxLength={FIELD_MAX.phone}
+                  aria-invalid={Boolean(errors.phone)}
+                  aria-describedby={errors.phone ? 'contact-phone-error' : undefined}
                   className={`input-brutal w-full ${errors.phone ? 'border-accent' : ''}`}
                   value={form.phone}
                   onChange={(e) => {
@@ -256,37 +345,49 @@ export default function Contact() {
                     if (errors.phone) setErrors({ ...errors, phone: '' });
                   }}
                 />
-                {errors.phone && <p className="text-accent text-xs font-mono mt-1" role="alert">{errors.phone}</p>}
+                {errors.phone && <p id="contact-phone-error" className="text-accent text-xs font-mono mt-1" role="alert">{errors.phone}</p>}
               </div>
 
               <div className="border-t-3 border-ink-950 pt-5 mt-5">
                 <div className="label-brutal">Your Message</div>
               </div>
               <div>
-                <label className="label-brutal">Message</label>
+                <label htmlFor="contact-message" className="label-brutal">Message *</label>
                 <textarea
+                  id="contact-message"
+                  name="message"
+                  maxLength={FIELD_MAX.message}
+                  aria-invalid={Boolean(errors.message)}
+                  aria-describedby={errors.message ? 'contact-message-error' : undefined}
                   className={`input-brutal w-full h-32 text-base ${errors.message ? 'border-accent' : ''}`}
                   value={form.message}
                   onChange={(e) => {
                     setForm({ ...form, message: e.target.value });
                     if (errors.message) setErrors({ ...errors, message: '' });
                   }}
-                  placeholder="Tell us about your organization and why you want to get verified..."
+                  placeholder="Tell us about your organisation and why you want to get verified..."
+                  required
                 />
-                {errors.message && <p className="text-accent text-xs font-mono mt-1" role="alert">{errors.message}</p>}
+                {errors.message && <p id="contact-message-error" className="text-accent text-xs font-mono mt-1" role="alert">{errors.message}</p>}
               </div>
 
               {error && <p className="text-accent text-sm font-mono flex items-center gap-1"><AlertCircle size={14} /> {error}</p>}
 
               <Turnstile
-                onSuccess={setTurnstileToken}
+                onSuccess={(token) => {
+                  setTurnstileToken(token);
+                  setError('');
+                }}
                 onExpire={() => setTurnstileToken(null)}
-                onError={() => setTurnstileToken(null)}
+                onError={() => {
+                  setTurnstileToken(null);
+                  setError('Security check failed to load. Please refresh and try again.');
+                }}
               />
 
               <button
                 type="submit"
-                disabled={submitting || !turnstileToken}
+                disabled={submitting || (isTurnstileEnabled() && !turnstileToken)}
                 className="btn-brutal-accent w-full flex items-center justify-center gap-2 text-base min-h-[44px] disabled:opacity-60"
               >
                 <Send size={16} /> {submitting ? 'Submitting...' : 'Submit Inquiry'}

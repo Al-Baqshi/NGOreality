@@ -21,9 +21,34 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const MAX_FIELD = 2000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+const PHONE_RE = /^\+?[\d\s\-().]+$/;
+const CATEGORIES = [
+  "Education",
+  "Health",
+  "Environment",
+  "Social Services",
+  "Arts & Culture",
+  "Human Rights",
+  "Community Development",
+  "Animal Welfare",
+  "Disaster Relief",
+  "Youth Development",
+  "Other",
+];
 
 function clean(v: unknown, max = 300): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
+}
+
+function isValidEmail(email: string): boolean {
+  return EMAIL_RE.test(email);
+}
+
+function isValidPhone(phone: string): boolean {
+  if (!phone) return true;
+  const digits = phone.replace(/\D/g, "").length;
+  return digits >= 7 && digits <= 15 && PHONE_RE.test(phone);
 }
 
 Deno.serve(async (req: Request) => {
@@ -66,25 +91,30 @@ Deno.serve(async (req: Request) => {
   }
   if (!token) return json({ error: "Please complete the verification challenge." }, 400);
 
-  const verify = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+  // Cloudflare siteverify expects form-urlencoded (same as turnstile-verify).
+  const form = new URLSearchParams({ secret, response: token });
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  const clientIp = req.headers.get("cf-connecting-ip") ??
+    (forwardedFor ? forwardedFor.split(",")[0].trim() : "");
+  if (clientIp) form.set("remoteip", clientIp);
+
+  const verifyRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      secret,
-      response: token,
-      remoteip: req.headers.get("cf-connecting-ip") ?? undefined,
-    }),
-  }).then((r) => r.json()).catch(() => null);
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form.toString(),
+  }).catch(() => null);
+
+  const verify = verifyRes?.ok ? await verifyRes.json().catch(() => null) : null;
 
   if (!verify?.success) {
     console.warn("turnstile rejected", verify?.["error-codes"]);
     return json({ error: "Verification failed. Please try again." }, 403);
   }
 
-  const organizationName = clean(body.organization_name);
-  const contactName = clean(body.contact_name);
-  const email = clean(body.email);
-  const phone = clean(body.phone, 60);
+  const organizationName = clean(body.organization_name, 200);
+  const contactName = clean(body.contact_name, 120);
+  const email = clean(body.email, 254);
+  const phone = clean(body.phone, 40);
   const message = clean(body.message, MAX_FIELD);
   const category = clean(body.category, 60);
 
@@ -93,11 +123,23 @@ Deno.serve(async (req: Request) => {
   const rawOrgId = clean(body.organization_id, 64);
   const organizationId = UUID_RE.test(rawOrgId) ? rawOrgId : null;
 
-  if (!email.includes("@") || email.length < 5) {
+  if (organizationName.length < 2) {
+    return json({ error: "Organisation name is required." }, 400);
+  }
+  if (contactName.length < 2) {
+    return json({ error: "Contact name is required." }, 400);
+  }
+  if (!isValidEmail(email)) {
     return json({ error: "A valid email address is required." }, 400);
   }
-  if (!message && !organizationName) {
-    return json({ error: "Please tell us a little about your enquiry." }, 400);
+  if (phone && !isValidPhone(phone)) {
+    return json({ error: "Please enter a valid phone number." }, 400);
+  }
+  if (category && !CATEGORIES.includes(category)) {
+    return json({ error: "Please choose a category from the list." }, 400);
+  }
+  if (message.length < 20) {
+    return json({ error: "Please tell us a little about your enquiry (at least 20 characters)." }, 400);
   }
 
   const supabase = createClient(
