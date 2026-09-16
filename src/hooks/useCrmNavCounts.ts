@@ -15,6 +15,12 @@ const ZERO: CrmNavCounts = {
   unreconciled: 0,
 };
 
+export const CRM_NAV_COUNTS_REFRESH = 'crm-nav-counts-refresh';
+
+export function refreshCrmNavCounts() {
+  window.dispatchEvent(new Event(CRM_NAV_COUNTS_REFRESH));
+}
+
 /**
  * Counts for the sidebar pills.
  *
@@ -32,33 +38,39 @@ export function useCrmNavCounts(): CrmNavCounts & { error: string | null } {
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([
-      supabase
-        .from('inquiry_submissions')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'new'),
-      supabase
-        .from('organization_payments')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'pending'),
-    ]).then(([inquiries, payments]) => {
-      if (cancelled) return;
-      const extraParts: string[] = [];
-      if (inquiries.error) {
-        extraParts.push(captureError(inquiries.error, { where: 'useCrmNavCounts.inquiries' }));
-      }
-      if (payments.error) {
-        extraParts.push(captureError(payments.error, { where: 'useCrmNavCounts.unreconciled' }));
-      }
-      setExtraError(extraParts.length ? extraParts.join(' · ') : null);
-      setExtra((prev) => ({
-        inquiries: inquiries.error ? prev.inquiries : (inquiries.count ?? 0),
-        unreconciled: payments.error ? prev.unreconciled : (payments.count ?? 0),
-      }));
-    });
+    const load = () => {
+      Promise.all([
+        supabase
+          .from('inquiry_submissions')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'new')
+          .is('read_at', null),
+        supabase
+          .from('organization_payments')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pending'),
+      ]).then(([inquiries, payments]) => {
+        if (cancelled) return;
+        const extraParts: string[] = [];
+        if (inquiries.error) {
+          extraParts.push(captureError(inquiries.error, { where: 'useCrmNavCounts.inquiries' }));
+        }
+        if (payments.error) {
+          extraParts.push(captureError(payments.error, { where: 'useCrmNavCounts.unreconciled' }));
+        }
+        setExtraError(extraParts.length ? extraParts.join(' · ') : null);
+        setExtra((prev) => ({
+          inquiries: inquiries.error ? prev.inquiries : (inquiries.count ?? 0),
+          unreconciled: payments.error ? prev.unreconciled : (payments.count ?? 0),
+        }));
+      });
+    };
 
+    load();
+    window.addEventListener(CRM_NAV_COUNTS_REFRESH, load);
     return () => {
       cancelled = true;
+      window.removeEventListener(CRM_NAV_COUNTS_REFRESH, load);
     };
   }, []);
 

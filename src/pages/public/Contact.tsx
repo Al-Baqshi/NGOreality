@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CATEGORIES } from '../../types';
-import { Send, CheckCircle, AlertCircle } from 'lucide-react';
+import { Send, CheckCircle, AlertCircle, ShieldCheck } from 'lucide-react';
 import SEO from '../../components/SEO';
 import Turnstile, { isTurnstileEnabled } from '../../components/Turnstile';
 import { usePublicOrganizationBySlug } from '../../hooks/useSupabase';
 import { captureError } from '../../lib/errorReporting';
 import { isRegistryListed } from '../../types';
+import { cn } from '../../lib/utils';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '');
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -87,6 +88,36 @@ function validateInquiryForm(form: InquiryForm): Record<string, string> {
   return errors;
 }
 
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p
+      id={id}
+      className="mt-1.5 flex items-start gap-1.5 border-2 border-accent bg-accent-light px-2.5 py-1.5 text-xs leading-snug text-accent"
+      role="alert"
+    >
+      <AlertCircle size={14} className="mt-0.5 shrink-0" aria-hidden />
+      <span>{message}</span>
+    </p>
+  );
+}
+
+function fieldClass(hasError: boolean, extra = '') {
+  return cn(
+    'input-brutal w-full text-base min-h-[48px]',
+    hasError && 'border-accent ring-2 ring-accent/30',
+    extra,
+  );
+}
+
+function RequiredMark() {
+  return (
+    <span className="text-accent" aria-hidden>
+      *
+    </span>
+  );
+}
+
 export default function Contact() {
   const [searchParams] = useSearchParams();
   const orgSlug = searchParams.get('org') || undefined;
@@ -106,6 +137,25 @@ export default function Contact() {
   const [error, setError] = useState('');
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const updateField = <K extends keyof InquiryForm>(key: K, value: InquiryForm[K]) => {
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      if (errors[key]) {
+        const nextErrors = validateInquiryForm(next);
+        setErrors((current) => ({ ...current, [key]: nextErrors[key] ?? '' }));
+      }
+      return next;
+    });
+  };
+
+  const blurField = (key: keyof InquiryForm) => {
+    const nextErrors = validateInquiryForm(form);
+    setErrors((prev) => ({ ...prev, [key]: nextErrors[key] ?? '' }));
+  };
+
+  const errorCount = Object.values(errors).filter(Boolean).length;
+  const messageLen = form.message.trim().length;
 
   useEffect(() => {
     if (!listedOrg) return;
@@ -240,9 +290,23 @@ export default function Contact() {
             </div>
           ) : (
             <form noValidate onSubmit={handleSubmit} className="card-brutal p-6 md:p-8 space-y-5">
-              <div className="label-brutal">Organization Information</div>
+              {errorCount > 0 ? (
+                <div
+                  className="border-2 border-accent bg-accent-light px-3 py-3 text-sm text-accent"
+                  role="alert"
+                >
+                  <p className="flex items-center gap-2 font-semibold">
+                    <AlertCircle size={16} aria-hidden />
+                    Fix {errorCount} {errorCount === 1 ? 'field' : 'fields'} before sending
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="label-brutal text-ink-400">Organisation</div>
               <div>
-                <label htmlFor="contact-organization_name" className="label-brutal">Organisation Name *</label>
+                <label htmlFor="contact-organization_name" className="label-brutal">
+                  Organisation name <RequiredMark />
+                </label>
                 <input
                   id="contact-organization_name"
                   name="organization_name"
@@ -250,29 +314,28 @@ export default function Contact() {
                   maxLength={FIELD_MAX.organization_name}
                   aria-invalid={Boolean(errors.organization_name)}
                   aria-describedby={errors.organization_name ? 'contact-organization_name-error' : undefined}
-                  className={`input-brutal w-full ${errors.organization_name ? 'border-accent' : ''}`}
+                  className={fieldClass(Boolean(errors.organization_name))}
                   value={form.organization_name}
-                  onChange={(e) => {
-                    setForm({ ...form, organization_name: e.target.value });
-                    if (errors.organization_name) setErrors({ ...errors, organization_name: '' });
-                  }}
+                  onChange={(e) => updateField('organization_name', e.target.value)}
+                  onBlur={() => blurField('organization_name')}
                   required
                 />
-                {errors.organization_name && <p id="contact-organization_name-error" className="text-accent text-xs font-mono mt-1" role="alert">{errors.organization_name}</p>}
+                <FieldError id="contact-organization_name-error" message={errors.organization_name} />
               </div>
               <div>
-                <label htmlFor="contact-category" className="label-brutal">Category</label>
+                <label htmlFor="contact-category" className="label-brutal">
+                  Category{' '}
+                  <span className="font-normal normal-case tracking-normal text-ink-400">(optional)</span>
+                </label>
                 <select
                   id="contact-category"
                   name="category"
                   aria-invalid={Boolean(errors.category)}
                   aria-describedby={errors.category ? 'contact-category-error' : undefined}
-                  className={`input-brutal w-full ${errors.category ? 'border-accent' : ''}`}
+                  className={fieldClass(Boolean(errors.category))}
                   value={form.category}
-                  onChange={(e) => {
-                    setForm({ ...form, category: e.target.value });
-                    if (errors.category) setErrors({ ...errors, category: '' });
-                  }}
+                  onChange={(e) => updateField('category', e.target.value)}
+                  onBlur={() => blurField('category')}
                 >
                   <option value="">Select category</option>
                   {CATEGORIES.map((c) => (
@@ -281,14 +344,16 @@ export default function Contact() {
                     </option>
                   ))}
                 </select>
-                {errors.category && <p id="contact-category-error" className="text-accent text-xs font-mono mt-1" role="alert">{errors.category}</p>}
+                <FieldError id="contact-category-error" message={errors.category} />
               </div>
 
               <div className="border-t-3 border-ink-950 pt-5 mt-5">
-                <div className="label-brutal">Contact Information</div>
+                <div className="label-brutal text-ink-400">Your details</div>
               </div>
               <div>
-                <label htmlFor="contact-contact_name" className="label-brutal">Contact Name *</label>
+                <label htmlFor="contact-contact_name" className="label-brutal">
+                  Contact name <RequiredMark />
+                </label>
                 <input
                   id="contact-contact_name"
                   name="contact_name"
@@ -296,101 +361,157 @@ export default function Contact() {
                   maxLength={FIELD_MAX.contact_name}
                   aria-invalid={Boolean(errors.contact_name)}
                   aria-describedby={errors.contact_name ? 'contact-contact_name-error' : undefined}
-                  className={`input-brutal w-full ${errors.contact_name ? 'border-accent' : ''}`}
+                  className={fieldClass(Boolean(errors.contact_name))}
                   value={form.contact_name}
-                  onChange={(e) => {
-                    setForm({ ...form, contact_name: e.target.value });
-                    if (errors.contact_name) setErrors({ ...errors, contact_name: '' });
-                  }}
+                  onChange={(e) => updateField('contact_name', e.target.value)}
+                  onBlur={() => blurField('contact_name')}
                   required
                 />
-                {errors.contact_name && <p id="contact-contact_name-error" className="text-accent text-xs font-mono mt-1" role="alert">{errors.contact_name}</p>}
+                <FieldError id="contact-contact_name-error" message={errors.contact_name} />
               </div>
-              <div>
-                <label htmlFor="contact-email" className="label-brutal">Email *</label>
-                <input
-                  id="contact-email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  inputMode="email"
-                  maxLength={FIELD_MAX.email}
-                  aria-invalid={Boolean(errors.email)}
-                  aria-describedby={errors.email ? 'contact-email-error' : undefined}
-                  className={`input-brutal w-full ${errors.email ? 'border-accent' : ''}`}
-                  value={form.email}
-                  onChange={(e) => {
-                    setForm({ ...form, email: e.target.value });
-                    if (errors.email) setErrors({ ...errors, email: '' });
-                  }}
-                  required
-                />
-                {errors.email && <p id="contact-email-error" className="text-accent text-xs font-mono mt-1" role="alert">{errors.email}</p>}
-              </div>
-              <div>
-                <label htmlFor="contact-phone" className="label-brutal">Phone</label>
-                <input
-                  id="contact-phone"
-                  name="phone"
-                  type="tel"
-                  autoComplete="tel"
-                  inputMode="tel"
-                  maxLength={FIELD_MAX.phone}
-                  aria-invalid={Boolean(errors.phone)}
-                  aria-describedby={errors.phone ? 'contact-phone-error' : undefined}
-                  className={`input-brutal w-full ${errors.phone ? 'border-accent' : ''}`}
-                  value={form.phone}
-                  onChange={(e) => {
-                    setForm({ ...form, phone: e.target.value });
-                    if (errors.phone) setErrors({ ...errors, phone: '' });
-                  }}
-                />
-                {errors.phone && <p id="contact-phone-error" className="text-accent text-xs font-mono mt-1" role="alert">{errors.phone}</p>}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="contact-email" className="label-brutal">
+                    Email <RequiredMark />
+                  </label>
+                  <input
+                    id="contact-email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    maxLength={FIELD_MAX.email}
+                    aria-invalid={Boolean(errors.email)}
+                    aria-describedby={errors.email ? 'contact-email-error' : undefined}
+                    className={fieldClass(Boolean(errors.email))}
+                    value={form.email}
+                    onChange={(e) => updateField('email', e.target.value)}
+                    onBlur={() => blurField('email')}
+                    required
+                  />
+                  <FieldError id="contact-email-error" message={errors.email} />
+                </div>
+                <div>
+                  <label htmlFor="contact-phone" className="label-brutal">
+                    Phone{' '}
+                    <span className="font-normal normal-case tracking-normal text-ink-400">(optional)</span>
+                  </label>
+                  <input
+                    id="contact-phone"
+                    name="phone"
+                    type="tel"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    maxLength={FIELD_MAX.phone}
+                    placeholder="+64 …"
+                    aria-invalid={Boolean(errors.phone)}
+                    aria-describedby={errors.phone ? 'contact-phone-error' : undefined}
+                    className={fieldClass(Boolean(errors.phone))}
+                    value={form.phone}
+                    onChange={(e) => updateField('phone', e.target.value)}
+                    onBlur={() => blurField('phone')}
+                  />
+                  <FieldError id="contact-phone-error" message={errors.phone} />
+                </div>
               </div>
 
               <div className="border-t-3 border-ink-950 pt-5 mt-5">
-                <div className="label-brutal">Your Message</div>
+                <div className="label-brutal text-ink-400">Your message</div>
               </div>
               <div>
-                <label htmlFor="contact-message" className="label-brutal">Message *</label>
+                <div className="mb-2 flex items-end justify-between gap-2">
+                  <label htmlFor="contact-message" className="label-brutal mb-0">
+                    Message <RequiredMark />
+                  </label>
+                  <span
+                    className={cn(
+                      'font-mono text-2xs tabular-nums',
+                      messageLen > 0 && messageLen < 20 ? 'text-accent' : 'text-ink-400',
+                    )}
+                  >
+                    {messageLen < 20 ? `${messageLen}/20 min` : `${messageLen}/${FIELD_MAX.message}`}
+                  </span>
+                </div>
                 <textarea
                   id="contact-message"
                   name="message"
                   maxLength={FIELD_MAX.message}
                   aria-invalid={Boolean(errors.message)}
-                  aria-describedby={errors.message ? 'contact-message-error' : undefined}
-                  className={`input-brutal w-full h-32 text-base ${errors.message ? 'border-accent' : ''}`}
+                  aria-describedby={
+                    errors.message ? 'contact-message-error' : 'contact-message-hint'
+                  }
+                  className={fieldClass(Boolean(errors.message), 'h-32')}
                   value={form.message}
-                  onChange={(e) => {
-                    setForm({ ...form, message: e.target.value });
-                    if (errors.message) setErrors({ ...errors, message: '' });
-                  }}
+                  onChange={(e) => updateField('message', e.target.value)}
+                  onBlur={() => blurField('message')}
                   placeholder="Tell us about your organisation and why you want to get verified..."
                   required
                 />
-                {errors.message && <p id="contact-message-error" className="text-accent text-xs font-mono mt-1" role="alert">{errors.message}</p>}
+                <p id="contact-message-hint" className="mt-1.5 font-mono text-2xs text-ink-400">
+                  At least 20 characters so we know how to help.
+                </p>
+                <FieldError id="contact-message-error" message={errors.message} />
               </div>
 
-              {error && <p className="text-accent text-sm font-mono flex items-center gap-1"><AlertCircle size={14} /> {error}</p>}
+              {error ? (
+                <div
+                  className="flex items-start gap-2 border-2 border-accent bg-accent-light px-3 py-2 text-sm text-accent"
+                  role="alert"
+                >
+                  <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden />
+                  <span>{error}</span>
+                </div>
+              ) : null}
 
-              <Turnstile
-                onSuccess={(token) => {
-                  setTurnstileToken(token);
-                  setError('');
-                }}
-                onExpire={() => setTurnstileToken(null)}
-                onError={() => {
-                  setTurnstileToken(null);
-                  setError('Security check failed to load. Please refresh and try again.');
-                }}
-              />
+              {isTurnstileEnabled() ? (
+                <div
+                  className={cn(
+                    'border-3 px-4 py-4',
+                    turnstileToken
+                      ? 'border-teal bg-teal/5'
+                      : 'border-ink-950 bg-ink-50 dark:bg-surface-raised',
+                  )}
+                >
+                  <div className="mb-1 flex items-center gap-2">
+                    <ShieldCheck size={16} className={turnstileToken ? 'text-teal' : 'text-ink-500'} aria-hidden />
+                    <span className="label-brutal mb-0">
+                      Security check <RequiredMark />
+                    </span>
+                  </div>
+                  <p className="mb-3 text-xs leading-relaxed text-ink-500">
+                    Complete this so we can receive your enquiry. It only takes a moment.
+                  </p>
+                  <Turnstile
+                    onSuccess={(token) => {
+                      setTurnstileToken(token);
+                      setError('');
+                    }}
+                    onExpire={() => setTurnstileToken(null)}
+                    onError={() => {
+                      setTurnstileToken(null);
+                      setError('Security check failed to load. Please refresh and try again.');
+                    }}
+                  />
+                  {turnstileToken ? (
+                    <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-teal">
+                      <CheckCircle size={14} aria-hidden /> Verified
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <Turnstile
+                  onSuccess={setTurnstileToken}
+                  onExpire={() => setTurnstileToken(null)}
+                  onError={() => setTurnstileToken(null)}
+                />
+              )}
 
               <button
                 type="submit"
                 disabled={submitting || (isTurnstileEnabled() && !turnstileToken)}
-                className="btn-brutal-accent w-full flex items-center justify-center gap-2 text-base min-h-[44px] disabled:opacity-60"
+                className="btn-brutal-accent w-full flex items-center justify-center gap-2 text-base min-h-[48px] disabled:opacity-60"
               >
-                <Send size={16} /> {submitting ? 'Submitting...' : 'Submit Inquiry'}
+                <Send size={16} /> {submitting ? 'Submitting...' : 'Submit inquiry'}
               </button>
             </form>
           )}

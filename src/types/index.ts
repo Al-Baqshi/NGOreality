@@ -277,6 +277,7 @@ export interface InquirySubmission {
   category: string;
   status: 'new' | 'contacted' | 'qualified' | 'closed';
   created_at: string;
+  read_at: string | null;
 }
 
 export const ORG_STATUS_LABELS: Record<OrgStatus, string> = {

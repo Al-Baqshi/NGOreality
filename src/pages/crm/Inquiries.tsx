@@ -1,6 +1,7 @@
 import { useInquiries } from '../../hooks/useSupabase';
 import { supabase } from '../../lib/supabase';
 import { captureEmptyMutation, captureError } from '../../lib/errorReporting';
+import { refreshCrmNavCounts } from '../../hooks/useCrmNavCounts';
 import { useState } from 'react';
 import { SectionHeader, EmptyState, FormField, Modal, QueryError } from '../../components/ui';
 import { Mail, Clock, CheckCircle, XCircle } from 'lucide-react';
@@ -42,11 +43,30 @@ export default function Inquiries() {
       return;
     }
     refetch();
+    refreshCrmNavCounts();
   };
 
-  const openDetail = (inq: InquirySubmission) => {
+  const openDetail = async (inq: InquirySubmission) => {
     setSelected(inq);
     setDetailOpen(true);
+    if (inq.read_at) return;
+
+    const readAt = new Date().toISOString();
+    const { data, error: updateError } = await supabase
+      .from('inquiry_submissions')
+      .update({ read_at: readAt })
+      .eq('id', inq.id)
+      .is('read_at', null)
+      .select('id');
+    if (updateError) {
+      captureError(updateError, { where: 'Inquiries.markRead' });
+      return;
+    }
+    if (!data?.length) return;
+
+    setSelected((prev) => (prev && prev.id === inq.id ? { ...prev, read_at: readAt } : prev));
+    refetch();
+    refreshCrmNavCounts();
   };
 
   return (
