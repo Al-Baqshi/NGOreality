@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
-import { LogIn, Linkedin, Menu, X } from 'lucide-react';
+import { LogIn, ExternalLink, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import BrandLogo from './BrandLogo';
 import ThemeToggle from './ThemeToggle';
@@ -188,7 +188,7 @@ export default function PublicLayout() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs text-ink-400 hover:text-white transition-colors py-0.5 min-h-[44px] sm:min-h-0"
                 >
-                  <Linkedin size={12} aria-hidden />
+                  <ExternalLink size={12} aria-hidden />
                   LinkedIn
                 </a>
               </div>

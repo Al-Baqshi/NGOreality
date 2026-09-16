@@ -254,7 +254,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // on "check your email" with an empty inbox.
       if (!error && !data.session) {
         const sentAt = data.user?.confirmation_sent_at;
-        const justSent = Boolean(sentAt) && Date.now() - Date.parse(sentAt) < 20_000;
+        const justSent =
+          typeof sentAt === 'string' && Date.now() - Date.parse(sentAt) < 20_000;
         if (!justSent) {
           await supabase.auth.resend({
             type: 'signup',
